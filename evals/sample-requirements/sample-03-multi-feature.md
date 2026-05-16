@@ -17,20 +17,19 @@ Test results should be exportable to CSV. The applied filter state should be sav
 
 ## Features Contained (RTIA should identify these)
 
-1. **Filtering** — by date range, environment, test suite name
+1. **Filtering with persistence** — filter by date range, environment, test suite name; filter state saved per user account across sessions
 2. **Email alerting** — failure rate threshold trigger (>20%), recipient is QA Lead
 3. **CSV export** — of filtered test results
-4. **Persistent filter state** — saved per user account across sessions
 
-These are 4 separable user stories. The Requirements Analyst Agent should flag this to the PO at the human checkpoint.
+These are 3 separable user stories. Persistent filter state is a sub-capability of filtering (it describes how filter preferences behave), not a standalone feature. The Requirements Analyst Agent should flag this to the PO at the human checkpoint.
 
 ---
 
 ## Expected Output (ground truth for eval dataset)
 
-> Note: The expected output below represents the correctly scoped single user story for **filtering only**, as if the PO decided to scope to one story per session. The other 3 features would become separate backlog items.
+> Note: The expected output below represents the correctly scoped single user story for **filtering and filter persistence**, as if the PO decided to scope to one story per session. Email alerting and CSV export become separate backlog items.
 
-### User Story (scoped to filtering)
+### User Story (scoped to filtering + filter persistence)
 As a tester, I want to filter test results by date range, environment, and test suite name, so that I can quickly find the results relevant to my current area of focus without scrolling through unrelated runs.
 
 ### Acceptance Criteria
@@ -54,8 +53,9 @@ As a tester, I want to filter test results by date range, environment, and test 
 ---
 
 ## Eval Notes
-- The Requirements Analyst Agent should flag that this contains 4 features, not 1
-- A user story that tries to cover all 4 features in one is a failure — too broad, untestable as a single unit
+- The Requirements Analyst Agent should flag that this contains 3 separable user stories, not 1
+- Persistent filter state is a sub-capability of filtering — not a 4th standalone feature
+- A user story that tries to cover all 3 features in one is a failure — too broad, untestable as a single unit
 - The Reviewer Agent should flag if ACs are missing for any filter type (date range, environment, suite name)
 - The persistent filter state AC is a common miss — the Reviewer Agent should catch it if absent
-- Email alerting and CSV export should NOT appear in the ACs for this story — that is out of scope for the scoped version
+- Email alerting and CSV export should NOT appear in the ACs for this story — they are out of scope for this scoped version
