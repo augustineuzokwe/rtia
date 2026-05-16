@@ -25,6 +25,8 @@ The Requirements Analyst Agent should identify and surface at least the followin
 
 ## Expected Output (ground truth for eval dataset)
 
+> **Note:** Because this requirement is deliberately vague, the expected output is intentionally minimal. The ground truth only reflects what can be directly inferred — no invented fields, no assumed data structures. Anything beyond this is scope creep.
+
 ### User Story (inferred from available information)
 As a QA team member, I want to view and update defect records in a central tool, so that the team has a shared, up-to-date view of open defects without relying on spreadsheets.
 
@@ -32,20 +34,21 @@ As a QA team member, I want to view and update defect records in a central tool,
 
 **Given** I am a logged-in QA team member  
 **When** I open the defect tracker  
-**Then** I see a list of all open defects with their current status
+**Then** I see a list of open defects
 
 **Given** I am viewing a defect  
-**When** I update its status or add a comment  
-**Then** the change is saved immediately and visible to other users without a page refresh
+**When** I make a change to it  
+**Then** the change is saved and visible to other team members
 
 **Given** I am a manager  
 **When** I open the defect tracker  
-**Then** I see a summary view showing total open defects, defects by severity, and defects by assignee
+**Then** I see a summary view of open defects
 
 ---
 
 ## Eval Notes
 - The Requirements Analyst Agent MUST flag ambiguities — a user story generated without surfacing any is a failure
-- The User Story Writer Agent should not invent scope (e.g. email notifications, SLA tracking) not implied by the requirement
-- The Reviewer Agent should flag that the ACs for "manager visibility" are underspecified without knowing what "visibility" means
-- This sample tests the agent's ability to handle real-world messy input gracefully
+- The ground truth ACs are intentionally vague to match the vague input — the agent should NOT invent specific fields (e.g. "status", "severity", "assignee") or technical behaviour (e.g. "without a page refresh") not stated in the requirement
+- The Reviewer Agent should flag that the manager summary AC is underspecified — "visibility" is undefined — and recommend the PO clarifies before proceeding
+- A correct agent response on this sample is: surface ambiguities → generate a minimal story → flag that ACs cannot be fully specified without answers to the ambiguity questions
+- This sample tests the agent's ability to handle real-world messy input without hallucinating specificity
