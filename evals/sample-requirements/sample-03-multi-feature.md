@@ -1,6 +1,6 @@
 # Sample Requirement 03 — Multi-Feature
 
-**Type:** Well-written but contains multiple distinct features in one block  
+**Type:** Well-written but contains multiple distinct features in one block
 **Purpose:** Tests whether the Requirements Analyst Agent correctly identifies that this is more than one user story and scopes the output accordingly — either by splitting it or by flagging it for the PO to decide.
 
 ---
@@ -34,20 +34,20 @@ As a tester, I want to filter test results by date range, environment, and test 
 
 ### Acceptance Criteria
 
-**Given** I am a logged-in tester on the test results page  
-**When** I apply a date range filter  
+**Given** I am a logged-in tester on the test results page
+**When** I apply a date range filter
 **Then** only test runs within that date range are displayed
 
-**Given** I am filtering test results  
-**When** I select one or more environments (dev, staging, prod)  
+**Given** I am filtering test results
+**When** I select one or more environments (dev, staging, prod)
 **Then** only results from the selected environments are shown
 
-**Given** I am filtering test results  
-**When** I enter or select a test suite name  
+**Given** I am filtering test results
+**When** I enter or select a test suite name
 **Then** only results matching that suite are displayed
 
-**Given** I have applied one or more filters  
-**When** I log out and log back in  
+**Given** I have applied one or more filters
+**When** I log out and log back in
 **Then** my previously applied filter selections are restored automatically
 
 ---

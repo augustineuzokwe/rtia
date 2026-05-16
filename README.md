@@ -35,7 +35,7 @@ Structured output           →  JSON / markdown export
 
 A PO or BA has raw requirements. Instead of manually writing user stories, ACs, and test cases from scratch, they paste the requirements into RTIA. The system generates a first draft at each stage. A QA Lead reviews, edits, and accepts at the human checkpoint before the pipeline continues.
 
-**Input formats (v1):** Free text · PDF · Markdown  
+**Input formats (v1):** Free text · PDF · Markdown
 **Input formats (v2):** Jira Epic via API
 
 ## Stack

@@ -52,11 +52,7 @@ def extract_section(content: str, start_header: str, stop_headers: list[str]) ->
 
 
 def check_required_sections(content: str) -> list[str]:
-    return [
-        f"Missing required section: '{s}'"
-        for s in REQUIRED_SECTIONS
-        if s not in content
-    ]
+    return [f"Missing required section: '{s}'" for s in REQUIRED_SECTIONS if s not in content]
 
 
 def check_user_story_format(content: str) -> list[str]:
@@ -64,7 +60,9 @@ def check_user_story_format(content: str) -> list[str]:
     if section is None:
         return []
     if not USER_STORY_RE.search(section):
-        return ["User story does not follow format: 'As a [role], I want [feature], so that [benefit]'"]
+        return [
+            "User story does not follow format: 'As a [role], I want [feature], so that [benefit]'"
+        ]
     return []
 
 

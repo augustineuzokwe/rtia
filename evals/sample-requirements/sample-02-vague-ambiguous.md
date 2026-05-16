@@ -1,6 +1,6 @@
 # Sample Requirement 02 — Vague and Ambiguous
 
-**Type:** Vague, ambiguous, stakeholder-style request  
+**Type:** Vague, ambiguous, stakeholder-style request
 **Purpose:** Stress test for the Requirements Analyst Agent — it must surface ambiguities before the User Story Writer Agent proceeds. The generated user story should reflect only what can be inferred; the agent should flag what is missing.
 
 ---
@@ -32,16 +32,16 @@ As a QA team member, I want to view and update defect records in a central tool,
 
 ### Acceptance Criteria
 
-**Given** I am a logged-in QA team member  
-**When** I open the defect tracker  
+**Given** I am a logged-in QA team member
+**When** I open the defect tracker
 **Then** I see a list of open defects
 
-**Given** I am viewing a defect  
-**When** I make a change to it  
+**Given** I am viewing a defect
+**When** I make a change to it
 **Then** the change is saved and visible to other team members
 
-**Given** I am a manager  
-**When** I open the defect tracker  
+**Given** I am a manager
+**When** I open the defect tracker
 **Then** I see a summary view of open defects
 
 ---

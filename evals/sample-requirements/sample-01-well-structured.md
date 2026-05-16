@@ -1,6 +1,6 @@
 # Sample Requirement 01 — Well-Structured
 
-**Type:** Well-structured, clear, single feature  
+**Type:** Well-structured, clear, single feature
 **Purpose:** Happy path test — RTIA should produce a clean user story and ACs with no ambiguity to resolve
 
 ---
@@ -22,16 +22,16 @@ As a QA Lead, I want to see a real-time test run summary for my selected project
 
 ### Acceptance Criteria
 
-**Given** I am an authenticated user on the QA Dashboard  
-**When** I select a project  
+**Given** I am an authenticated user on the QA Dashboard
+**When** I select a project
 **Then** I see the total number of tests, passed count, failed count, and skipped count for the most recent run
 
-**Given** I am viewing the dashboard  
-**When** 30 seconds have elapsed since the last data load  
+**Given** I am viewing the dashboard
+**When** 30 seconds have elapsed since the last data load
 **Then** the test run summary updates automatically without a full page reload
 
-**Given** I am not authenticated  
-**When** I navigate to the dashboard URL  
+**Given** I am not authenticated
+**When** I navigate to the dashboard URL
 **Then** I am redirected to the login page and the dashboard content is not visible
 
 ---
