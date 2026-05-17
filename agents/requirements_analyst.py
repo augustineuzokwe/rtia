@@ -18,6 +18,8 @@ from pydantic import BaseModel, Field
 from prompts.requirements_analyst_prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
 
 DEFAULT_MODEL = "claude-opus-4-7"
+DEFAULT_TIMEOUT_SECONDS = 60.0
+DEFAULT_MAX_RETRIES = 3
 
 
 class AnalystOutput(BaseModel):
@@ -33,14 +35,35 @@ def analyze_requirement(
     *,
     model: str = DEFAULT_MODEL,
     temperature: float = 0.0,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+    max_tokens: int | None = None,
 ) -> AnalystOutput:
     """Run the Requirements Analyst agent on a raw requirement.
 
     Reads ANTHROPIC_API_KEY from the environment (via python-dotenv in callers).
     Temperature defaults to 0 because we want stable, reproducible structure for
     downstream agents and eval comparison.
+
+    LLM resilience knobs (all overridable per caller — a FastAPI endpoint with a
+    tight SLO will set different values than a batch eval job):
+
+    - timeout: wall-clock seconds per Claude call. Caps stuck network requests.
+    - max_retries: retries on transient errors (429, 5xx, network blips) with
+      exponential backoff. NOTE: retries are silent — the caller (e.g. the API
+      layer) should surface retry counts in logs/traces so latency spikes
+      remain debuggable.
+    - max_tokens: hard cap on response length. None means use the model's
+      default. Set explicitly only if you need cost/latency protection;
+      setting it too low will truncate the JSON and trigger a parse error.
     """
-    llm = ChatAnthropic(model=model, temperature=temperature)
+    llm = ChatAnthropic(
+        model=model,
+        temperature=temperature,
+        timeout=timeout,
+        max_retries=max_retries,
+        max_tokens=max_tokens,
+    )
     messages = [
         SystemMessage(content=SYSTEM_PROMPT),
         HumanMessage(content=USER_PROMPT_TEMPLATE.format(requirement_text=requirement_text)),
