@@ -15,7 +15,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
-from prompts.requirements_analyst import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
+from prompts.requirements_analyst_prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
 
 DEFAULT_MODEL = "claude-opus-4-7"
 
