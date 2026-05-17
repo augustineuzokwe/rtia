@@ -68,7 +68,7 @@ def main() -> None:
 
     banner("LLM PARAMS")
     print(f"  model        = {DEFAULT_MODEL}")
-    print("  temperature  = 0.0  (deterministic structure for reproducibility)")
+    print("  temperature  = None (Opus 4.7 rejects this param; use model default)")
     print(f"  timeout      = {DEFAULT_TIMEOUT_SECONDS}s")
     print(f"  max_retries  = {DEFAULT_MAX_RETRIES}")
     print("  max_tokens   = None (use model default)")
