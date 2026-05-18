@@ -3,7 +3,8 @@
 Invokes the compiled LangGraph pipeline. The pipeline pauses at the PO
 checkpoint if the Analyst flagged any critical ambiguities; the demo
 collects answers from stdin and resumes the graph. If all ambiguities
-are normal, the pipeline flows through without pausing.
+are normal, the pipeline flows through without pausing. After the
+checkpoint, the User Story Writer produces a single user story.
 
 Requires `ANTHROPIC_API_KEY` in `.env` (see `.env.example`).
 
@@ -97,6 +98,14 @@ def main() -> None:
         for question, answer in po_answers.items():
             print(f"Q: {question}")
             print(f"A: {answer}\n")
+
+    story = result["user_story"]
+    banner("USER STORY")
+    print(story.as_sentence())
+    if story.assumptions:
+        print(f"\nAssumptions ({len(story.assumptions)}):")
+        for assumption in story.assumptions:
+            print(f"  - {assumption}")
 
 
 if __name__ == "__main__":

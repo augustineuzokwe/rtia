@@ -20,7 +20,9 @@ Requirements Analyst Agent  →  extracts intent, actors, and ambiguities
       │
       ▼
 User Story Writer Agent     →  "As a [role], I want [feature], so that [benefit]"
-                            →  uses original intent + actors + PO answers
+                            →  uses intent + actors + PO answers; records
+                            →  defaults picked for normal ambiguities as
+                            →  story assumptions for the next checkpoint
       │
       ▼
 ⏸ STORY REVIEW CHECKPOINT  →  PO/QA reviews and edits the generated story
