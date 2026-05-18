@@ -1,8 +1,7 @@
 """Tests for the Requirements Analyst agent.
 
 Mocks the LLM call — these tests cover the agent's contract (prompt assembly,
-JSON parsing, schema validation), not Claude's behavior. A live-API smoke test
-will live separately.
+JSON parsing, schema validation), not Claude's behavior.
 """
 
 from __future__ import annotations
@@ -14,7 +13,7 @@ import pytest
 from langchain_core.messages import AIMessage
 from pydantic import ValidationError
 
-from agents.requirements_analyst import AnalystOutput, analyze_requirement
+from agents.requirements_analyst import Ambiguity, AnalystOutput, analyze_requirement
 
 SAMPLE_REQUIREMENT = (
     "The QA Dashboard should show a real-time test run summary for a selected project."
@@ -23,12 +22,21 @@ SAMPLE_REQUIREMENT = (
 VALID_RESPONSE = {
     "intent": "Give QA Leads a live view of test run health per project.",
     "actors": ["QA Lead", "unauthenticated user"],
-    "ambiguities": ["What counts as 'real-time' — sub-second, or 30s refresh acceptable?"],
+    "ambiguities": [
+        {
+            "question": "What counts as 'real-time' — sub-second or 30s refresh acceptable?",
+            "severity": "normal",
+        },
+        {
+            "question": "Which user role is meant by 'authenticated user'?",
+            "severity": "critical",
+        },
+    ],
 }
 
 
 def _mock_invoke(payload: dict | str):
-    """Build a patch context that makes ChatAnthropic.invoke return `payload`."""
+    """Patch ChatAnthropic.invoke to return `payload` as the LLM response."""
     content = payload if isinstance(payload, str) else json.dumps(payload)
     return patch(
         "agents.requirements_analyst.ChatAnthropic.invoke",
@@ -43,7 +51,9 @@ def test_returns_validated_analyst_output():
     assert isinstance(result, AnalystOutput)
     assert result.intent == VALID_RESPONSE["intent"]
     assert result.actors == VALID_RESPONSE["actors"]
-    assert result.ambiguities == VALID_RESPONSE["ambiguities"]
+    assert len(result.ambiguities) == 2
+    assert all(isinstance(a, Ambiguity) for a in result.ambiguities)
+    assert {a.severity for a in result.ambiguities} == {"normal", "critical"}
 
 
 def test_rejects_malformed_json():
@@ -53,5 +63,15 @@ def test_rejects_malformed_json():
 
 def test_rejects_response_missing_required_field():
     bad = {"intent": "x", "actors": ["y"]}  # missing 'ambiguities'
+    with _mock_invoke(bad), pytest.raises(ValidationError):
+        analyze_requirement(SAMPLE_REQUIREMENT)
+
+
+def test_rejects_ambiguity_with_invalid_severity():
+    bad = {
+        "intent": "x",
+        "actors": ["y"],
+        "ambiguities": [{"question": "q?", "severity": "maybe"}],  # not 'critical'/'normal'
+    }
     with _mock_invoke(bad), pytest.raises(ValidationError):
         analyze_requirement(SAMPLE_REQUIREMENT)

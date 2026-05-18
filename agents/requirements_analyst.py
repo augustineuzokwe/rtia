@@ -10,6 +10,7 @@ Walking-skeleton scope: a single function, no LangGraph orchestration yet.
 from __future__ import annotations
 
 import json
+from typing import Literal
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -22,12 +23,33 @@ DEFAULT_TIMEOUT_SECONDS = 60.0
 DEFAULT_MAX_RETRIES = 3
 
 
+Severity = Literal["critical", "normal"]
+
+
+class Ambiguity(BaseModel):
+    """A clarifying question the Analyst surfaced about the requirement.
+
+    The `severity` controls whether the PO checkpoint pauses for it:
+    - "critical": the Story Writer cannot proceed without an answer; the
+      PO checkpoint will pause the graph and wait for a response.
+    - "normal": a reasonable default assumption will let the Story Writer
+      continue; the question flows forward as a story assumption.
+    """
+
+    question: str = Field(description="The clarifying question itself.")
+    severity: Severity = Field(
+        description="'critical' pauses the PO checkpoint; 'normal' flows through."
+    )
+
+
 class AnalystOutput(BaseModel):
     """Structured output of the Requirements Analyst agent."""
 
     intent: str = Field(description="One or two sentences capturing the underlying goal.")
     actors: list[str] = Field(description="Distinct user roles or systems mentioned or implied.")
-    ambiguities: list[str] = Field(description="Concrete clarifying questions a PO could answer.")
+    ambiguities: list[Ambiguity] = Field(
+        description="Clarifying questions, each tagged with severity (critical or normal).",
+    )
 
 
 def analyze_requirement(
