@@ -1,9 +1,10 @@
 """LangGraph orchestration for the RTIA pipeline.
 
 Defines the shared `PipelineState` and the compiled pipeline graph that
-chains agents together. Currently wires the Analyst and the PO checkpoint;
-subsequent agents (User Story Writer, AC Generator, Test Case, Reviewer)
-attach as additional nodes without rewiring the existing structure.
+chains agents together. Currently wires the Analyst, the PO checkpoint,
+and the User Story Writer; subsequent agents (AC Generator, Test Case,
+Reviewer) attach as additional nodes without rewiring the existing
+structure.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from agents.requirements_analyst import AnalystOutput, analyze_requirement
+from agents.user_story_writer import UserStory, write_user_story
 
 
 class PipelineState(TypedDict, total=False):
@@ -28,6 +30,7 @@ class PipelineState(TypedDict, total=False):
     requirement_text: str
     analyst_output: AnalystOutput
     po_answers: dict[str, str]
+    user_story: UserStory
 
 
 def analyst_node(state: PipelineState) -> dict:
@@ -55,6 +58,12 @@ def po_checkpoint_node(state: PipelineState) -> dict:
     return {"po_answers": answers}
 
 
+def story_writer_node(state: PipelineState) -> dict:
+    """Run the User Story Writer on the Analyst's output + PO answers."""
+    story = write_user_story(state["analyst_output"], state.get("po_answers", {}))
+    return {"user_story": story}
+
+
 def build_pipeline():
     """Build and compile the RTIA pipeline graph.
 
@@ -69,7 +78,9 @@ def build_pipeline():
     builder = StateGraph(PipelineState)
     builder.add_node("analyst", analyst_node)
     builder.add_node("po_checkpoint", po_checkpoint_node)
+    builder.add_node("story_writer", story_writer_node)
     builder.add_edge(START, "analyst")
     builder.add_edge("analyst", "po_checkpoint")
-    builder.add_edge("po_checkpoint", END)
+    builder.add_edge("po_checkpoint", "story_writer")
+    builder.add_edge("story_writer", END)
     return builder.compile(checkpointer=MemorySaver())
