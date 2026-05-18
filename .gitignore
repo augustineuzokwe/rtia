@@ -218,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Personal learning log — local-only, not shared
+LEARNINGS.md
