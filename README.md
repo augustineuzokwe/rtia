@@ -2,7 +2,7 @@
 
 A multi-agent AI assistant that takes raw software requirements — feature requests, business requirements, PRD snippets, or meeting notes — and produces a structured user story, acceptance criteria (Given/When/Then), and test cases through a supervised pipeline.
 
-A human review checkpoint sits between story generation and AC generation, keeping a PO or QA Lead in control of quality before downstream output is produced.
+Two human-in-the-loop checkpoints keep a PO or QA Lead in control: one *before* story generation (to resolve critical ambiguities) and one *after* (to review the generated story before AC generation).
 
 ## How It Works
 
@@ -10,13 +10,20 @@ A human review checkpoint sits between story generation and AC generation, keepi
 Requirements input (free text or uploaded PDF/markdown)
       │
       ▼
-Requirements Analyst Agent  →  extracts intent, flags ambiguities
+Requirements Analyst Agent  →  extracts intent, actors, and ambiguities
+                            →  each ambiguity tagged "critical" or "normal"
+      │
+      ▼
+⏸ PO CHECKPOINT             →  pauses ONLY if critical ambiguities exist
+                            →  PO answers critical questions; normal ones
+                            →  flow forward as story assumptions
       │
       ▼
 User Story Writer Agent     →  "As a [role], I want [feature], so that [benefit]"
+                            →  uses original intent + actors + PO answers
       │
       ▼
-⏸ HUMAN CHECKPOINT          →  PO/QA reviews and edits the story
+⏸ STORY REVIEW CHECKPOINT  →  PO/QA reviews and edits the generated story
       │
       ▼
 AC Generator Agent          →  Given/When/Then acceptance criteria
@@ -31,9 +38,14 @@ Reviewer Agent              →  coverage gaps, weak ACs, untestable criteria
 Structured output           →  JSON / markdown export
 ```
 
+**Why two checkpoints?** They do different work that the other can't:
+
+- The **PO checkpoint** resolves missing information *before* the system makes assumptions. The Analyst classifies each ambiguity by severity so the PO only pauses for genuinely blocking questions, not every detail.
+- The **Story Review checkpoint** verifies the *output* — catching cases where the Story Writer's interpretation of the resolved inputs doesn't match what the PO actually meant.
+
 ## Use Case
 
-A PO or BA has raw requirements. Instead of manually writing user stories, ACs, and test cases from scratch, they paste the requirements into RTIA. The system generates a first draft at each stage. A QA Lead reviews, edits, and accepts at the human checkpoint before the pipeline continues.
+A PO or BA has raw requirements. Instead of manually writing user stories, ACs, and test cases from scratch, they paste the requirements into RTIA. The system generates a first draft at each stage. The PO answers a small number of critical clarifying questions up front and reviews the generated story before the pipeline continues to AC generation.
 
 **Input formats (v1):** Free text · PDF · Markdown
 **Input formats (v2):** Jira Epic via API
