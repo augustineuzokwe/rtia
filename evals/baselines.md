@@ -12,6 +12,85 @@ required.
 
 ---
 
+## 2026-05-20 — AC-layer baseline (Phase 8.4 metrics live)
+
+| | |
+|---|---|
+| Model (production agents) | `claude-opus-4-7` |
+| GEval (intent, AC faithfulness) judge | `claude-opus-4-7` |
+| Match (actor, ambiguity, AC coverage) judge | `claude-haiku-4-5-20251001` |
+| Prompt caching | enabled on Analyst + Story Writer + AC Generator |
+| Analyst prompt_hash | `19631aecc02a` |
+| AC Generator prompt_hash | (captured in JSON report) |
+
+The runner now chains Analyst → Story Writer → AC Generator per sample (so
+AC metrics score against the AC Generator's actual output, not a synthetic
+input). Critical Analyst ambiguities are auto-resolved with a canned PO
+answer — Story-Writer / AC-Generator quality on multi-feature samples is
+upstream-coupled to that answer; this is intentional and documented.
+
+### Mean scores
+
+| Metric | Mean | Threshold | Δ vs prior |
+|---|---|---|---|
+| `intent_faithfulness` | **0.83** | 0.80 | +0.06 |
+| `actor_set_completeness` | **0.77** | 0.80 | 0.00 |
+| `ambiguity_discipline` | **0.92** | 0.80 | +0.06 |
+| `ac_coverage` | **0.43** | 0.80 | (new) |
+| `ac_testability` | **1.00** | 0.80 | (new) |
+| `ac_faithfulness` | **0.77** | 0.80 | (new) |
+
+### Per-sample detail
+
+| Sample | intent | actors | ambig | ac_cov | ac_test | ac_faith |
+|---|---|---|---|---|---|---|
+| sample-01-well-structured | 0.90 | 0.80 | 1.00 | 0.80 | 1.00 | 0.67 |
+| sample-02-vague-ambiguous | 0.80 | 0.50 | 0.75 | 0.50 | 1.00 | 0.85 |
+| sample-03-multi-feature   | 0.80 | 1.00 | 1.00 | **0.00** | 1.00 | 0.80 |
+
+### Headline findings (calibration insights — do NOT silence by tuning prompts mid-flight)
+
+1. **sample-03 ac_coverage = 0.00** — the AC Generator collapsed the 4 required
+   filter categories (date range / environment / suite name / persistence) into
+   3 generic ACs that don't differentiate the dimensions. Exactly the failure
+   mode the coverage metric was designed to catch. Concrete prompt-iteration
+   opportunity: the AC Generator's coverage rule needs reinforcement on
+   multi-dimension stories ("one AC per stated dimension").
+
+2. **sample-01 ac_coverage dropped 1.00 → 0.80** between the single-sample
+   probe and the full sweep. Same prompt hash, different AC output text
+   (stochastic LLM). Same band as the Analyst's run-to-run variance noted
+   in the prior baseline — treat per-sample scores as ±0.10 noise floor.
+
+3. **ac_faithfulness is structurally pessimistic** on sample-01 (0.67) because
+   the AC Generator legitimately pulls context from the Analyst's intent +
+   actors, but the metric only compares ACs against the Story Writer's
+   description+objective (which can be terser than the underlying Analyst
+   read). A more permissive metric would include the Analyst output in the
+   "expected_output" payload — captured as a future iteration, NOT changed
+   here so the baseline is reproducible.
+
+4. **ac_testability = 1.00 across all samples** — programmatic checks pass.
+   The metric is currently lenient; if real regressions don't surface here
+   over the next few runs, add an atomicity check (no `" and "` joining
+   independent assertions in `then`).
+
+### Token usage (production-agent calls only, excludes judge spend)
+
+| | input | output |
+|---|---|---|
+| Analyst across 3 samples | 6948 | 913 |
+| Story Writer + AC Generator | (not captured at runner level — see Anthropic console) |
+
+Story Writer / AC Generator usage is not captured here because their library
+entry points (`write_user_story`, `generate_acceptance_criteria`) return parsed
+objects, not the raw LLM response. Anthropic console's Cost tab is the source
+of truth; this telemetry is informational only. Switching to a usage-aware
+invocation would require either restructuring those library functions or
+duplicating their bodies — neither is worth it for a billing convenience.
+
+---
+
 ## 2026-05-20 — cost-reduction baseline (caching + split judges)
 
 | | |
