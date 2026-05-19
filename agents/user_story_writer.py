@@ -2,10 +2,15 @@
 
 Second agent in the RTIA pipeline. Consumes the Requirements Analyst's
 structured output plus any PO answers collected at the checkpoint, and
-emits a single user story in "As a / I want / so that" form.
+emits a user story formatted to land directly in a Jira or GitHub Issue
+backlog: Description + Objective sections, with the writer's defaults
+for normal-severity ambiguities recorded as Assumptions for downstream
+review.
 
-Normal-severity ambiguities are resolved by the writer with reasonable
-defaults and recorded in `assumptions` for downstream review.
+This is the shape that maps cleanly to the future `FinalUserStory`
+artifact (Phase 3 of the prod-readiness plan): description and objective
+become the corresponding sections of the final artifact, with
+Acceptance Criteria and Test Cases populated by later agents.
 """
 
 from __future__ import annotations
@@ -25,18 +30,38 @@ DEFAULT_MAX_RETRIES = 3
 
 
 class UserStory(BaseModel):
-    """A single user story produced by the Story Writer."""
+    """A user story formatted for paste-into-backlog (Description + Objective)."""
 
-    role: str = Field(description="Primary human actor (chosen from analyst actors).")
-    want: str = Field(description="Action or capability the role wants.")
-    benefit: str = Field(description="Value the role gets from the capability.")
+    description: str = Field(
+        description=(
+            "What the role wants — 1-2 sentences starting with "
+            "'As a/an {role}, I want {action}'. Article agreement is the writer's"
+            " responsibility (use 'an' before a vowel-sound role)."
+        )
+    )
+    objective: str = Field(
+        description=(
+            "Value or outcome the role gets, one sentence, WITHOUT a 'so that' "
+            "prefix (the renderer supplies the section header)."
+        )
+    )
     assumptions: list[str] = Field(
         description="Defaults the writer picked for normal-severity ambiguities.",
     )
 
-    def as_sentence(self) -> str:
-        """Render the story in its canonical sentence form."""
-        return f"As a {self.role}, I want {self.want}, so that {self.benefit}."
+    def as_markdown_sections(self) -> str:
+        """Render as paste-ready Jira/GitHub Issue markdown.
+
+        Lightweight version that lives on the schema for the demo + tests.
+        Phase 3 will move full rendering into `agents/final_artifact.py`
+        once Acceptance Criteria and Test Cases sections also need to be
+        composed; until then, this method keeps the demo legible without
+        creating a separate module for one renderer.
+        """
+        out = f"## Description\n{self.description}\n\n## Objective\n{self.objective}"
+        if self.assumptions:
+            out += "\n\n## Assumptions\n" + "\n".join(f"- {a}" for a in self.assumptions)
+        return out
 
 
 def _format_ambiguities(analyst_output: AnalystOutput) -> str:

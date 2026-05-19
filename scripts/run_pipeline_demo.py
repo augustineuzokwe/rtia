@@ -108,12 +108,8 @@ def main() -> None:
             print(f"A: {answer}\n")
 
     story = result["user_story"]
-    banner("USER STORY")
-    print(story.as_sentence())
-    if story.assumptions:
-        print(f"\nAssumptions ({len(story.assumptions)}):")
-        for assumption in story.assumptions:
-            print(f"  - {assumption}")
+    banner("USER STORY (paste-ready markdown)")
+    print(story.as_markdown_sections())
 
 
 if __name__ == "__main__":

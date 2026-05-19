@@ -28,9 +28,10 @@ ANALYST_OUTPUT = AnalystOutput(
 PO_ANSWERS = {"Which authenticated user role?": "QA Lead"}
 
 VALID_RESPONSE = {
-    "role": "QA Lead",
-    "want": "see a real-time summary of test runs for a selected project",
-    "benefit": "I can quickly assess release health",
+    "description": (
+        "As a QA Lead, I want to see a real-time summary of test runs for a selected project."
+    ),
+    "objective": "I can quickly assess release health.",
     "assumptions": ["Assumed 30s refresh for: What counts as 'real-time'?"],
 }
 
@@ -49,10 +50,35 @@ def test_returns_validated_user_story():
         result = write_user_story(ANALYST_OUTPUT, PO_ANSWERS)
 
     assert isinstance(result, UserStory)
-    assert result.role == "QA Lead"
-    assert "real-time summary" in result.want
+    assert result.description.startswith("As a QA Lead, I want")
+    assert "real-time summary" in result.description
+    assert "release health" in result.objective
     assert result.assumptions == VALID_RESPONSE["assumptions"]
-    assert result.as_sentence().startswith("As a QA Lead, I want ")
+
+
+def test_as_markdown_sections_renders_description_and_objective_sections():
+    """Paste-into-Jira rendering must surface the named sections clearly."""
+    with _mock_invoke(VALID_RESPONSE):
+        story = write_user_story(ANALYST_OUTPUT, PO_ANSWERS)
+
+    md = story.as_markdown_sections()
+    assert "## Description" in md
+    assert "## Objective" in md
+    assert "## Assumptions" in md
+    assert story.description in md
+    assert story.objective in md
+
+
+def test_as_markdown_sections_omits_assumptions_when_empty():
+    """An empty assumptions list should not emit a stub `## Assumptions` header."""
+    no_assumptions = {**VALID_RESPONSE, "assumptions": []}
+    with _mock_invoke(no_assumptions):
+        story = write_user_story(ANALYST_OUTPUT, PO_ANSWERS)
+
+    md = story.as_markdown_sections()
+    assert "## Description" in md
+    assert "## Objective" in md
+    assert "## Assumptions" not in md
 
 
 def test_rejects_malformed_json():
@@ -61,6 +87,18 @@ def test_rejects_malformed_json():
 
 
 def test_rejects_response_missing_required_field():
-    bad = {"role": "QA Lead", "want": "x", "benefit": "y"}  # missing 'assumptions'
+    bad = {"description": "x", "objective": "y"}  # missing 'assumptions'
     with _mock_invoke(bad), pytest.raises(ValidationError):
+        write_user_story(ANALYST_OUTPUT, PO_ANSWERS)
+
+
+def test_rejects_response_with_legacy_role_want_benefit_schema():
+    """Legacy schema (role/want/benefit) must fail loudly to surface stale callers."""
+    legacy = {
+        "role": "QA Lead",
+        "want": "x",
+        "benefit": "y",
+        "assumptions": [],
+    }
+    with _mock_invoke(legacy), pytest.raises(ValidationError):
         write_user_story(ANALYST_OUTPUT, PO_ANSWERS)

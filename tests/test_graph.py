@@ -28,9 +28,8 @@ def _fake_analyst_response(ambiguities: list[dict]) -> dict:
 
 
 FAKE_STORY_RESPONSE = {
-    "role": "User",
-    "want": "do thing X",
-    "benefit": "outcome Y is achieved",
+    "description": "As a user, I want to do thing X.",
+    "objective": "Outcome Y is achieved.",
     "assumptions": [],
 }
 
@@ -77,8 +76,8 @@ def test_pipeline_flows_through_when_no_critical_ambiguities():
     assert "__interrupt__" not in result
     assert result["analyst_output"].intent == "Goal X"
     assert result["po_answers"] == {}
-    assert result["user_story"].role == "User"
-    assert result["user_story"].want == "do thing X"
+    assert result["user_story"].description.startswith("As a user, I want")
+    assert "thing X" in result["user_story"].description
 
 
 def test_pipeline_pauses_when_critical_ambiguity_present():
@@ -118,4 +117,4 @@ def test_pipeline_resumes_into_story_writer_with_po_answers():
 
     assert "__interrupt__" not in result
     assert result["po_answers"] == answers
-    assert result["user_story"].role == "User"
+    assert result["user_story"].description.startswith("As a user, I want")
