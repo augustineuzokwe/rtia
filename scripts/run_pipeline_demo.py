@@ -84,6 +84,27 @@ def collect_po_answers(critical_questions: list[str]) -> dict[str, str]:
     return answers
 
 
+def collect_story_review_response(payload: dict) -> dict:
+    """Show the rendered story preview; collect accept-or-override.
+
+    Empty input (default in non-interactive mode like `yes ""`) is
+    treated as accept — so smoke runs don't get stuck. To override,
+    answer 'n' and the demo prompts for new description / objective.
+    """
+    print(payload["rendered_artifact"])
+    print()
+    answer = input("Accept this story? (Y/n; n to override): ").strip().lower()
+    if answer in ("", "y", "yes"):
+        return {"accepted": True}
+    new_description = input("New description (Enter to keep current): ").strip()
+    new_objective = input("New objective (Enter to keep current): ").strip()
+    return {
+        "accepted": False,
+        "description": new_description or payload["description"],
+        "objective": new_objective or payload["objective"],
+    }
+
+
 def main() -> None:
     load_dotenv()
 
@@ -120,15 +141,23 @@ def main() -> None:
     print("Calling Claude (Analyst)…")
     result = pipeline.invoke({"requirement_text": requirement_text}, config=config)
 
-    if "__interrupt__" in result:
-        critical = result["__interrupt__"][0].value["critical_ambiguities"]
-        banner(f"PO CHECKPOINT — {len(critical)} CRITICAL AMBIGUITY/IES")
-        print("The graph has paused. Please answer the critical questions below.")
-        answers = collect_po_answers(critical)
+    # The pipeline has two interrupts (PO Checkpoint + Story Review Checkpoint).
+    # Loop until the run completes — each iteration handles whichever checkpoint
+    # fired, dispatching on the interrupt payload's shape.
+    while "__interrupt__" in result:
+        payload = result["__interrupt__"][0].value
+        if "critical_ambiguities" in payload:
+            critical = payload["critical_ambiguities"]
+            banner(f"PO CHECKPOINT — {len(critical)} CRITICAL AMBIGUITY/IES")
+            print("The graph has paused. Please answer the critical questions below.")
+            resume_value: object = collect_po_answers(critical)
+        elif "rendered_artifact" in payload:
+            banner("STORY REVIEW CHECKPOINT — review the rendered story below")
+            resume_value = collect_story_review_response(payload)
+        else:
+            raise RuntimeError(f"Unknown interrupt payload shape: {sorted(payload)}")
         banner("RESUMING PIPELINE")
-        result = pipeline.invoke(Command(resume=answers), config=config)
-    else:
-        banner("NO CRITICAL AMBIGUITIES — PIPELINE FLOWED THROUGH")
+        result = pipeline.invoke(Command(resume=resume_value), config=config)
 
     analyst = result["analyst_output"]
 

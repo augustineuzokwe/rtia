@@ -84,20 +84,24 @@ def _mock_pipeline_llms(analyst_payload: dict, story_payload: dict = FAKE_STORY_
 
 
 def test_pipeline_flows_through_when_no_critical_ambiguities():
-    """No critical ambiguities -> no pause, Story Writer runs, story populated."""
+    """No critical ambiguities → PO checkpoint flows through. Story Review still pauses;
+    resuming with accept lands the full pipeline."""
     analyst = _fake_analyst_response([{"question": "Style preference?", "severity": "normal"}])
 
     with _mock_pipeline_llms(analyst):
         pipeline = build_pipeline(checkpointer=_test_checkpointer())
         config = {"configurable": {"thread_id": "test-flow-through"}}
-        result = pipeline.invoke({"requirement_text": "some requirement"}, config=config)
+        first = pipeline.invoke({"requirement_text": "some requirement"}, config=config)
+        # The Story Review Checkpoint always pauses for explicit accept.
+        assert "rendered_artifact" in first["__interrupt__"][0].value
+        result = pipeline.invoke(Command(resume={"accepted": True}), config=config)
 
     assert "__interrupt__" not in result
     assert result["analyst_output"].intent == "Goal X"
     assert result["po_answers"] == {}
     assert result["user_story"].description.startswith("As a user, I want")
     assert "thing X" in result["user_story"].description
-    # Composer node runs after Story Writer — final_artifact must be populated
+    # Composer runs after Story Review accept — final_artifact populated
     assert "final_artifact" in result
     assert result["final_artifact"].description == result["user_story"].description
     assert result["final_artifact"].acceptance_criteria == []  # Phase 8 will fill
@@ -136,13 +140,19 @@ def test_pipeline_resumes_into_story_writer_with_po_answers():
         config = {"configurable": {"thread_id": "test-resume"}}
         pipeline.invoke({"requirement_text": "some requirement"}, config=config)
 
+        # First resume: provide PO answers → pipeline runs Story Writer
+        # → pauses at Story Review Checkpoint.
         answers = {"What role is the actor?": "QA Lead"}
-        result = pipeline.invoke(Command(resume=answers), config=config)
+        intermediate = pipeline.invoke(Command(resume=answers), config=config)
+        assert "rendered_artifact" in intermediate["__interrupt__"][0].value
+
+        # Second resume: accept the rendered story → Composer runs → END.
+        result = pipeline.invoke(Command(resume={"accepted": True}), config=config)
 
     assert "__interrupt__" not in result
     assert result["po_answers"] == answers
     assert result["user_story"].description.startswith("As a user, I want")
-    # Composer runs after Story Writer in the resumed path too
+    # Composer runs after Story Review accept
     assert "final_artifact" in result
     assert result["final_artifact"].description == result["user_story"].description
 
@@ -202,3 +212,108 @@ def test_build_pipeline_accepts_injected_checkpointer():
     pipeline = build_pipeline(checkpointer=_test_checkpointer())
     # Smoke check: the compiled pipeline has nodes wired.
     assert pipeline is not None
+
+
+# ---------------------------------------------------------------------------
+# Story Review Checkpoint (Phase 4)
+# ---------------------------------------------------------------------------
+
+
+def test_pipeline_pauses_at_story_review_checkpoint():
+    """After Story Writer, the graph pauses with a rendered-artifact preview.
+
+    Distinguishable from the PO Checkpoint by interrupt payload keys —
+    PO emits `critical_ambiguities`; Story Review emits
+    `rendered_artifact` + `description` + `objective`.
+    """
+    analyst = _fake_analyst_response([])  # no critical ambiguities → goes straight through PO
+    checkpointer = _test_checkpointer()
+
+    with _mock_pipeline_llms(analyst):
+        pipeline = build_pipeline(checkpointer=checkpointer)
+        config = {"configurable": {"thread_id": "test-story-review-pause"}}
+        result = pipeline.invoke({"requirement_text": "some requirement"}, config=config)
+
+    assert "__interrupt__" in result
+    payload = result["__interrupt__"][0].value
+    assert "rendered_artifact" in payload
+    assert "description" in payload and "objective" in payload
+    # PO Checkpoint should NOT have been the one that fired here.
+    assert "critical_ambiguities" not in payload
+    # Composer must not have run yet.
+    assert "final_artifact" not in result
+
+
+def test_story_review_accept_passes_through():
+    """Resuming with `{'accepted': True}` uses Story Writer's output unchanged."""
+    analyst = _fake_analyst_response([])
+    checkpointer = _test_checkpointer()
+
+    with _mock_pipeline_llms(analyst):
+        pipeline = build_pipeline(checkpointer=checkpointer)
+        config = {"configurable": {"thread_id": "test-story-review-accept"}}
+        pipeline.invoke({"requirement_text": "x"}, config=config)
+        result = pipeline.invoke(Command(resume={"accepted": True}), config=config)
+
+    assert "__interrupt__" not in result
+    artifact = result["final_artifact"]
+    # Story Writer's mock produced "As a user, I want to do thing X." —
+    # accept path preserves it unchanged.
+    assert artifact.description == "As a user, I want to do thing X."
+    assert artifact.objective == "Outcome Y is achieved."
+
+
+def test_story_review_override_replaces_description_and_objective():
+    """Resuming with overrides replaces description/objective in the final artifact."""
+    analyst = _fake_analyst_response([])
+    checkpointer = _test_checkpointer()
+
+    with _mock_pipeline_llms(analyst):
+        pipeline = build_pipeline(checkpointer=checkpointer)
+        config = {"configurable": {"thread_id": "test-story-review-override"}}
+        pipeline.invoke({"requirement_text": "x"}, config=config)
+        result = pipeline.invoke(
+            Command(
+                resume={
+                    "accepted": False,
+                    "description": "As a manager, I want overridden text.",
+                    "objective": "Overridden value statement.",
+                }
+            ),
+            config=config,
+        )
+
+    assert "__interrupt__" not in result
+    artifact = result["final_artifact"]
+    assert artifact.description == "As a manager, I want overridden text."
+    assert artifact.objective == "Overridden value statement."
+
+
+def test_story_review_override_partial_keeps_non_overridden_fields():
+    """Empty / missing override fields fall back to the Story Writer's value.
+
+    Pins the partial-override semantics: a PO who only wants to tweak
+    the description shouldn't lose the writer's objective by omitting
+    it.
+    """
+    analyst = _fake_analyst_response([])
+    checkpointer = _test_checkpointer()
+
+    with _mock_pipeline_llms(analyst):
+        pipeline = build_pipeline(checkpointer=checkpointer)
+        config = {"configurable": {"thread_id": "test-story-review-partial"}}
+        pipeline.invoke({"requirement_text": "x"}, config=config)
+        result = pipeline.invoke(
+            Command(
+                resume={
+                    "accepted": False,
+                    "description": "Only the description changed.",
+                    # objective omitted → keeps writer's "Outcome Y is achieved."
+                }
+            ),
+            config=config,
+        )
+
+    artifact = result["final_artifact"]
+    assert artifact.description == "Only the description changed."
+    assert artifact.objective == "Outcome Y is achieved."
