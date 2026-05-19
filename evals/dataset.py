@@ -20,6 +20,11 @@ _INTENT_HEADER = "### Intent"
 _ACTORS_HEADER = "### Actors (expected set)"
 _AMBIGUITY_HEADER = "### Ambiguity Categories"
 _IMPLIED_HEADER = "### Implied Stories"
+_AC_HEADER = "## Expected Acceptance Criteria"
+_AC_CATEGORIES_HEADER = "### Required AC Categories"
+_AC_COUNT_HEADER = "### Expected AC Count"
+_AC_OUT_OF_SCOPE_HEADER = "### Out-of-Scope Behaviours"
+_AC_COUNT_RE = re.compile(r"\b(\d+)\s*\(\s*±\s*(\d+)\s*\)")
 
 _BULLET_RE = re.compile(r"^\s*[-*]\s+(?P<body>.+?)\s*$", re.MULTILINE)
 _NONE_EXPECTED_RE = re.compile(r"\(none expected\)", re.IGNORECASE)
@@ -46,6 +51,23 @@ class ExpectedAnalystOutput:
 
 
 @dataclass(frozen=True)
+class ExpectedAcceptanceCriteria:
+    """Per-agent ground truth for the AC Generator.
+
+    ``required_categories`` and ``out_of_scope`` are short labels (not
+    full ACs) — eval metrics check that each required category is covered
+    by *some* generated AC, and that no AC covers an out-of-scope item.
+    ``expected_count`` carries the (count, tolerance) pair so the metric
+    can penalise both under-coverage and over-flagging.
+    """
+
+    required_categories: list[str]
+    expected_count: int
+    count_tolerance: int
+    out_of_scope: list[str]
+
+
+@dataclass(frozen=True)
 class SampleRecord:
     """A loaded sample-requirements file."""
 
@@ -54,9 +76,10 @@ class SampleRecord:
     path: Path
     raw_requirement: str
     expected_analyst: ExpectedAnalystOutput
+    expected_acs: ExpectedAcceptanceCriteria
     extra: dict[str, str] = field(default_factory=dict)
-    """Reserved for future per-agent ground-truth blocks (Story Writer,
-    AC Generator, …) once those agents land."""
+    """Reserved for future per-agent ground-truth blocks (Test Case agent,
+    Reviewer agent, …) once those agents land."""
 
 
 def _extract_section(content: str, start_header: str, stop_headers: list[str]) -> str:
@@ -127,6 +150,27 @@ def _parse_expected_analyst(content: str) -> ExpectedAnalystOutput:
     )
 
 
+def _parse_expected_acs(content: str) -> ExpectedAcceptanceCriteria:
+    ac_block = _extract_section(content, _AC_HEADER, ["## "])
+    categories_body = _extract_section(ac_block, _AC_CATEGORIES_HEADER, ["###", "## "])
+    count_body = _extract_section(ac_block, _AC_COUNT_HEADER, ["###", "## "])
+    out_of_scope_body = _extract_section(ac_block, _AC_OUT_OF_SCOPE_HEADER, ["###", "## "])
+
+    match = _AC_COUNT_RE.search(count_body)
+    if match is None:
+        raise ValueError(
+            f"Expected AC Count block must contain a 'N (±M)' pattern; got: {count_body!r}"
+        )
+    expected_count, tolerance = int(match.group(1)), int(match.group(2))
+
+    return ExpectedAcceptanceCriteria(
+        required_categories=[_bullet_label(b) for b in _bullets(categories_body)],
+        expected_count=expected_count,
+        count_tolerance=tolerance,
+        out_of_scope=[_bullet_label(b) for b in _bullets(out_of_scope_body)],
+    )
+
+
 def load_sample(path: Path) -> SampleRecord:
     """Parse a single sample-requirements file into a SampleRecord."""
     content = path.read_text(encoding="utf-8")
@@ -136,6 +180,7 @@ def load_sample(path: Path) -> SampleRecord:
         path=path,
         raw_requirement=raw,
         expected_analyst=_parse_expected_analyst(content),
+        expected_acs=_parse_expected_acs(content),
     )
 
 

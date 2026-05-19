@@ -33,8 +33,14 @@ REQUIRED_SECTIONS = [
     "### Actors (expected set)",
     "### Ambiguity Categories",
     "### Implied Stories",
+    "## Expected Acceptance Criteria",
+    "### Required AC Categories",
+    "### Expected AC Count",
+    "### Out-of-Scope Behaviours",
     "## Eval Notes",
 ]
+
+AC_COUNT_RE = re.compile(r"\b(\d+)\s*\(\s*±\s*(\d+)\s*\)")
 
 BULLET_RE = re.compile(r"^\s*[-*]\s+", re.MULTILINE)
 NONE_EXPECTED_RE = re.compile(r"\(none expected\)", re.IGNORECASE)
@@ -152,6 +158,33 @@ def check_analyst_implied_stories(content: str) -> list[str]:
     return []
 
 
+def check_ac_required_categories(content: str) -> list[str]:
+    section = extract_section(content, "### Required AC Categories", ["###", "## "])
+    if section is None:
+        return []
+    if not BULLET_RE.search(section):
+        return ["Expected Acceptance Criteria → Required AC Categories must be a bulleted list"]
+    return []
+
+
+def check_ac_expected_count(content: str) -> list[str]:
+    section = extract_section(content, "### Expected AC Count", ["###", "## "])
+    if section is None:
+        return []
+    if not AC_COUNT_RE.search(section):
+        return ["Expected Acceptance Criteria → Expected AC Count must include a 'N (±M)' pattern"]
+    return []
+
+
+def check_ac_out_of_scope(content: str) -> list[str]:
+    section = extract_section(content, "### Out-of-Scope Behaviours", ["###", "## "])
+    if section is None:
+        return []
+    if not BULLET_RE.search(section):
+        return ["Expected Acceptance Criteria → Out-of-Scope Behaviours must be a bulleted list"]
+    return []
+
+
 CHECKS = [
     check_required_sections,
     check_user_story_format,
@@ -161,6 +194,9 @@ CHECKS = [
     check_analyst_actors,
     check_analyst_ambiguity_categories,
     check_analyst_implied_stories,
+    check_ac_required_categories,
+    check_ac_expected_count,
+    check_ac_out_of_scope,
 ]
 
 

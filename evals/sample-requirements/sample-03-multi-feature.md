@@ -79,6 +79,34 @@ A 4-story output that splits filter persistence out as its own story is a known 
 
 ---
 
+## Expected Acceptance Criteria (per-agent ground truth for the AC Generator)
+
+> Ground truth for the **AC Generator agent only**, scoped to the **filtering
+> + filter-persistence** story (per the multi-feature pick-one decision in
+> the Expected Output above). Email alerting and CSV export are out of scope
+> for this story; they would each get their own AC ground truth as separate
+> backlog items.
+
+### Required AC Categories
+- **filter by date range** — applying a date range filter restricts results to runs within that range
+- **filter by environment** — selecting one or more environments (dev/staging/prod) restricts results to those environments
+- **filter by test-suite name** — selecting/entering a suite name restricts results to that suite
+- **filter persistence** — applied filter selections are restored after logout/login
+
+### Expected AC Count
+4 (±1). Below 3 means missing filter dimensions; above 5 usually indicates atomicity violations or out-of-scope leakage (CSV export, email alerting).
+
+### Out-of-Scope Behaviours
+The AC Generator should NOT produce ACs for any of:
+- **email alerting on failure-rate threshold** — this is its own implied story, deliberately deferred
+- **CSV export of filtered results** — also its own implied story
+- specific filter-UI controls (dropdown vs autocomplete, multi-select vs chips) — not stated
+- filter-combination semantics edge cases (AND vs OR across types) — not stated
+- result count or pagination behaviour — not stated
+- per-user filter sharing or team defaults — not stated
+
+---
+
 ## Eval Notes
 - The Requirements Analyst Agent should flag that this contains 3 separable user stories, not 1
 - Persistent filter state is a sub-capability of filtering — not a 4th standalone feature
