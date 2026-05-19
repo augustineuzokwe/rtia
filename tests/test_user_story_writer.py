@@ -56,31 +56,6 @@ def test_returns_validated_user_story():
     assert result.assumptions == VALID_RESPONSE["assumptions"]
 
 
-def test_as_markdown_sections_renders_description_and_objective_sections():
-    """Paste-into-Jira rendering must surface the named sections clearly."""
-    with _mock_invoke(VALID_RESPONSE):
-        story = write_user_story(ANALYST_OUTPUT, PO_ANSWERS)
-
-    md = story.as_markdown_sections()
-    assert "## Description" in md
-    assert "## Objective" in md
-    assert "## Assumptions" in md
-    assert story.description in md
-    assert story.objective in md
-
-
-def test_as_markdown_sections_omits_assumptions_when_empty():
-    """An empty assumptions list should not emit a stub `## Assumptions` header."""
-    no_assumptions = {**VALID_RESPONSE, "assumptions": []}
-    with _mock_invoke(no_assumptions):
-        story = write_user_story(ANALYST_OUTPUT, PO_ANSWERS)
-
-    md = story.as_markdown_sections()
-    assert "## Description" in md
-    assert "## Objective" in md
-    assert "## Assumptions" not in md
-
-
 def test_rejects_malformed_json():
     with _mock_invoke("not json"), pytest.raises(json.JSONDecodeError):
         write_user_story(ANALYST_OUTPUT, PO_ANSWERS)

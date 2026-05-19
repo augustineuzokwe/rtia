@@ -54,19 +54,10 @@ class UserStory(BaseModel):
         description="Defaults the writer picked for normal-severity ambiguities.",
     )
 
-    def as_markdown_sections(self) -> str:
-        """Render as paste-ready Jira/GitHub Issue markdown.
-
-        Lightweight version that lives on the schema for the demo + tests.
-        Phase 3 will move full rendering into `agents/final_artifact.py`
-        once Acceptance Criteria and Test Cases sections also need to be
-        composed; until then, this method keeps the demo legible without
-        creating a separate module for one renderer.
-        """
-        out = f"## Description\n{self.description}\n\n## Objective\n{self.objective}"
-        if self.assumptions:
-            out += "\n\n## Assumptions\n" + "\n".join(f"- {a}" for a in self.assumptions)
-        return out
+    # NOTE: rendering moved to `agents.final_artifact.FinalUserStory.as_markdown()`
+    # in Phase 3. The composer node in `agents.graph` maps UserStory →
+    # FinalUserStory; downstream consumers should render via the final
+    # artifact, not directly off UserStory.
 
 
 def _format_ambiguities(analyst_output: AnalystOutput) -> str:

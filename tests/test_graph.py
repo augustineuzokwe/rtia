@@ -97,6 +97,11 @@ def test_pipeline_flows_through_when_no_critical_ambiguities():
     assert result["po_answers"] == {}
     assert result["user_story"].description.startswith("As a user, I want")
     assert "thing X" in result["user_story"].description
+    # Composer node runs after Story Writer — final_artifact must be populated
+    assert "final_artifact" in result
+    assert result["final_artifact"].description == result["user_story"].description
+    assert result["final_artifact"].acceptance_criteria == []  # Phase 8 will fill
+    assert result["final_artifact"].test_cases == []  # Phase 9 will fill
 
 
 def test_pipeline_pauses_when_critical_ambiguity_present():
@@ -137,6 +142,9 @@ def test_pipeline_resumes_into_story_writer_with_po_answers():
     assert "__interrupt__" not in result
     assert result["po_answers"] == answers
     assert result["user_story"].description.startswith("As a user, I want")
+    # Composer runs after Story Writer in the resumed path too
+    assert "final_artifact" in result
+    assert result["final_artifact"].description == result["user_story"].description
 
 
 # ---------------------------------------------------------------------------
@@ -152,7 +160,13 @@ def test_pipeline_state_v1_schema_is_stable():
     migration ADR — silent state-shape drift after PR #40's checkpoint
     landed would corrupt every paused thread on disk.
     """
-    expected_v1_fields = {"requirement_text", "analyst_output", "po_answers", "user_story"}
+    expected_v1_fields = {
+        "requirement_text",
+        "analyst_output",
+        "po_answers",
+        "user_story",
+        "final_artifact",
+    }
     actual_fields = set(PipelineState.__annotations__.keys())
     missing = expected_v1_fields - actual_fields
     assert not missing, (
@@ -166,7 +180,7 @@ def test_checkpoint_allowlist_covers_all_pydantic_state_types():
     """The msgpack allowlist must include every Pydantic type we put in state.
 
     A missing allowlist entry resurfaces the noisy
-    'Deserializing unregistered type ...' warning that PR #58 fixed.
+    'Deserializing unregistered type ...' warning that PR #59 fixed.
     This test catches it the moment a new Pydantic type slips into state.
     """
     allowed = {(mod, cls) for mod, cls in _CHECKPOINT_ALLOWLIST}
@@ -175,6 +189,9 @@ def test_checkpoint_allowlist_covers_all_pydantic_state_types():
         ("agents.requirements_analyst", "Ambiguity"),
         ("agents.requirements_analyst", "ImpliedStory"),
         ("agents.user_story_writer", "UserStory"),
+        ("agents.final_artifact", "FinalUserStory"),
+        ("agents.final_artifact", "AcceptanceCriterion"),
+        ("agents.final_artifact", "TestCase"),
     }
     missing = required - allowed
     assert not missing, f"Pydantic types not in checkpoint allowlist: {missing}"

@@ -153,9 +153,9 @@ def main() -> None:
             print(f"Q: {question}")
             print(f"A: {answer}\n")
 
-    story = result["user_story"]
-    banner("USER STORY (paste-ready markdown)")
-    print(story.as_markdown_sections())
+    artifact = result["final_artifact"]
+    banner("FINAL ARTIFACT (paste-ready markdown)")
+    print(artifact.as_markdown())
 
 
 if __name__ == "__main__":
