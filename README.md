@@ -84,7 +84,57 @@ rtia/
 
 ## Getting Started
 
-> Setup instructions will be added as the project is built.
+### Prerequisites
+
+- Python 3.13+
+- [uv](https://docs.astral.sh/uv/) for dependency + venv management
+- An Anthropic API key ([get one](https://console.anthropic.com/))
+- (Optional) A LangSmith API key for observability ([get one](https://smith.langchain.com))
+
+### Setup
+
+```bash
+git clone https://github.com/augustineuzokwe/rtia.git
+cd rtia
+uv sync                          # install deps into a local .venv
+cp .env.example .env             # then fill in your keys (see below)
+uv run pre-commit install        # one-time: enable the pre-commit hooks
+```
+
+### Environment variables
+
+`.env.example` documents every variable. The minimum to run the demo:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+To turn on **LangSmith tracing** (recommended — every LLM call is traced, with token counts, latency, and full input/output), add:
+
+```
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=lsv_...
+LANGSMITH_PROJECT=rtia
+```
+
+Tracing is purely opt-in. Leaving the vars unset (the CI default) runs the pipeline identically with no external calls beyond Anthropic.
+
+### Run the demo
+
+```bash
+uv run python scripts/run_pipeline_demo.py
+```
+
+The demo runs the pipeline against `evals/sample-requirements/sample-01-well-structured.md`, pauses for PO input if the Analyst flagged critical ambiguities, and prints the generated user story. If tracing is on, the script prints a link to the LangSmith dashboard at the start of the run.
+
+### Run the tests
+
+```bash
+uv run pytest -q                 # unit tests (mocked, offline)
+uv run pre-commit run --all-files
+```
+
+> **Note on AI testing:** the unit tests mock the LLM — they validate prompt assembly, JSON parsing, and pipeline wiring, not the model's behavior. Behavioral evaluation (faithfulness, ambiguity discipline, story quality) is the next track on the roadmap and will live under `evals/` with its own runner.
 
 ## Workshop Context
 

@@ -25,6 +25,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from agents.graph import build_pipeline  # noqa: E402
+from agents.observability import tracing_status  # noqa: E402
+
+LANGSMITH_DASHBOARD_URL = "https://smith.langchain.com"
 
 SAMPLE_PATH = REPO_ROOT / "evals" / "sample-requirements" / "sample-01-well-structured.md"
 
@@ -57,6 +60,11 @@ def collect_po_answers(critical_questions: list[str]) -> dict[str, str]:
 
 def main() -> None:
     load_dotenv()
+
+    tracing = tracing_status()
+    print(tracing.status_line())
+    if tracing.enabled:
+        print(f"  View traces at {LANGSMITH_DASHBOARD_URL} → project '{tracing.project}'")
 
     raw_markdown = SAMPLE_PATH.read_text(encoding="utf-8")
     requirement_text = extract_section(raw_markdown, "Raw Requirement")
