@@ -20,9 +20,16 @@ vague observation).
     - "severity": either "critical" or "normal".
         * "critical" = the Story Writer cannot proceed without an answer \
 (missing role, missing core action, contradictory constraint, undefined \
-key behaviour the story depends on).
+key behaviour the story depends on, OR a multi-feature requirement — see \
+multi-feature rule below).
         * "normal" = a story-shape question the Story Writer can answer with \
 a reasonable default (see scope rule below).
+- "implied_stories": list of objects, each with two fields:
+    - "title": short title for an implied story (e.g. "Filter by date").
+    - "summary": one sentence describing the story (action + role if implied).
+  Populate this list ONLY when the requirement implies multiple independent \
+stories. Leave it as an empty list `[]` for single-story requirements \
+(the common case). See multi-feature rule below.
 
 Scope rule — what counts as an ambiguity at all:
 
@@ -56,7 +63,8 @@ CORRECT OUTPUT:
 {
   "intent": "Let sellers attach images to listings, with caps for unverified accounts.",
   "actors": ["verified seller", "unverified seller"],
-  "ambiguities": []
+  "ambiguities": [],
+  "implied_stories": []
 }
 
 Why zero ambiguities — questions you might be tempted to flag, and why \
@@ -76,6 +84,52 @@ The role distinction (verified vs unverified seller) is the only thing \
 that could have changed the story's shape — and it is already clearly \
 stated, so it is not an ambiguity either. Result: empty ambiguities list. \
 That is a valid, common, and often correct output.
+
+Multi-feature rule — when one requirement implies multiple stories:
+
+A single requirement sometimes describes several independent capabilities \
+that should each be their own story in the backlog. Indicators: distinct \
+action verbs that don't compose into one user goal (filter AND export AND \
+configure AND notify), or different end-user outcomes joined by "also" / \
+"and" / "additionally". When you detect this:
+
+1. Populate `implied_stories` with one entry per independent story.
+2. ALSO add a CRITICAL ambiguity asking the PO to pick one, of the form:
+   "This requirement implies N independent stories: [titles]. Which single \
+story should this issue cover? (The others should be raised as separate \
+issues.)"
+
+This forces the Story Writer to draft only the chosen story, not a \
+cram-story that splices multiple features together.
+
+Worked example — multi-feature case:
+
+REQUIREMENT (input):
+"The dashboard should let users filter test results by date, export them \
+to CSV, save their filter preferences across sessions, and email the QA \
+Lead when failure rates spike above 20%."
+
+CORRECT OUTPUT:
+{
+  "intent": "Improve dashboard usability and alert QA on failure spikes.",
+  "actors": ["tester", "QA Lead"],
+  "ambiguities": [
+    {
+      "question": "Implies 4 stories (filter, export, prefs, alert). Pick one.",
+      "severity": "critical"
+    }
+  ],
+  "implied_stories": [
+    {"title": "Filter results by date", "summary": "Tester filters dashboard results."},
+    {"title": "Export results to CSV", "summary": "Tester exports current results."},
+    {"title": "Save filter preferences", "summary": "Filter selections persist across sessions."},
+    {"title": "Email alert on failure spike", "summary": "QA Lead emailed when failure rate > 20%."}
+  ]
+}
+
+Single-story requirements (the common case) should leave `implied_stories` \
+as an empty list `[]`. Don't invent multi-feature splits when the \
+requirement is genuinely about one capability.
 
 Other rules:
 - Do NOT invent requirements that are not in the text.

@@ -13,7 +13,7 @@ import pytest
 from langchain_core.messages import AIMessage
 from pydantic import ValidationError
 
-from agents.requirements_analyst import Ambiguity, AnalystOutput, analyze_requirement
+from agents.requirements_analyst import Ambiguity, AnalystOutput, ImpliedStory, analyze_requirement
 
 SAMPLE_REQUIREMENT = (
     "The QA Dashboard should show a real-time test run summary for a selected project."
@@ -54,6 +54,51 @@ def test_returns_validated_analyst_output():
     assert len(result.ambiguities) == 2
     assert all(isinstance(a, Ambiguity) for a in result.ambiguities)
     assert {a.severity for a in result.ambiguities} == {"normal", "critical"}
+    # implied_stories defaults to empty for single-story requirements.
+    assert result.implied_stories == []
+
+
+def test_implied_stories_populates_for_multi_feature_response():
+    """When the model returns implied_stories, they are validated and surfaced."""
+    multi = {
+        "intent": "Improve dashboard usability across multiple capabilities.",
+        "actors": ["tester", "QA Lead"],
+        "ambiguities": [
+            {
+                "question": (
+                    "This requirement implies 2 independent stories: filter results, "
+                    "export to CSV. Which single story should this issue cover?"
+                ),
+                "severity": "critical",
+            }
+        ],
+        "implied_stories": [
+            {"title": "Filter results", "summary": "Tester filters dashboard results."},
+            {"title": "Export to CSV", "summary": "Tester exports current results."},
+        ],
+    }
+    with _mock_invoke(multi):
+        result = analyze_requirement(SAMPLE_REQUIREMENT)
+
+    assert isinstance(result, AnalystOutput)
+    assert len(result.implied_stories) == 2
+    assert all(isinstance(s, ImpliedStory) for s in result.implied_stories)
+    assert {s.title for s in result.implied_stories} == {"Filter results", "Export to CSV"}
+    # Multi-feature detection MUST be paired with a critical ambiguity asking the PO to pick.
+    assert any(a.severity == "critical" for a in result.ambiguities)
+
+
+def test_implied_stories_default_empty_when_field_omitted():
+    """Legacy / single-story responses without implied_stories must still validate."""
+    legacy = {
+        "intent": "x",
+        "actors": ["y"],
+        "ambiguities": [],
+    }
+    with _mock_invoke(legacy):
+        result = analyze_requirement(SAMPLE_REQUIREMENT)
+
+    assert result.implied_stories == []
 
 
 def test_rejects_malformed_json():
