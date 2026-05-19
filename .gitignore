@@ -221,3 +221,7 @@ __marimo__/
 
 # Personal learning log — local-only, not shared
 LEARNINGS.md
+
+# Eval run artifacts — regenerated per run, baselines.md is the curated record
+evals/reports/
+.deepeval*

@@ -1,0 +1,308 @@
+"""Analyst-layer metrics for the per-agent eval suite.
+
+Three metrics, each scored in [0.0, 1.0]:
+
+- ``intent_faithfulness`` — judge call (GEval-style). Did the Analyst
+  capture the underlying goal without inventing scope?
+- ``actor_set_completeness`` — programmatic set comparison with a judge
+  tiebreak for synonymous role names ("QA Lead" ≈ "test lead").
+- ``ambiguity_discipline`` — discrete count + category-coverage check.
+  Penalises both over-flagging (UX/edge-case detail) and under-flagging
+  (missing categories from the ground truth).
+
+Implied-story handling rides along with ``ambiguity_discipline`` because
+the prompt couples them: a multi-feature requirement must emit one
+CRITICAL pick-one ambiguity *and* populate ``implied_stories``.
+
+Metrics use the ``ClaudeJudge`` wrapper so the eval stack stays
+single-provider. Scores are returned as a plain dataclass — we do not
+inherit from ``deepeval.metrics.BaseMetric`` because GEval is the only
+deepeval metric we use directly, and these custom scorers are simpler
+expressed as functions.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from deepeval.metrics import GEval
+from deepeval.test_case import LLMTestCase, SingleTurnParams
+from pydantic import BaseModel, Field
+
+from agents.requirements_analyst import AnalystOutput
+from evals.dataset import ExpectedAnalystOutput
+from evals.judge import ClaudeJudge
+
+
+@dataclass(frozen=True)
+class MetricResult:
+    """Single metric outcome for one sample run."""
+
+    name: str
+    score: float
+    reason: str
+
+
+# ---------------------------------------------------------------------------
+# intent_faithfulness — GEval
+# ---------------------------------------------------------------------------
+
+_INTENT_CRITERION = (
+    "Compare the actual_output (the Analyst's one-or-two-sentence intent) to "
+    "the expected_output (ground-truth intent). Award high marks ONLY when "
+    "actual_output captures the same underlying goal as expected_output and "
+    "introduces no scope, fields, or behaviour that the ground truth omits. "
+    "Penalise: invented specificity (concrete fields, UI behaviours, "
+    "implementation choices not in the ground truth); rewordings that drift "
+    "into a different goal; and missing the core 'who does what for what "
+    "outcome' shape. Surface-level wording differences are NOT a penalty — "
+    "only meaning matters."
+)
+
+
+def build_intent_metric(judge: ClaudeJudge, threshold: float = 0.8) -> GEval:
+    """Construct the GEval metric for Analyst intent-faithfulness."""
+    return GEval(
+        name="intent_faithfulness",
+        criteria=_INTENT_CRITERION,
+        evaluation_params=[SingleTurnParams.ACTUAL_OUTPUT, SingleTurnParams.EXPECTED_OUTPUT],
+        model=judge,
+        threshold=threshold,
+    )
+
+
+def score_intent_faithfulness(
+    actual: AnalystOutput,
+    expected: ExpectedAnalystOutput,
+    judge: ClaudeJudge,
+) -> MetricResult:
+    metric = build_intent_metric(judge)
+    test_case = LLMTestCase(
+        input="(intent comparison)",
+        actual_output=actual.intent,
+        expected_output=expected.intent,
+    )
+    metric.measure(test_case)
+    return MetricResult(
+        name="intent_faithfulness",
+        score=float(metric.score or 0.0),
+        reason=metric.reason or "",
+    )
+
+
+# ---------------------------------------------------------------------------
+# actor_set_completeness — set comparison + judge tiebreak for synonyms
+# ---------------------------------------------------------------------------
+
+
+class _ActorAlignment(BaseModel):
+    """Judge verdict on whether an actual actor label matches an expected one."""
+
+    matched_expected_label: str | None = Field(
+        description="Exact expected label this actual maps to, or null if no match."
+    )
+    reason: str
+
+
+def _normalise(label: str) -> str:
+    return " ".join(label.lower().split())
+
+
+def _judge_actor_match(
+    actual_label: str,
+    candidates: list[str],
+    judge: ClaudeJudge,
+) -> str | None:
+    """Ask the judge whether ``actual_label`` is a synonym of any candidate.
+
+    Returns the matched candidate (verbatim from ``candidates``) or None.
+    """
+    if not candidates:
+        return None
+    prompt = (
+        "You decide whether two role labels from a software requirement refer "
+        "to the SAME role. Treat trivial wording differences as a match "
+        "(e.g. 'QA Lead' ≈ 'test lead' ≈ 'quality assurance lead'). Do NOT "
+        "match labels that name structurally different roles even if they "
+        "co-occur (e.g. 'tester' ≠ 'QA Lead').\n\n"
+        f"Actual label: {actual_label!r}\n"
+        f"Expected candidates: {candidates!r}\n\n"
+        "Return JSON: matched_expected_label = the exact candidate string if "
+        "there is a synonym match, else null; plus a short reason."
+    )
+    verdict: _ActorAlignment = judge.generate(prompt, schema=_ActorAlignment)
+    if verdict.matched_expected_label in candidates:
+        return verdict.matched_expected_label
+    return None
+
+
+def score_actor_set_completeness(
+    actual: AnalystOutput,
+    expected: ExpectedAnalystOutput,
+    judge: ClaudeJudge,
+) -> MetricResult:
+    """F1 between expected and actual actor sets, with judge synonym matching.
+
+    Precision and recall are computed on the matched set. F1 keeps the metric
+    symmetric so both missing actors (low recall) and invented actors (low
+    precision) are penalised — invented actors are a known Analyst failure
+    mode worth measuring.
+    """
+    expected_labels = list(expected.actors)
+    actual_labels = list(actual.actors)
+    if not expected_labels and not actual_labels:
+        return MetricResult(
+            name="actor_set_completeness",
+            score=1.0,
+            reason="Both expected and actual actor sets are empty.",
+        )
+
+    expected_norm = {_normalise(label): label for label in expected_labels}
+    matched_expected: set[str] = set()
+    matched_actual: set[str] = set()
+
+    # Fast path: exact (case-insensitive) matches.
+    for actual_label in actual_labels:
+        norm = _normalise(actual_label)
+        if norm in expected_norm and expected_norm[norm] not in matched_expected:
+            matched_expected.add(expected_norm[norm])
+            matched_actual.add(actual_label)
+
+    # Judge tiebreak for remaining actuals against remaining expected.
+    unmatched_actual = [a for a in actual_labels if a not in matched_actual]
+    for actual_label in unmatched_actual:
+        remaining = [e for e in expected_labels if e not in matched_expected]
+        match = _judge_actor_match(actual_label, remaining, judge)
+        if match is not None:
+            matched_expected.add(match)
+            matched_actual.add(actual_label)
+
+    true_positives = len(matched_expected)
+    precision = true_positives / len(actual_labels) if actual_labels else 1.0
+    recall = true_positives / len(expected_labels) if expected_labels else 1.0
+    f1 = 0.0 if (precision + recall) == 0 else 2 * precision * recall / (precision + recall)
+
+    missing = [e for e in expected_labels if e not in matched_expected]
+    invented = [a for a in actual_labels if a not in matched_actual]
+    reason = (
+        f"precision={precision:.2f}, recall={recall:.2f}, F1={f1:.2f}. "
+        f"matched={sorted(matched_expected)}, missing={missing}, invented={invented}"
+    )
+    return MetricResult(name="actor_set_completeness", score=f1, reason=reason)
+
+
+# ---------------------------------------------------------------------------
+# ambiguity_discipline — count + category coverage
+# ---------------------------------------------------------------------------
+
+
+class _CategoryCoverage(BaseModel):
+    """Judge verdict mapping a single actual ambiguity to an expected category."""
+
+    matched_category: str | None = Field(
+        description="Exact expected category label this ambiguity covers, or null."
+    )
+    is_in_scope: bool = Field(
+        description=(
+            "True if the ambiguity is a legitimate story-shape question. "
+            "False if it is implementation/UX/edge-case detail the Analyst "
+            "prompt explicitly forbids surfacing."
+        )
+    )
+    reason: str
+
+
+def _judge_ambiguity(
+    ambiguity_text: str,
+    expected_categories: list[str],
+    judge: ClaudeJudge,
+) -> _CategoryCoverage:
+    prompt = (
+        "The Requirements Analyst is instructed to flag ONLY story-shape "
+        "ambiguities (role, core action, business value, contradictions, "
+        "multi-feature splits). Implementation, UX, and edge-case details "
+        "(retry behaviour, refresh indicators, redirect targets, etc.) are "
+        "OUT of scope and must NOT be flagged.\n\n"
+        "Decide two things about this ambiguity:\n"
+        "1. Which expected category does it cover? (Pick from the list "
+        "verbatim, or null if it doesn't match any.)\n"
+        "2. Is it in scope per the rule above?\n\n"
+        f"Ambiguity: {ambiguity_text!r}\n"
+        f"Expected categories: {expected_categories!r}\n\n"
+        "Return JSON with matched_category, is_in_scope, and reason."
+    )
+    return judge.generate(prompt, schema=_CategoryCoverage)
+
+
+def score_ambiguity_discipline(
+    actual: AnalystOutput,
+    expected: ExpectedAnalystOutput,
+    judge: ClaudeJudge,
+) -> MetricResult:
+    """Score how disciplined the Analyst was about flagging ambiguities.
+
+    Two failure modes to catch:
+
+    - **over-flagging**: Analyst raised out-of-scope details (UX, edge cases).
+      Each out-of-scope item drops the precision component.
+    - **under-flagging**: ground-truth categories not covered by any actual
+      ambiguity. Each missing category drops the recall component.
+
+    Score is F1 of category-coverage precision/recall. When the ground truth
+    expects zero ambiguities, the score is 1.0 iff the Analyst also emitted
+    zero — any flagged item is by definition out-of-scope here.
+    """
+    expected_cats = list(expected.ambiguity_categories)
+    actual_items = list(actual.ambiguities)
+
+    if not expected_cats:
+        if not actual_items:
+            return MetricResult(
+                name="ambiguity_discipline",
+                score=1.0,
+                reason="Expected zero ambiguities; Analyst correctly emitted zero.",
+            )
+        return MetricResult(
+            name="ambiguity_discipline",
+            score=0.0,
+            reason=(
+                f"Expected zero ambiguities; Analyst emitted "
+                f"{len(actual_items)} (all out-of-scope by definition): "
+                f"{[a.question for a in actual_items]}"
+            ),
+        )
+
+    if not actual_items:
+        return MetricResult(
+            name="ambiguity_discipline",
+            score=0.0,
+            reason=(
+                f"Expected {len(expected_cats)} categories ({expected_cats}); Analyst emitted none."
+            ),
+        )
+
+    matched_categories: set[str] = set()
+    in_scope_count = 0
+    out_of_scope: list[str] = []
+    for ambig in actual_items:
+        verdict = _judge_ambiguity(ambig.question, expected_cats, judge)
+        if verdict.is_in_scope:
+            in_scope_count += 1
+        else:
+            out_of_scope.append(ambig.question)
+        if verdict.matched_category in expected_cats:
+            matched_categories.add(verdict.matched_category)
+
+    precision = in_scope_count / len(actual_items) if actual_items else 1.0
+    recall = len(matched_categories) / len(expected_cats) if expected_cats else 1.0
+    f1 = 0.0 if (precision + recall) == 0 else 2 * precision * recall / (precision + recall)
+
+    missing = [c for c in expected_cats if c not in matched_categories]
+    reason = (
+        f"in_scope={in_scope_count}/{len(actual_items)} "
+        f"(precision={precision:.2f}); "
+        f"matched={sorted(matched_categories)}, missing={missing} "
+        f"(recall={recall:.2f}); F1={f1:.2f}. "
+        f"out_of_scope={out_of_scope}"
+    )
+    return MetricResult(name="ambiguity_discipline", score=f1, reason=reason)
