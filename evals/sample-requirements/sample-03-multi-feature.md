@@ -52,6 +52,33 @@ As a tester, I want to filter test results by date range, environment, and test 
 
 ---
 
+## Expected Analyst Output (per-agent ground truth for the Requirements Analyst)
+
+> Ground truth for the **Analyst agent only**. Phrasing is illustrative — eval metrics
+> compare against this fuzzily (judge for intent, set semantics for actors, category
+> coverage for ambiguities and implied stories), not by exact string match.
+
+### Intent
+Improve the test-results dashboard with filtering (with persisted preferences) and CSV export, and alert the QA Lead when a test suite's failure rate crosses a threshold.
+
+### Actors (expected set)
+- tester
+- QA Lead
+
+### Ambiguity Categories
+- **multi-feature pick-one** — the requirement bundles independent capabilities; the Analyst must emit a CRITICAL ambiguity asking the PO to pick a single story for this issue (the others should be raised separately). This is the *only* ambiguity required for this sample; other story-shape questions are not expected because each feature is itself stated clearly enough at this level.
+
+### Implied Stories
+The Analyst should populate `implied_stories` with three entries (titles will vary; the eval checks the count and the category of each):
+
+- **Filtering with persistence** — tester filters test results by date range, environment, and test suite name, with filter preferences saved across sessions. (Persistent filter state is a sub-capability of filtering, not a 4th standalone story.)
+- **CSV export** — tester exports test results to CSV.
+- **Email alerting on failure spike** — QA Lead is emailed when a test suite's failure rate exceeds 20% in a single run.
+
+A 4-story output that splits filter persistence out as its own story is a known failure mode the eval should catch.
+
+---
+
 ## Eval Notes
 - The Requirements Analyst Agent should flag that this contains 3 separable user stories, not 1
 - Persistent filter state is a sub-capability of filtering — not a 4th standalone feature

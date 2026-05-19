@@ -28,8 +28,16 @@ REQUIRED_SECTIONS = [
     "## Expected Output",
     "### User Story",
     "### Acceptance Criteria",
+    "## Expected Analyst Output",
+    "### Intent",
+    "### Actors (expected set)",
+    "### Ambiguity Categories",
+    "### Implied Stories",
     "## Eval Notes",
 ]
+
+BULLET_RE = re.compile(r"^\s*[-*]\s+", re.MULTILINE)
+NONE_EXPECTED_RE = re.compile(r"\(none expected\)", re.IGNORECASE)
 
 USER_STORY_RE = re.compile(
     r"As an? .+,\s+I want .+,\s+so that .+",
@@ -89,11 +97,70 @@ def check_ambiguities(content: str) -> list[str]:
     return []
 
 
+def check_analyst_intent(content: str) -> list[str]:
+    section = extract_section(content, "### Intent", ["###", "## "])
+    if section is None:
+        return []
+    # Strip optional quoted-block guidance that precedes the actual intent text.
+    body = "\n".join(line for line in section.splitlines() if not line.lstrip().startswith(">"))
+    if len(body.strip()) < 20:
+        return ["Expected Analyst Output → Intent must be a non-trivial sentence (>=20 chars)"]
+    return []
+
+
+def check_analyst_actors(content: str) -> list[str]:
+    section = extract_section(content, "### Actors (expected set)", ["###", "## "])
+    if section is None:
+        return []
+    if not BULLET_RE.search(section):
+        return ["Expected Analyst Output → Actors (expected set) must be a bulleted list"]
+    return []
+
+
+def check_analyst_ambiguity_categories(content: str) -> list[str]:
+    section = extract_section(content, "### Ambiguity Categories", ["###", "## "])
+    if section is None:
+        return []
+    has_bullets = bool(BULLET_RE.search(section))
+    has_none_marker = bool(NONE_EXPECTED_RE.search(section))
+    if not (has_bullets or has_none_marker):
+        return [
+            "Expected Analyst Output → Ambiguity Categories must be a bulleted list "
+            "or explicitly state '(none expected)'"
+        ]
+    return []
+
+
+def check_analyst_implied_stories(content: str) -> list[str]:
+    section = extract_section(content, "### Implied Stories", ["###", "## "])
+    if section is None:
+        return []
+    has_bullets = bool(BULLET_RE.search(section))
+    has_none_marker = bool(NONE_EXPECTED_RE.search(section))
+    if not (has_bullets or has_none_marker):
+        return [
+            "Expected Analyst Output → Implied Stories must be a bulleted list "
+            "or explicitly state '(none expected)'"
+        ]
+    # Multi-feature samples are the ones that declare features; their Implied Stories
+    # section must be a real list, not '(none expected)'.
+    if "## Features Contained" in content and has_none_marker and not has_bullets:
+        return [
+            "Multi-feature samples must list implied stories under "
+            "'### Implied Stories' (not '(none expected)')"
+        ]
+    return []
+
+
 CHECKS = [
     check_required_sections,
     check_user_story_format,
     check_ac_format,
     check_ambiguities,
+    check_analyst_intent,
+    check_analyst_actors,
+    check_analyst_ambiguity_categories,
+    check_analyst_implied_stories,
 ]
 
 

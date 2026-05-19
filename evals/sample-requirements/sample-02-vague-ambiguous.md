@@ -46,6 +46,35 @@ As a QA team member, I want to view and update defect records in a central tool,
 
 ---
 
+## Expected Analyst Output (per-agent ground truth for the Requirements Analyst)
+
+> Ground truth for the **Analyst agent only**. Phrasing is illustrative — eval metrics
+> compare against this fuzzily (judge for intent, set semantics for actors, category
+> coverage for ambiguities), not by exact string match.
+
+### Intent
+Replace spreadsheet-based defect tracking with a shared, central tool so the QA team can update defects quickly and managers can see what is going on.
+
+### Actors (expected set)
+- QA team member
+- manager
+
+### Ambiguity Categories
+The Analyst should surface at least one ambiguity per category below. Wording will vary; the eval checks that each *category* is represented.
+
+- **actor scoping** — are "managers" and "the team" separate roles with different views, or one combined role?
+- **manager visibility shape** — what does "visibility" concretely mean (summary report, live list, digest, etc.)?
+- **team update scope** — what does "update things quickly" cover (status change, comments, assignment, etc.)?
+- **defect domain** — what counts as a "defect" here; is this standalone or integrated with an existing tracker (Jira, GitHub Issues, etc.)?
+- **success measure** — what does "track better" mean as an outcome (fewer missed defects, faster resolution, etc.)?
+
+At least one of these should be marked `severity: "critical"` — actor scoping is the strongest candidate, since the Story Writer cannot pick a single "As a..." role without an answer.
+
+### Implied Stories
+- (none expected) — vague but single-capability; the Analyst should not invent multi-feature splits to compensate for vagueness.
+
+---
+
 ## Eval Notes
 - The Requirements Analyst Agent MUST flag ambiguities — a user story generated without surfacing any is a failure
 - The ground truth ACs are intentionally vague to match the vague input — the agent should NOT invent specific fields (e.g. "status", "severity", "assignee") or technical behaviour (e.g. "without a page refresh") not stated in the requirement
