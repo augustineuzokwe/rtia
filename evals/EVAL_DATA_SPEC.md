@@ -32,6 +32,10 @@ Every sample file must contain all of the following sections in this order:
 ### Actors (expected set)
 ### Ambiguity Categories
 ### Implied Stories
+## Expected Acceptance Criteria (per-agent ground truth for the AC Generator)
+### Required AC Categories
+### Expected AC Count
+### Out-of-Scope Behaviours
 ## Eval Notes
 ```
 
@@ -62,6 +66,32 @@ exact string match:
   `## Features Contained` section), or `(none expected)` for single-story samples.
   Each entry is a short title plus one-line summary. The eval checks the count
   and category of each implied story, not exact title wording.
+
+---
+
+## Rules for Expected Acceptance Criteria
+
+Per-agent ground truth for the AC Generator (added in Phase 8.3). Like the
+Analyst block, phrasing is illustrative — eval metrics compare categories,
+not the exact Given/When/Then text. The block has three required subsections:
+
+- **Required AC Categories** — bulleted list of behaviours that each must be
+  covered by at least one generated AC. Each entry is a short category label
+  (e.g. "filter by date range"), not a full Given/When/Then. The AC eval
+  metric checks coverage one category at a time — an AC that pattern-matches
+  the category counts, regardless of wording.
+- **Expected AC Count** — a `N (±M)` pattern (e.g. `3 (±1)`). The AC eval
+  metric penalises both under-count (missing coverage) and over-count
+  (atomicity violations or invented scope).
+- **Out-of-Scope Behaviours** — bulleted list of behaviours the AC Generator
+  must NOT produce ACs for: implementation/UX details the requirement does not
+  state, sub-stories deliberately deferred to other backlog items, edge cases
+  the Test Case agent owns. Used by the AC eval metric to penalise scope creep.
+
+The block is **scoped to the single user story for this sample**. For
+multi-feature samples (sample-03), the expected ACs cover only the chosen
+story; other implied stories' ACs would be ground-truthed separately if and
+when those stories are addressed.
 
 ---
 

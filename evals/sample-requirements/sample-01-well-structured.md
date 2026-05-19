@@ -57,6 +57,32 @@ Let an authenticated QA user monitor the health of the most recent test run for 
 
 ---
 
+## Expected Acceptance Criteria (per-agent ground truth for the AC Generator)
+
+> Ground truth for the **AC Generator agent only**. Phrasing is illustrative —
+> eval metrics check that each category below is covered by at least one
+> produced AC (fuzzy match), not exact Given/When/Then wording.
+
+### Required AC Categories
+The AC Generator should produce at least one AC for each:
+
+- **summary display** — selecting a project surfaces totals + pass/failed/skipped counts for the most recent run
+- **auto-refresh cadence** — summary updates without a full page reload on the stated interval (30s)
+- **access boundary** — unauthenticated users are redirected to the login page; the dashboard is not visible to them
+
+### Expected AC Count
+3 (±1). Below 3 means a missing category; above 4 usually means atomicity violations or invented scope.
+
+### Out-of-Scope Behaviours
+The AC Generator should NOT produce ACs for any of:
+- specific refresh-indicator UI (spinner, "last updated" timestamp)
+- network error or backend-unavailable handling
+- auto-refresh pause when the tab is inactive
+- redirect-target choice after successful login
+- empty-state rendering when no test runs exist
+
+---
+
 ## Eval Notes
 - RTIA output should contain all 3 ACs (auth redirect, data display, auto-refresh)
 - A missing auto-refresh AC is a coverage gap the Reviewer Agent should catch

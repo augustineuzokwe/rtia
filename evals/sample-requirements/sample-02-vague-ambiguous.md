@@ -75,6 +75,32 @@ At least one of these should be marked `severity: "critical"` — actor scoping 
 
 ---
 
+## Expected Acceptance Criteria (per-agent ground truth for the AC Generator)
+
+> Ground truth for the **AC Generator agent only**. Because the input is
+> vague, the per-agent AC ground truth is correspondingly minimal — the AC
+> Generator should match the vagueness, not compensate for it by inventing
+> specifics the requirement does not name.
+
+### Required AC Categories
+- **view defects list** — a logged-in QA team member can open the tracker and see a list of open defects
+- **update a defect** — a change to a defect is saved and visible to others
+- **manager summary view** — a manager sees a summary view of open defects (shape unspecified by design)
+
+### Expected AC Count
+3 (±1). More than 4 ACs on this sample almost certainly indicates invented scope (specific fields, statuses, severities not named in the requirement).
+
+### Out-of-Scope Behaviours
+The AC Generator should NOT produce ACs for any of:
+- specific defect fields (status, severity, assignee, priority) — not stated
+- update mechanics (in-place edit vs modal, optimistic UI) — not stated
+- notification/alerting behaviour — not stated
+- specific manager-summary contents (charts, counts by severity) — "visibility" is undefined in the input
+- defect-creation flow — only "view + update + manager visibility" are in scope
+- integration boundaries (Jira sync, GitHub Issues) — flagged as Analyst ambiguity, not yet PO-answered
+
+---
+
 ## Eval Notes
 - The Requirements Analyst Agent MUST flag ambiguities — a user story generated without surfacing any is a failure
 - The ground truth ACs are intentionally vague to match the vague input — the agent should NOT invent specific fields (e.g. "status", "severity", "assignee") or technical behaviour (e.g. "without a page refresh") not stated in the requirement
