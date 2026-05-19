@@ -16,8 +16,16 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
-from agents.config import DEFAULT_MAX_RETRIES, DEFAULT_MODEL, DEFAULT_TIMEOUT_SECONDS
+from agents.config import (
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_MODEL,
+    DEFAULT_TIMEOUT_SECONDS,
+    prompt_hash,
+)
 from prompts.requirements_analyst_prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
+
+_PROMPT_HASH = prompt_hash(SYSTEM_PROMPT, USER_PROMPT_TEMPLATE)
+"""Stable identifier for this agent's prompt version (see agents.config.prompt_hash)."""
 
 Severity = Literal["critical", "normal"]
 
@@ -116,6 +124,9 @@ def analyze_requirement(
         SystemMessage(content=SYSTEM_PROMPT),
         HumanMessage(content=USER_PROMPT_TEMPLATE.format(requirement_text=requirement_text)),
     ]
-    response = llm.invoke(messages)
+    # Attach prompt_hash to LangSmith trace metadata so every traced run is
+    # attributable to the exact prompt version. See agents.config.prompt_hash.
+    config = {"metadata": {"agent": "requirements_analyst", "prompt_hash": _PROMPT_HASH}}
+    response = llm.invoke(messages, config=config)
     raw = response.content if isinstance(response.content, str) else str(response.content)
     return AnalystOutput.model_validate(json.loads(raw))
