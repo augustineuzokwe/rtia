@@ -66,6 +66,32 @@ def test_prompt_includes_worked_example_with_empty_ambiguities():
     assert "correct output" in lower
 
 
+def test_prompt_defines_multi_feature_rule():
+    """The Analyst must detect multi-feature requirements and ask PO to pick one."""
+    lower = SYSTEM_PROMPT.lower()
+    assert "multi-feature" in lower
+    assert "implied_stories" in SYSTEM_PROMPT
+    # The rule MUST require pairing with a critical ambiguity (so the PO checkpoint pauses).
+    assert "critical ambiguity" in lower or "critical' ambiguity" in lower
+    # Single-story default must be explicit so model doesn't always populate the list.
+    assert "empty list" in lower
+    assert "single-story" in lower
+
+
+def test_prompt_includes_multi_feature_worked_example():
+    """A worked example for the multi-feature case is the strongest lever.
+
+    Without it, the model treats the rule as advisory and rarely populates
+    implied_stories — the very behavior we're trying to fix on sample-03.
+    """
+    lower = SYSTEM_PROMPT.lower()
+    assert "multi-feature case" in lower or "multi-feature rule" in lower
+    # The example must show implied_stories populated and a critical ambiguity.
+    assert '"implied_stories":' in SYSTEM_PROMPT
+    # And it must show concrete story splits to anchor the pattern.
+    assert "filter" in lower and "csv" in lower
+
+
 def test_prompt_explains_why_anti_examples_are_rejected_in_the_worked_example():
     """The worked example must explicitly reject specific would-be ambiguities.
 

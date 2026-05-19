@@ -141,6 +141,11 @@ def main() -> None:
     for amb in analyst.ambiguities:
         print(f"  - [{amb.severity}] {amb.question}")
 
+    if analyst.implied_stories:
+        print(f"\nImplied stories ({len(analyst.implied_stories)}) — PO must pick one:")
+        for s in analyst.implied_stories:
+            print(f"  - {s.title}: {s.summary}")
+
     po_answers = result.get("po_answers", {})
     if po_answers:
         banner("PO ANSWERS")

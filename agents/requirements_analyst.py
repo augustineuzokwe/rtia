@@ -42,6 +42,23 @@ class Ambiguity(BaseModel):
     )
 
 
+class ImpliedStory(BaseModel):
+    """A single story implied by a multi-feature requirement.
+
+    When the Analyst detects that one requirement encompasses multiple
+    independent stories (e.g. "filter results AND export to CSV AND email
+    on failure"), each is listed here and the Analyst additionally emits
+    a CRITICAL ambiguity asking the PO to pick one. The pipeline then
+    drafts only the chosen story; the rest are surfaced for the PO to
+    process in separate runs.
+    """
+
+    title: str = Field(description="Short title for the implied story (e.g. 'Filter by date').")
+    summary: str = Field(
+        description="One sentence describing the story (action + role if implied)."
+    )
+
+
 class AnalystOutput(BaseModel):
     """Structured output of the Requirements Analyst agent."""
 
@@ -49,6 +66,13 @@ class AnalystOutput(BaseModel):
     actors: list[str] = Field(description="Distinct user roles or systems mentioned or implied.")
     ambiguities: list[Ambiguity] = Field(
         description="Clarifying questions, each tagged with severity (critical or normal).",
+    )
+    implied_stories: list[ImpliedStory] = Field(
+        default_factory=list,
+        description=(
+            "Populated when the requirement implies multiple independent stories. "
+            "Empty list means single-story (the common case)."
+        ),
     )
 
 
