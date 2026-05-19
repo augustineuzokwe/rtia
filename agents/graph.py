@@ -24,6 +24,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from agents.ac_generator import AcGeneratorOutput, generate_acceptance_criteria
 from agents.final_artifact import AcceptanceCriterion, FinalUserStory, TestCase
 from agents.requirements_analyst import (
     Ambiguity,
@@ -53,6 +54,7 @@ _CHECKPOINT_ALLOWLIST: list[tuple[str, ...]] = [
     ("agents.requirements_analyst", "Ambiguity"),
     ("agents.requirements_analyst", "ImpliedStory"),
     ("agents.user_story_writer", "UserStory"),
+    ("agents.ac_generator", "AcGeneratorOutput"),
     ("agents.final_artifact", "FinalUserStory"),
     ("agents.final_artifact", "AcceptanceCriterion"),
     ("agents.final_artifact", "TestCase"),
@@ -74,6 +76,7 @@ class PipelineState(TypedDict, total=False):
     analyst_output: AnalystOutput
     po_answers: dict[str, str]
     user_story: UserStory
+    acceptance_criteria: list[AcceptanceCriterion]
     final_artifact: FinalUserStory
 
 
@@ -165,22 +168,38 @@ def story_review_checkpoint_node(state: PipelineState) -> dict:
     return {"user_story": revised}
 
 
+def ac_generator_node(state: PipelineState) -> dict:
+    """Run the AC Generator on the (possibly PO-revised) Story Writer output.
+
+    Sits after the Story Review Checkpoint so any direct PO overrides on
+    description / objective are already baked into `state["user_story"]`
+    before the AC Generator sees them. The Generator never re-reads the
+    original requirement — `state["analyst_output"]` is its sole source
+    of truth for the requirement's actor set and intent.
+    """
+    result = generate_acceptance_criteria(
+        state["user_story"],
+        state["analyst_output"],
+        state.get("po_answers", {}),
+    )
+    return {"acceptance_criteria": result.criteria}
+
+
 def composer_node(state: PipelineState) -> dict:
     """Assemble the final artifact from current pipeline state.
 
-    Today this is a pure transformation (no LLM call): description +
-    objective + assumptions come from the Story Writer; AC and Test
-    Case sections stay empty (their authoring agents land in Phase 8/9).
-    This node is the explicit sink of the pipeline; downstream agents
-    will WRITE into `final_artifact.acceptance_criteria` /
-    `.test_cases` in later phases, with this composer remaining the
-    final-state assembler.
+    Pure transformation (no LLM call): description + objective +
+    assumptions come from the Story Writer; acceptance criteria come
+    from the AC Generator; test cases stay empty until the Test Case
+    agent lands (Phase 9). This node is the explicit sink of the
+    pipeline; downstream agents WRITE into their respective state
+    slots and the composer assembles whatever's currently there.
     """
     story = state["user_story"]
     artifact = FinalUserStory(
         description=story.description,
         objective=story.objective,
-        acceptance_criteria=[],
+        acceptance_criteria=list(state.get("acceptance_criteria", [])),
         test_cases=[],
         assumptions=list(story.assumptions),
         metadata={},
@@ -242,12 +261,14 @@ def build_pipeline(checkpointer: BaseCheckpointSaver | None = None):
     builder.add_node("po_checkpoint", po_checkpoint_node)
     builder.add_node("story_writer", story_writer_node)
     builder.add_node("story_review_checkpoint", story_review_checkpoint_node)
+    builder.add_node("ac_generator", ac_generator_node)
     builder.add_node("composer", composer_node)
     builder.add_edge(START, "analyst")
     builder.add_edge("analyst", "po_checkpoint")
     builder.add_edge("po_checkpoint", "story_writer")
     builder.add_edge("story_writer", "story_review_checkpoint")
-    builder.add_edge("story_review_checkpoint", "composer")
+    builder.add_edge("story_review_checkpoint", "ac_generator")
+    builder.add_edge("ac_generator", "composer")
     builder.add_edge("composer", END)
     return builder.compile(checkpointer=checkpointer)
 
@@ -255,6 +276,7 @@ def build_pipeline(checkpointer: BaseCheckpointSaver | None = None):
 # Re-export the types we allowlist so callers (tests, future eval harness)
 # can compare against the contract without reaching into agent modules.
 __all__ = [
+    "AcGeneratorOutput",
     "AcceptanceCriterion",
     "Ambiguity",
     "AnalystOutput",

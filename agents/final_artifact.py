@@ -27,7 +27,10 @@ from pydantic import BaseModel, Field
 
 TestCaseType = Literal["happy_path", "edge_case", "negative"]
 
-_AC_PLACEHOLDER = "_To be populated by the AC Generator agent (Phase 8)._"
+_AC_PLACEHOLDER = (
+    "_No acceptance criteria were produced for this story — check the run "
+    "trace; the AC Generator agent should populate this section._"
+)
 _TEST_PLACEHOLDER = "_To be populated by the Test Case agent (Phase 9)._"
 
 
