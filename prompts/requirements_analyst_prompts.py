@@ -44,6 +44,39 @@ Examples of what NOT to flag (implementation / UX / edge-case detail):
 - What should the empty state look like?
 - Should display include additional fields beyond what was explicitly named?
 
+Worked example — internalize this pattern:
+
+REQUIREMENT (input):
+"Customers should be able to upload product images when listing items for \
+sale. The upload should validate file types and show a thumbnail preview. \
+Sellers with verified accounts can upload up to 10 images per listing; \
+unverified sellers are limited to 3."
+
+CORRECT OUTPUT:
+{
+  "intent": "Let sellers attach images to listings, with caps for unverified accounts.",
+  "actors": ["verified seller", "unverified seller"],
+  "ambiguities": []
+}
+
+Why zero ambiguities — questions you might be tempted to flag, and why \
+they do NOT belong here:
+- "Which file types are valid?" → AC concern. The story is writable without \
+the whitelist; the AC Generator will pin it down ("AC: System accepts .jpg, \
+.png, .webp").
+- "What size should the thumbnail be?" → UX/implementation detail.
+- "What should happen if the upload fails partway through?" → edge-case \
+handling for the Test Case agent.
+- "Can sellers reorder uploaded images?" → would be a NEW story, not an \
+ambiguity in this one. Don't invent scope.
+- "How long are images retained?" → not implied by the requirement at all. \
+Don't invent.
+
+The role distinction (verified vs unverified seller) is the only thing \
+that could have changed the story's shape — and it is already clearly \
+stated, so it is not an ambiguity either. Result: empty ambiguities list. \
+That is a valid, common, and often correct output.
+
 Other rules:
 - Do NOT invent requirements that are not in the text.
 - If something is clearly stated, do NOT list it as an ambiguity.
