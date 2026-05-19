@@ -52,6 +52,12 @@ FAKE_STORY_RESPONSE = {
     "assumptions": [],
 }
 
+FAKE_AC_RESPONSE = {
+    "criteria": [
+        {"given": "the user is logged in", "when": "they do X", "then": "outcome Y appears"}
+    ]
+}
+
 
 def _llm_factory(payload: dict):
     """Build a fake ChatAnthropic class whose instances return `payload`."""
@@ -64,12 +70,17 @@ def _llm_factory(payload: dict):
     return _factory
 
 
-def _mock_pipeline_llms(analyst_payload: dict, story_payload: dict = FAKE_STORY_RESPONSE):
+def _mock_pipeline_llms(
+    analyst_payload: dict,
+    story_payload: dict = FAKE_STORY_RESPONSE,
+    ac_payload: dict = FAKE_AC_RESPONSE,
+):
     """Patch each agent's `ChatAnthropic` symbol with its own fake.
 
-    `ChatAnthropic` is the same class object in both agent modules, so patching
+    `ChatAnthropic` is the same class object in every agent module, so patching
     `.invoke` on the class would bleed across agents. Patching the symbol at
-    each import site keeps the two mocks independent.
+    each import site keeps the mocks independent (see feedback memory
+    `feedback_mock_class_per_module`).
     """
     stack = ExitStack()
     stack.enter_context(
@@ -79,6 +90,9 @@ def _mock_pipeline_llms(analyst_payload: dict, story_payload: dict = FAKE_STORY_
     )
     stack.enter_context(
         patch("agents.user_story_writer.ChatAnthropic", side_effect=_llm_factory(story_payload))
+    )
+    stack.enter_context(
+        patch("agents.ac_generator.ChatAnthropic", side_effect=_llm_factory(ac_payload))
     )
     return stack
 
@@ -104,7 +118,9 @@ def test_pipeline_flows_through_when_no_critical_ambiguities():
     # Composer runs after Story Review accept — final_artifact populated
     assert "final_artifact" in result
     assert result["final_artifact"].description == result["user_story"].description
-    assert result["final_artifact"].acceptance_criteria == []  # Phase 8 will fill
+    # AC Generator (Phase 8) populates this slot from FAKE_AC_RESPONSE.
+    assert len(result["final_artifact"].acceptance_criteria) == 1
+    assert result["final_artifact"].acceptance_criteria[0].then == "outcome Y appears"
     assert result["final_artifact"].test_cases == []  # Phase 9 will fill
 
 
