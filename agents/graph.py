@@ -5,18 +5,54 @@ chains agents together. Currently wires the Analyst, the PO checkpoint,
 and the User Story Writer; subsequent agents (AC Generator, Test Case,
 Reviewer) attach as additional nodes without rewiring the existing
 structure.
+
+Checkpointing uses SQLite by default so paused human-in-the-loop threads
+survive process restarts (see `docs/adr-0002-durable-checkpointer.md`).
+Test code injects an in-memory SQLite saver via `build_pipeline(checkpointer=...)`.
 """
 
 from __future__ import annotations
 
+import os
+import sqlite3
+from pathlib import Path
 from typing import TypedDict
 
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
-from agents.requirements_analyst import AnalystOutput, analyze_requirement
+from agents.requirements_analyst import (
+    Ambiguity,
+    AnalystOutput,
+    ImpliedStory,
+    analyze_requirement,
+)
 from agents.user_story_writer import UserStory, write_user_story
+
+DEFAULT_CHECKPOINT_DB = "~/.rtia/state.db"
+"""Default SQLite path for the checkpointer; overridable via RTIA_CHECKPOINT_DB."""
+
+PIPELINE_STATE_VERSION = 1
+"""Schema version marker for PipelineState.
+
+Bump when fields are removed or renamed (additions are backward-compatible
+because `total=False` allows missing keys). A bump means existing SQLite
+state files may need migration — document the migration in an ADR.
+"""
+
+# Pydantic types we serialize into checkpointed state. LangGraph's msgpack
+# serializer refuses to deserialize unknown types in newer releases, so we
+# explicitly allowlist these — fixes the warning that has surfaced on every
+# demo run since the Analyst started returning Pydantic models.
+_CHECKPOINT_ALLOWLIST: list[tuple[str, ...]] = [
+    ("agents.requirements_analyst", "AnalystOutput"),
+    ("agents.requirements_analyst", "Ambiguity"),
+    ("agents.requirements_analyst", "ImpliedStory"),
+    ("agents.user_story_writer", "UserStory"),
+]
 
 
 class PipelineState(TypedDict, total=False):
@@ -25,6 +61,9 @@ class PipelineState(TypedDict, total=False):
     Each node reads what it needs from prior fields and writes its own
     output slot. `total=False` means fields are populated incrementally as
     the graph runs — the initial invoke only needs `requirement_text`.
+
+    Schema version: see PIPELINE_STATE_VERSION. Field additions are safe;
+    removals or renames require a version bump + migration plan.
     """
 
     requirement_text: str
@@ -64,17 +103,55 @@ def story_writer_node(state: PipelineState) -> dict:
     return {"user_story": story}
 
 
-def build_pipeline():
+def _allowlisted_serde() -> JsonPlusSerializer:
+    """Build the serializer with our Pydantic types pre-registered.
+
+    Passing this serde directly to `SqliteSaver(conn, serde=...)` is the
+    fix that survives cross-process reads. `SqliteSaver.with_allowlist()`
+    only configures the local saver instance — when a fresh process
+    re-opens the same DB with a fresh saver, the deserializer falls back
+    to its default (warning-on-unknown) behavior. Direct serde
+    construction makes the allowlist part of every read and write.
+    """
+    return JsonPlusSerializer(allowed_msgpack_modules=_CHECKPOINT_ALLOWLIST)
+
+
+def _default_sqlite_checkpointer() -> BaseCheckpointSaver:
+    """Build the production-default checkpointer: SQLite at the configured path.
+
+    The DB file lives at `RTIA_CHECKPOINT_DB` if set, otherwise
+    `~/.rtia/state.db`. Parent directory is auto-created.
+
+    Idempotency: a pipeline invoked with the same `thread_id` resumes
+    existing state; a new `thread_id` is a fresh run. This is the
+    LangGraph default and is documented in ADR-0002.
+
+    `check_same_thread=False` lets the saver be used from worker threads
+    (LangGraph spins these up internally). The connection's lifetime
+    is tied to the saver instance, which is tied to the compiled
+    pipeline returned by `build_pipeline()`.
+    """
+    db_path_str = os.environ.get("RTIA_CHECKPOINT_DB") or DEFAULT_CHECKPOINT_DB
+    db_path = Path(db_path_str).expanduser()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    return SqliteSaver(conn, serde=_allowlisted_serde())
+
+
+def build_pipeline(checkpointer: BaseCheckpointSaver | None = None):
     """Build and compile the RTIA pipeline graph.
 
-    Compiled with an in-memory checkpointer because `interrupt()` requires
-    one to persist state across pause/resume. In-memory is correct for
-    demos and tests; production callers should swap for a durable
-    checkpointer (Redis, Postgres) so paused threads survive restarts.
+    `checkpointer=None` (default) uses the durable SQLite saver — paused
+    human-in-the-loop threads survive process restarts. Pass an explicit
+    checkpointer to override (tests inject an in-memory SQLite saver; a
+    future production UI may pass a Postgres saver).
 
-    Callers build their own instance (no module-level singleton) so
-    production and tests go through the same construction path.
+    Callers build their own pipeline instance (no module-level singleton)
+    so production and tests go through the same construction path.
     """
+    if checkpointer is None:
+        checkpointer = _default_sqlite_checkpointer()
+
     builder = StateGraph(PipelineState)
     builder.add_node("analyst", analyst_node)
     builder.add_node("po_checkpoint", po_checkpoint_node)
@@ -83,4 +160,19 @@ def build_pipeline():
     builder.add_edge("analyst", "po_checkpoint")
     builder.add_edge("po_checkpoint", "story_writer")
     builder.add_edge("story_writer", END)
-    return builder.compile(checkpointer=MemorySaver())
+    return builder.compile(checkpointer=checkpointer)
+
+
+# Re-export the types we allowlist so callers (tests, future eval harness)
+# can compare against the contract without reaching into agent modules.
+__all__ = [
+    "Ambiguity",
+    "AnalystOutput",
+    "ImpliedStory",
+    "PIPELINE_STATE_VERSION",
+    "PipelineState",
+    "UserStory",
+    "_CHECKPOINT_ALLOWLIST",
+    "_allowlisted_serde",
+    "build_pipeline",
+]
