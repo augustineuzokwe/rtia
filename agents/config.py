@@ -25,11 +25,25 @@ constant to the dated ID for full reproducibility. See ADR-0001.
 DEFAULT_TIMEOUT_SECONDS = 60.0
 """Wall-clock seconds per Claude call. Caps stuck network requests."""
 
-DEFAULT_MAX_RETRIES = 3
-"""Retries on transient errors (429, 5xx). Exponential backoff.
+DEFAULT_MAX_RETRIES = 5
+"""Anthropic SDK retry count. See `docs/adr-0003-llm-resilience.md`.
 
-NOTE: retries are silent — callers should surface retry counts via logs
-or LangSmith traces so latency spikes remain debuggable.
+What the SDK retries (verified from `anthropic._base_client._should_retry`):
+    408 Request Timeout
+    409 Lock Timeout
+    429 Rate Limit
+    >= 500 Server Errors (includes 529 Overloaded that Opus 4.7 emits)
+
+Backoff: exponential `min(0.5 * 2^n, 8.0)` seconds with jitter; respects
+`Retry-After` header when ≤ 60s.
+
+Patience budget with N=5: ~0.5+1+2+4+8 = ~15.5s of total wait. Tuned so
+a brief Anthropic load event doesn't wedge an interactive demo, while a
+sustained outage fails fast. Override per call when the agent runs in a
+different SLO context (tight: 2; batch: 10+).
+
+NOTE: retries are silent at the SDK layer. LangSmith trace metadata
+exposes `x-stainless-retry-count` so latency spikes remain debuggable.
 """
 
 

@@ -23,6 +23,25 @@ def test_defaults_are_present_and_typed():
     assert isinstance(DEFAULT_MAX_RETRIES, int) and DEFAULT_MAX_RETRIES >= 0
 
 
+def test_default_max_retries_in_resilience_window():
+    """Patience budget must ride out brief Anthropic load events without wedging.
+
+    Anthropic SDK backoff: min(0.5 * 2^n, 8.0) per retry. The total wait
+    for max_retries=5 is ~15.5s (0.5+1+2+4+8), tuned for an interactive
+    demo. See docs/adr-0003-llm-resilience.md for the budget table.
+
+    Lower bound (>=4) catches an accidental downgrade that re-introduces
+    the Phase 1.3 sample-03 failure mode (sustained 529 storms wedged a
+    3-retry budget).
+    Upper bound (<=10) catches an accidental upgrade that would block an
+    interactive demo for ~47s on a genuinely-down endpoint.
+    """
+    assert 4 <= DEFAULT_MAX_RETRIES <= 10, (
+        f"DEFAULT_MAX_RETRIES={DEFAULT_MAX_RETRIES} is outside the "
+        "resilience window. See ADR-0003 before tuning."
+    )
+
+
 def test_prompt_hash_is_deterministic():
     """Same input bytes must always produce the same hash."""
     assert prompt_hash("hello") == prompt_hash("hello")
