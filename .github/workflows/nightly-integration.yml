@@ -1,17 +1,17 @@
-name: Nightly integration smoke
+name: Integration smoke (manual)
 
 # Runs the live agent pipeline against every sample requirement using the
 # cheapest dated Anthropic model and a hard token budget. Catches behaviour
 # regressions that mocked unit tests cannot see (prompt drift, schema
 # mismatches, missing assumptions, accidental cost blowups).
 #
-# Triggered nightly via cron and on demand via workflow_dispatch so a
-# draft PR can self-verify the workflow before merge.
+# **Manual trigger only.** The nightly cron was intentionally removed — RTIA
+# is local-dev today, so the value of catching overnight drift does not yet
+# justify the recurring (small) API spend. Re-enable the cron when the
+# Phase 14 API endpoint lands and the pipeline starts serving real requests.
+# Trigger on demand via: gh workflow run integration-smoke.yml
 
 on:
-  schedule:
-    # 03:17 UTC — odd minute keeps us off GitHub's hot cron buckets.
-    - cron: "17 3 * * *"
   workflow_dispatch:
     inputs:
       model:
