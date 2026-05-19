@@ -24,6 +24,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from agents.final_artifact import AcceptanceCriterion, FinalUserStory, TestCase
 from agents.requirements_analyst import (
     Ambiguity,
     AnalystOutput,
@@ -52,6 +53,9 @@ _CHECKPOINT_ALLOWLIST: list[tuple[str, ...]] = [
     ("agents.requirements_analyst", "Ambiguity"),
     ("agents.requirements_analyst", "ImpliedStory"),
     ("agents.user_story_writer", "UserStory"),
+    ("agents.final_artifact", "FinalUserStory"),
+    ("agents.final_artifact", "AcceptanceCriterion"),
+    ("agents.final_artifact", "TestCase"),
 ]
 
 
@@ -70,6 +74,7 @@ class PipelineState(TypedDict, total=False):
     analyst_output: AnalystOutput
     po_answers: dict[str, str]
     user_story: UserStory
+    final_artifact: FinalUserStory
 
 
 def analyst_node(state: PipelineState) -> dict:
@@ -101,6 +106,29 @@ def story_writer_node(state: PipelineState) -> dict:
     """Run the User Story Writer on the Analyst's output + PO answers."""
     story = write_user_story(state["analyst_output"], state.get("po_answers", {}))
     return {"user_story": story}
+
+
+def composer_node(state: PipelineState) -> dict:
+    """Assemble the final artifact from current pipeline state.
+
+    Today this is a pure transformation (no LLM call): description +
+    objective + assumptions come from the Story Writer; AC and Test
+    Case sections stay empty (their authoring agents land in Phase 8/9).
+    This node is the explicit sink of the pipeline; downstream agents
+    will WRITE into `final_artifact.acceptance_criteria` /
+    `.test_cases` in later phases, with this composer remaining the
+    final-state assembler.
+    """
+    story = state["user_story"]
+    artifact = FinalUserStory(
+        description=story.description,
+        objective=story.objective,
+        acceptance_criteria=[],
+        test_cases=[],
+        assumptions=list(story.assumptions),
+        metadata={},
+    )
+    return {"final_artifact": artifact}
 
 
 def _allowlisted_serde() -> JsonPlusSerializer:
@@ -156,21 +184,26 @@ def build_pipeline(checkpointer: BaseCheckpointSaver | None = None):
     builder.add_node("analyst", analyst_node)
     builder.add_node("po_checkpoint", po_checkpoint_node)
     builder.add_node("story_writer", story_writer_node)
+    builder.add_node("composer", composer_node)
     builder.add_edge(START, "analyst")
     builder.add_edge("analyst", "po_checkpoint")
     builder.add_edge("po_checkpoint", "story_writer")
-    builder.add_edge("story_writer", END)
+    builder.add_edge("story_writer", "composer")
+    builder.add_edge("composer", END)
     return builder.compile(checkpointer=checkpointer)
 
 
 # Re-export the types we allowlist so callers (tests, future eval harness)
 # can compare against the contract without reaching into agent modules.
 __all__ = [
+    "AcceptanceCriterion",
     "Ambiguity",
     "AnalystOutput",
+    "FinalUserStory",
     "ImpliedStory",
     "PIPELINE_STATE_VERSION",
     "PipelineState",
+    "TestCase",
     "UserStory",
     "_CHECKPOINT_ALLOWLIST",
     "_allowlisted_serde",
