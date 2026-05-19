@@ -109,8 +109,14 @@ def write_user_story(
         ambiguities=_format_ambiguities(analyst_output),
         po_answers=_format_po_answers(po_answers),
     )
+    # Cache the static system prompt — see agents/requirements_analyst.py for
+    # the rationale; same pattern, same TTL, same ~10% billing on cache hits.
     messages = [
-        SystemMessage(content=SYSTEM_PROMPT),
+        SystemMessage(
+            content=[
+                {"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
+            ]
+        ),
         HumanMessage(content=user_prompt),
     ]
     # Attach prompt_hash to LangSmith trace metadata so every traced run is

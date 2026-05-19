@@ -108,13 +108,36 @@ def _run_analyst_capturing_usage(text: str) -> tuple[AnalystOutput, UsageTelemet
     return parsed, telemetry
 
 
-def evaluate_sample(sample: SampleRecord, judge: ClaudeJudge) -> SampleReport:
+def evaluate_sample(
+    sample: SampleRecord,
+    geval_judge: ClaudeJudge,
+    match_judge: ClaudeJudge,
+) -> SampleReport:
+    """Score one sample with split judges.
+
+    ``geval_judge`` (typically Opus) is used for the criterion-based GEval
+    metric where judge reasoning quality matters. ``match_judge`` (typically
+    a cheaper model like Haiku) handles the structured-output verdicts for
+    actor synonyms and ambiguity-category matching — these are short, narrow
+    classification calls where a smaller model is calibrated well enough.
+    Split established here, not pushed into metrics.py, so the metric API
+    stays single-judge and the model-economics decision lives at the runner.
+    """
     actual, usage = _run_analyst_capturing_usage(sample.raw_requirement)
     expected = sample.expected_analyst
     metrics = [
-        score_intent_faithfulness(actual, expected, judge),
-        score_actor_set_completeness(actual, expected, judge),
-        score_ambiguity_discipline(actual, expected, judge),
+        # Intent + actor synonym matching stay on the stronger judge — both
+        # require nuanced reasoning (intent semantics; "X ≈ Y" for role
+        # labels). Verified empirically: Haiku fails the actor synonym
+        # call on sample-01 (e.g. "authenticated user" vs "QA Lead
+        # (authenticated user)"), regressing the metric from 0.80 to 0.40.
+        score_intent_faithfulness(actual, expected, geval_judge),
+        score_actor_set_completeness(actual, expected, geval_judge),
+        # Ambiguity-category matching is short, structured-output
+        # classification — Haiku is calibrated well enough here, and this
+        # is the most-called judge (one call per ambiguity item) so the
+        # cost savings are the largest.
+        score_ambiguity_discipline(actual, expected, match_judge),
     ]
     return SampleReport(
         name=sample.name,
@@ -124,7 +147,12 @@ def evaluate_sample(sample: SampleRecord, judge: ClaudeJudge) -> SampleReport:
     )
 
 
-def _serialise(reports: list[SampleReport]) -> dict:
+def _serialise(
+    reports: list[SampleReport],
+    *,
+    geval_judge_model: str,
+    match_judge_model: str,
+) -> dict:
     aggregate_usage = UsageTelemetry()
     for r in reports:
         aggregate_usage.add(r.analyst_usage)
@@ -137,6 +165,8 @@ def _serialise(reports: list[SampleReport]) -> dict:
     return {
         "generated_at": datetime.now(UTC).isoformat(),
         "model": DEFAULT_MODEL,
+        "geval_judge_model": geval_judge_model,
+        "match_judge_model": match_judge_model,
         "analyst_prompt_hash": _PROMPT_HASH,
         "samples": [
             {
@@ -156,6 +186,7 @@ def _serialise(reports: list[SampleReport]) -> dict:
 
 def _print_summary(payload: dict) -> None:
     print(f"\nmodel={payload['model']}  prompt_hash={payload['analyst_prompt_hash']}")
+    print(f"judges: geval={payload['geval_judge_model']}  match={payload['match_judge_model']}")
     print(f"samples evaluated: {len(payload['samples'])}\n")
     for s in payload["samples"]:
         print(f"  {s['name']}")
@@ -189,6 +220,24 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Write JSON report to this path (default: evals/reports/run-<utc>.json).",
     )
+    parser.add_argument(
+        "--geval-judge-model",
+        default=DEFAULT_MODEL,
+        help=(
+            "Model for the GEval intent-faithfulness judge — keep at the default "
+            "(Opus) unless you have a specific reason; downgrading degrades the "
+            "metric you most rely on."
+        ),
+    )
+    parser.add_argument(
+        "--match-judge-model",
+        default="claude-haiku-4-5-20251001",
+        help=(
+            "Model for short structured-output judge calls (actor synonyms, "
+            "ambiguity-category matching). Defaults to Haiku 4.5 to keep eval "
+            "spend low; bump to Opus if you suspect classification drift."
+        ),
+    )
     args = parser.parse_args(argv)
 
     samples = load_all_samples()
@@ -198,9 +247,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"No samples match {args.sample!r}", file=sys.stderr)
             return 2
 
-    judge = ClaudeJudge()
-    reports = [evaluate_sample(s, judge) for s in samples]
-    payload = _serialise(reports)
+    geval_judge = ClaudeJudge(model=args.geval_judge_model)
+    match_judge = ClaudeJudge(model=args.match_judge_model)
+    reports = [evaluate_sample(s, geval_judge, match_judge) for s in samples]
+    payload = _serialise(
+        reports,
+        geval_judge_model=args.geval_judge_model,
+        match_judge_model=args.match_judge_model,
+    )
     _print_summary(payload)
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
