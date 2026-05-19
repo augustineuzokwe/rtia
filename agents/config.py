@@ -11,6 +11,8 @@ choice and the version-pinning policy.
 
 from __future__ import annotations
 
+import hashlib
+
 DEFAULT_MODEL = "claude-opus-4-7"
 """Canonical Anthropic model ID for v1.
 
@@ -29,3 +31,24 @@ DEFAULT_MAX_RETRIES = 3
 NOTE: retries are silent — callers should surface retry counts via logs
 or LangSmith traces so latency spikes remain debuggable.
 """
+
+
+def prompt_hash(*prompts: str) -> str:
+    """Return a short, stable identifier for a set of prompt strings.
+
+    Used as `prompt_hash` in LangSmith trace metadata so every traced
+    LLM call can be attributed to the exact prompt version that produced
+    it. Editing any prompt content (system or user-template) changes the
+    hash; reordering arguments also changes it (deliberate — both
+    prompts contribute to model behavior).
+
+    Returns the first 12 hex chars of sha256, which is plenty to avoid
+    collisions in a single project's lifetime and short enough to read
+    in a trace UI. Truncation is deterministic so the same prompts
+    always produce the same value.
+    """
+    h = hashlib.sha256()
+    for prompt in prompts:
+        h.update(prompt.encode("utf-8"))
+        h.update(b"\x00")  # delimiter so ("ab", "c") != ("a", "bc")
+    return h.hexdigest()[:12]
