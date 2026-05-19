@@ -36,7 +36,29 @@ As a QA Lead, I want to see a real-time test run summary for my selected project
 
 ---
 
+## Expected Analyst Output (per-agent ground truth for the Requirements Analyst)
+
+> Ground truth for the **Analyst agent only**. Phrasing is illustrative — eval metrics
+> compare against this fuzzily (judge for intent, set semantics for actors, category
+> coverage for ambiguities), not by exact string match.
+
+### Intent
+Let an authenticated QA user monitor the health of the most recent test run for a selected project on the dashboard, with the data refreshing on its own.
+
+### Actors (expected set)
+- QA Lead (authenticated user)
+- unauthenticated user
+
+### Ambiguity Categories
+- (none expected) — the requirement is well-scoped, single-feature, and names its role, behaviour, refresh cadence, and auth boundary explicitly. The Analyst should return an empty `ambiguities` list. Any flagged item is most likely an implementation/UX detail the prompt's scope rule forbids (e.g. refresh indicator, retry on network error, redirect target after login).
+
+### Implied Stories
+- (none expected) — single-story requirement.
+
+---
+
 ## Eval Notes
 - RTIA output should contain all 3 ACs (auth redirect, data display, auto-refresh)
 - A missing auto-refresh AC is a coverage gap the Reviewer Agent should catch
 - Faithfulness: ACs should not introduce scope not present in the requirement (e.g. specific refresh UI indicator is not stated)
+- Analyst eval: empty `ambiguities` is the correct, expected output here; flagging UX detail is a discipline failure, not a thoroughness win.

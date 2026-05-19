@@ -27,8 +27,41 @@ Every sample file must contain all of the following sections in this order:
 ## Expected Output (ground truth for eval dataset)
 ### User Story
 ### Acceptance Criteria
+## Expected Analyst Output (per-agent ground truth for the Requirements Analyst)
+### Intent
+### Actors (expected set)
+### Ambiguity Categories
+### Implied Stories
 ## Eval Notes
 ```
+
+The `## Expected Output` block is the **end-to-end** ground truth (what the final
+FinalUserStory artifact should look like after the whole pipeline runs). The
+`## Expected Analyst Output` block is the **per-agent** ground truth for the
+Requirements Analyst only — added in Phase 5 so per-agent evals can be calibrated
+independently of downstream agents.
+
+---
+
+## Rules for Expected Analyst Output
+
+Phrasing inside this block is illustrative. Eval metrics compare fuzzily, not by
+exact string match:
+
+- **Intent** — one or two sentences capturing the underlying goal. Judge-evaluated
+  for faithfulness; do not include scope the raw requirement does not state or imply.
+- **Actors (expected set)** — bulleted list of distinct roles or systems the
+  requirement names or directly implies. Compared as a set (with judge tiebreak on
+  synonymous role names, e.g. "QA Lead" vs "test lead").
+- **Ambiguity Categories** — bulleted list of *categories* (not exact wording) the
+  Analyst should surface, OR the literal marker `(none expected)` when the
+  requirement is well-scoped. Each category should describe *what kind* of question
+  is expected (e.g. "actor scoping", "manager visibility shape"), so wording
+  variance in the agent's actual output does not break the eval.
+- **Implied Stories** — bulleted list for multi-feature samples (those with a
+  `## Features Contained` section), or `(none expected)` for single-story samples.
+  Each entry is a short title plus one-line summary. The eval checks the count
+  and category of each implied story, not exact title wording.
 
 ---
 
