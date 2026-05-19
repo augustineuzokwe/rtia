@@ -31,12 +31,20 @@ from dotenv import load_dotenv  # noqa: E402
 from langchain_anthropic import ChatAnthropic  # noqa: E402
 from langchain_core.messages import HumanMessage, SystemMessage  # noqa: E402
 
+from agents.ac_generator import _PROMPT_HASH as AC_PROMPT_HASH  # noqa: E402
+from agents.ac_generator import AcGeneratorOutput, generate_acceptance_criteria  # noqa: E402
 from agents.config import (  # noqa: E402
     DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
     DEFAULT_TIMEOUT_SECONDS,
 )
 from agents.requirements_analyst import _PROMPT_HASH, AnalystOutput  # noqa: E402
+from agents.user_story_writer import UserStory, write_user_story  # noqa: E402
+from evals.ac_metrics import (  # noqa: E402
+    score_ac_coverage,
+    score_ac_faithfulness,
+    score_ac_testability,
+)
 from evals.dataset import SampleRecord, load_all_samples  # noqa: E402
 from evals.judge import ClaudeJudge  # noqa: E402
 from evals.metrics import (  # noqa: E402
@@ -49,6 +57,19 @@ from prompts.requirements_analyst_prompts import (  # noqa: E402
     SYSTEM_PROMPT,
     USER_PROMPT_TEMPLATE,
 )
+
+_AUTO_PO_ANSWER = (
+    "Auto-resolved by eval runner: pick the first reasonable interpretation "
+    "and proceed; do not block on this."
+)
+"""Canned PO answer for any CRITICAL ambiguity an Analyst flags during eval.
+
+The eval runner is unattended — we can't pause for PO input. Using a fixed
+answer keeps the downstream Story Writer behaviour deterministic across
+runs. The Story-Writer / AC-Generator quality on multi-feature samples is
+therefore upstream-coupled to this canned answer; it is documented in
+baselines.md so a reader knows what they are looking at.
+"""
 
 REPORTS_DIR = Path(__file__).parent / "reports"
 
@@ -69,8 +90,20 @@ class UsageTelemetry:
 class SampleReport:
     name: str
     analyst_output: dict
+    story_output: dict | None = None
+    ac_output: dict | None = None
     metrics: list[MetricResult] = field(default_factory=list)
     analyst_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
+    story_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
+    ac_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
+
+    @property
+    def pipeline_usage(self) -> UsageTelemetry:
+        total = UsageTelemetry()
+        total.add(self.analyst_usage)
+        total.add(self.story_usage)
+        total.add(self.ac_usage)
+        return total
 
 
 def _run_analyst_capturing_usage(text: str) -> tuple[AnalystOutput, UsageTelemetry]:
@@ -108,6 +141,57 @@ def _run_analyst_capturing_usage(text: str) -> tuple[AnalystOutput, UsageTelemet
     return parsed, telemetry
 
 
+def _auto_po_answers(analyst_output: AnalystOutput) -> dict[str, str]:
+    """Provide the canned PO answer for each CRITICAL Analyst ambiguity."""
+    return {
+        a.question: _AUTO_PO_ANSWER for a in analyst_output.ambiguities if a.severity == "critical"
+    }
+
+
+def _usage_from_response(response) -> UsageTelemetry:
+    meta = getattr(response, "usage_metadata", None) or {}
+    return UsageTelemetry(
+        input_tokens=int(meta.get("input_tokens", 0)),
+        output_tokens=int(meta.get("output_tokens", 0)),
+    )
+
+
+def _run_story_writer_capturing_usage(
+    analyst_output: AnalystOutput, po_answers: dict[str, str]
+) -> tuple[UserStory, UsageTelemetry]:
+    """Run the Story Writer via the library entry point and pull usage telemetry.
+
+    The library call wraps its own LLM construction; we monkey-light it by
+    re-running the same path with a captured response is fragile. Instead we
+    call ``write_user_story`` (which has the prompt-cache + retry policy) and
+    accept that we miss per-call usage data here. We approximate token spend
+    by re-tokenising on the report side later if needed.
+    """
+    # Pragmatic compromise: write_user_story returns just the parsed UserStory.
+    # To capture usage without forking the function, we'd need to either
+    # restructure that function or do the invoke ourselves. For now, return
+    # zeros — the Anthropic console remains the source of truth on cost; this
+    # file-level telemetry is informational, not billing.
+    story = write_user_story(analyst_output, po_answers)
+    return story, UsageTelemetry()
+
+
+def _run_ac_generator_capturing_usage(
+    user_story: UserStory,
+    analyst_output: AnalystOutput,
+    po_answers: dict[str, str],
+) -> tuple[AcGeneratorOutput, UsageTelemetry]:
+    """Run the AC Generator and return its output + zero-usage placeholder.
+
+    Same trade-off as ``_run_story_writer_capturing_usage`` — see that
+    docstring. AC_PROMPT_HASH is imported so the report's metadata can
+    cite the AC Generator's prompt version even when token telemetry is
+    unavailable.
+    """
+    result = generate_acceptance_criteria(user_story, analyst_output, po_answers)
+    return result, UsageTelemetry()
+
+
 def evaluate_sample(
     sample: SampleRecord,
     geval_judge: ClaudeJudge,
@@ -123,27 +207,43 @@ def evaluate_sample(
     Split established here, not pushed into metrics.py, so the metric API
     stays single-judge and the model-economics decision lives at the runner.
     """
-    actual, usage = _run_analyst_capturing_usage(sample.raw_requirement)
-    expected = sample.expected_analyst
+    analyst_output, analyst_usage = _run_analyst_capturing_usage(sample.raw_requirement)
+    po_answers = _auto_po_answers(analyst_output)
+
+    # Chain forward through the rest of the pipeline so AC-layer metrics
+    # score against what the AC Generator actually produces. This couples
+    # AC scores to upstream agent quality; the trade-off is documented in
+    # baselines.md. Failure here (e.g. Story Writer JSON parse) propagates
+    # as an exception — eval results for the AC layer are explicitly
+    # unavailable rather than silently zero'd.
+    story, story_usage = _run_story_writer_capturing_usage(analyst_output, po_answers)
+    ac_result, ac_usage = _run_ac_generator_capturing_usage(story, analyst_output, po_answers)
+
     metrics = [
-        # Intent + actor synonym matching stay on the stronger judge — both
-        # require nuanced reasoning (intent semantics; "X ≈ Y" for role
-        # labels). Verified empirically: Haiku fails the actor synonym
-        # call on sample-01 (e.g. "authenticated user" vs "QA Lead
-        # (authenticated user)"), regressing the metric from 0.80 to 0.40.
-        score_intent_faithfulness(actual, expected, geval_judge),
-        score_actor_set_completeness(actual, expected, geval_judge),
-        # Ambiguity-category matching is short, structured-output
-        # classification — Haiku is calibrated well enough here, and this
-        # is the most-called judge (one call per ambiguity item) so the
-        # cost savings are the largest.
-        score_ambiguity_discipline(actual, expected, match_judge),
+        # Analyst layer — intent + actor synonym matching stay on the stronger
+        # judge (both require nuanced reasoning). Ambiguity-category matching
+        # goes to the cheaper match judge — most-called metric, cheapest to
+        # downgrade, calibrated empirically (#77).
+        score_intent_faithfulness(analyst_output, sample.expected_analyst, geval_judge),
+        score_actor_set_completeness(analyst_output, sample.expected_analyst, geval_judge),
+        score_ambiguity_discipline(analyst_output, sample.expected_analyst, match_judge),
+        # AC layer — coverage uses the cheaper judge (short classification per
+        # AC), testability is fully programmatic (no judge), faithfulness uses
+        # GEval so calibration matches Analyst intent-faithfulness.
+        score_ac_coverage(ac_result, sample.expected_acs, match_judge),
+        score_ac_testability(ac_result),
+        score_ac_faithfulness(ac_result, story, geval_judge),
     ]
+
     return SampleReport(
         name=sample.name,
-        analyst_output=actual.model_dump(),
+        analyst_output=analyst_output.model_dump(),
+        story_output=story.model_dump(),
+        ac_output=ac_result.model_dump(),
         metrics=metrics,
-        analyst_usage=usage,
+        analyst_usage=analyst_usage,
+        story_usage=story_usage,
+        ac_usage=ac_usage,
     )
 
 
@@ -168,10 +268,13 @@ def _serialise(
         "geval_judge_model": geval_judge_model,
         "match_judge_model": match_judge_model,
         "analyst_prompt_hash": _PROMPT_HASH,
+        "ac_generator_prompt_hash": AC_PROMPT_HASH,
         "samples": [
             {
                 "name": r.name,
                 "analyst_output": r.analyst_output,
+                "story_output": r.story_output,
+                "ac_output": r.ac_output,
                 "metrics": [asdict(m) for m in r.metrics],
                 "usage": asdict(r.analyst_usage),
             }
