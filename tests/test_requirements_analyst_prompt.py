@@ -47,3 +47,45 @@ def test_prompt_prefers_fewer_higher_signal_ambiguities():
     """The Analyst must be steered toward fewer, higher-signal ambiguities."""
     lower = SYSTEM_PROMPT.lower()
     assert "fewer" in lower and "higher-signal" in lower
+
+
+def test_prompt_includes_worked_example_with_empty_ambiguities():
+    """A concrete input→output example is the strongest lever for LLM compliance.
+
+    The example must show an empty ambiguities list as a *valid output*, so the
+    model learns that zero ambiguities is normal — not a failure mode. Without
+    this, the model defaults to padding the list to look thorough.
+    """
+    lower = SYSTEM_PROMPT.lower()
+    assert "worked example" in lower
+    assert '"ambiguities": []' in SYSTEM_PROMPT, (
+        "Worked example must show an empty ambiguities list as a valid output."
+    )
+    # The example must include both the input and the correct output sections.
+    assert "requirement (input)" in lower
+    assert "correct output" in lower
+
+
+def test_prompt_explains_why_anti_examples_are_rejected_in_the_worked_example():
+    """The worked example must explicitly reject specific would-be ambiguities.
+
+    Showing "you might be tempted to flag X but don't, because Y" teaches the
+    classification boundary in a way prose rules alone don't. Without this,
+    the example is just a happy-path; the model still hits the same trap on
+    edge cases.
+    """
+    lower = SYSTEM_PROMPT.lower()
+    assert "tempted to flag" in lower or "you might" in lower
+    # At least two distinct rejection categories should be reasoned through.
+    rejection_categories = [
+        "ac concern",
+        "ux/implementation",
+        "edge-case",
+        "new story",
+        "don't invent",
+    ]
+    matched = [c for c in rejection_categories if c in lower]
+    assert len(matched) >= 2, (
+        f"Worked example should explicitly reason through at least 2 of "
+        f"{rejection_categories}; got {matched}."
+    )

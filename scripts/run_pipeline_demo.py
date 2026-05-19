@@ -9,11 +9,14 @@ checkpoint, the User Story Writer produces a single user story.
 Requires `ANTHROPIC_API_KEY` in `.env` (see `.env.example`).
 
 Run with:
-    uv run python scripts/run_pipeline_demo.py
+    uv run python scripts/run_pipeline_demo.py                      # default: sample-01
+    uv run python scripts/run_pipeline_demo.py sample-02-vague-ambiguous.md
+    uv run python scripts/run_pipeline_demo.py /abs/path/to/req.md  # any path works
 """
 
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -29,7 +32,30 @@ from agents.observability import tracing_status  # noqa: E402
 
 LANGSMITH_DASHBOARD_URL = "https://smith.langchain.com"
 
-SAMPLE_PATH = REPO_ROOT / "evals" / "sample-requirements" / "sample-01-well-structured.md"
+SAMPLES_DIR = REPO_ROOT / "evals" / "sample-requirements"
+DEFAULT_SAMPLE = "sample-01-well-structured.md"
+
+
+def resolve_sample(arg: str | None) -> Path:
+    """Resolve a CLI argument to a real sample file path.
+
+    Accepts: nothing (default sample), a bare filename inside the samples
+    directory, or an absolute path. Fails loudly if the file doesn't exist
+    so the user never silently runs the wrong file.
+    """
+    if arg is None:
+        return SAMPLES_DIR / DEFAULT_SAMPLE
+    candidate = Path(arg)
+    if candidate.is_absolute() and candidate.exists():
+        return candidate
+    bare = SAMPLES_DIR / arg
+    if bare.exists():
+        return bare
+    raise FileNotFoundError(
+        f"Sample not found: tried {candidate} and {bare}. "
+        f"Available: {sorted(p.name for p in SAMPLES_DIR.glob('*.md'))}"
+    )
+
 
 SECTION_DIVIDER = "=" * 70
 
@@ -66,10 +92,25 @@ def main() -> None:
     if tracing.enabled:
         print(f"  View traces at {LANGSMITH_DASHBOARD_URL} → project '{tracing.project}'")
 
-    raw_markdown = SAMPLE_PATH.read_text(encoding="utf-8")
+    parser = argparse.ArgumentParser(
+        description="Run the RTIA pipeline against a sample requirement."
+    )
+    parser.add_argument(
+        "sample",
+        nargs="?",
+        default=None,
+        help=(
+            f"Sample filename inside evals/sample-requirements/, or an absolute path. "
+            f"Default: {DEFAULT_SAMPLE}"
+        ),
+    )
+    args = parser.parse_args()
+    sample_path = resolve_sample(args.sample)
+
+    raw_markdown = sample_path.read_text(encoding="utf-8")
     requirement_text = extract_section(raw_markdown, "Raw Requirement")
 
-    banner("INPUT REQUIREMENT")
+    banner(f"INPUT REQUIREMENT — {sample_path.name}")
     print(requirement_text)
 
     pipeline = build_pipeline()
