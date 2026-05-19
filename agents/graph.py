@@ -108,6 +108,63 @@ def story_writer_node(state: PipelineState) -> dict:
     return {"user_story": story}
 
 
+def story_review_checkpoint_node(state: PipelineState) -> dict:
+    """Pause for PO review of the rendered story before the Composer finalizes.
+
+    Always pauses (unlike the PO Checkpoint which pauses only on critical
+    ambiguities). Renders a preview FinalUserStory via the same
+    `as_markdown()` the demo and downstream consumers see, then waits
+    for the caller to resume with one of:
+
+        {"accepted": True}                    → pass through; use Story
+                                                Writer's output as-is.
+
+        {"accepted": False,
+         "description": "...",                → direct field-level overrides;
+         "objective": "..."}                    user_story is mutated in
+                                                state before the Composer
+                                                runs.
+
+    Direct overrides rather than re-running the Story Writer is the
+    intentional anti-iteration design (see `docs/adr-0005-story-review-
+    overrides.md`). The PO knows what they want; they write it. The
+    pipeline doesn't loop.
+
+    Distinguishable from the PO Checkpoint at the demo / API layer by
+    the interrupt payload keys: PO Checkpoint emits
+    `{"critical_ambiguities": [...]}`; this node emits
+    `{"rendered_artifact": ..., "description": ..., "objective": ...,
+    "assumptions": [...]}`.
+    """
+    story = state["user_story"]
+    preview = FinalUserStory(
+        description=story.description,
+        objective=story.objective,
+        assumptions=list(story.assumptions),
+    )
+    response = interrupt(
+        {
+            "rendered_artifact": preview.as_markdown(),
+            "description": story.description,
+            "objective": story.objective,
+            "assumptions": list(story.assumptions),
+        }
+    )
+    if not isinstance(response, dict) or response.get("accepted") is True:
+        # Accept (default): no state change; Composer uses the Story
+        # Writer's output unchanged.
+        return {}
+
+    new_description = response.get("description") or story.description
+    new_objective = response.get("objective") or story.objective
+    revised = UserStory(
+        description=new_description,
+        objective=new_objective,
+        assumptions=story.assumptions,
+    )
+    return {"user_story": revised}
+
+
 def composer_node(state: PipelineState) -> dict:
     """Assemble the final artifact from current pipeline state.
 
@@ -184,11 +241,13 @@ def build_pipeline(checkpointer: BaseCheckpointSaver | None = None):
     builder.add_node("analyst", analyst_node)
     builder.add_node("po_checkpoint", po_checkpoint_node)
     builder.add_node("story_writer", story_writer_node)
+    builder.add_node("story_review_checkpoint", story_review_checkpoint_node)
     builder.add_node("composer", composer_node)
     builder.add_edge(START, "analyst")
     builder.add_edge("analyst", "po_checkpoint")
     builder.add_edge("po_checkpoint", "story_writer")
-    builder.add_edge("story_writer", "composer")
+    builder.add_edge("story_writer", "story_review_checkpoint")
+    builder.add_edge("story_review_checkpoint", "composer")
     builder.add_edge("composer", END)
     return builder.compile(checkpointer=checkpointer)
 
