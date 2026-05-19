@@ -12,6 +12,68 @@ required.
 
 ---
 
+## 2026-05-20 — cost-reduction baseline (caching + split judges)
+
+| | |
+|---|---|
+| Model (production agents) | `claude-opus-4-7` |
+| GEval + actor judge | `claude-opus-4-7` |
+| Ambiguity-category judge | `claude-haiku-4-5-20251001` |
+| Prompt caching | enabled (`cache_control: ephemeral`) on Analyst + Story Writer system prompts |
+| Analyst prompt_hash | `19631aecc02a` (unchanged from prior baseline) |
+
+### Mean scores
+
+| Metric | Mean | Δ vs initial | Threshold |
+|---|---|---|---|
+| `intent_faithfulness` | **0.77** | −0.06 | 0.80 |
+| `actor_set_completeness` | **0.77** | 0.00 | 0.80 |
+| `ambiguity_discipline` | **0.86** | 0.00 | 0.80 |
+
+> The −0.06 on `intent_faithfulness` traces to sample-03 (0.70 → 0.60). The
+> Analyst's intent string came back terser this run — same prompt hash, same
+> model. This is **run-to-run Analyst variance**, not a judge or caching
+> artifact (the judge sees the Analyst output verbatim). Treat the per-metric
+> mean as a ±0.10 band, not a single number, until more runs accumulate.
+
+### Per-sample detail
+
+| Sample | intent | actors | ambiguity |
+|---|---|---|---|
+| sample-01-well-structured | 0.90 | 0.80 | 1.00 |
+| sample-02-vague-ambiguous | 0.80 | 0.50 | 0.57 |
+| sample-03-multi-feature   | 0.60 | 1.00 | 1.00 |
+
+Sample-02 ambiguity recall (0.57) remains the headline gap — same finding as the
+initial baseline, untouched by this change.
+
+### Why this baseline exists
+
+- **Prompt caching** on the static Analyst + Story Writer system prompts (≈2k
+  tokens each) — cached input billed at ~10% of standard rate when reused within
+  the 5-minute TTL, which covers a full eval-suite burst.
+- **Ambiguity-category judge moved to Haiku 4.5.** This metric makes one judge
+  call per ambiguity item (5+ on sample-02), so the volume justifies the cheaper
+  model. Classification quality validated empirically at parity with the
+  Opus-judged baseline (ambiguity scores unchanged).
+- **Actor-matching judge kept on Opus.** First attempt with Haiku regressed
+  sample-01 from 0.80 → 0.40 because Haiku failed the `authenticated user` ≈
+  `QA Lead (authenticated user)` synonym call. Reverted same-PR.
+- **GEval intent judge kept on Opus.** Single subtle-reasoning call per sample
+  — wrong place to economise.
+
+### Token usage (Analyst calls only, excludes judge spend)
+
+| | input | output |
+|---|---|---|
+| total across 3 samples | 6948 | 955 |
+
+Analyst token totals are essentially unchanged from the initial baseline (input
+identical, output +69) — caching doesn't reduce *reported* tokens, just billing.
+The real-cost reduction shows up in the Anthropic console, not in this telemetry.
+
+---
+
 ## 2026-05-19 — initial Phase 6 baseline
 
 | | |

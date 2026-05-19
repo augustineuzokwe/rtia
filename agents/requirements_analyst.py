@@ -120,8 +120,16 @@ def analyze_requirement(
         llm_kwargs["temperature"] = temperature
 
     llm = ChatAnthropic(**llm_kwargs)
+    # Mark the (large, static) system prompt as cacheable so Anthropic's prompt
+    # cache reuses it across calls within the 5-minute TTL window. Cached input
+    # tokens are billed at ~10% of the standard rate, which is the bulk of the
+    # savings on burst workloads like an eval-suite run.
     messages = [
-        SystemMessage(content=SYSTEM_PROMPT),
+        SystemMessage(
+            content=[
+                {"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
+            ]
+        ),
         HumanMessage(content=USER_PROMPT_TEMPLATE.format(requirement_text=requirement_text)),
     ]
     # Attach prompt_hash to LangSmith trace metadata so every traced run is
