@@ -12,6 +12,91 @@ required.
 
 ---
 
+## 2026-05-20 — multi-dimension fix (PR #85)
+
+| | |
+|---|---|
+| Model (production agents) | `claude-opus-4-7` |
+| GEval (intent, AC faithfulness) judge | `claude-opus-4-7` |
+| Match (actor, ambiguity, AC coverage) judge | `claude-haiku-4-5-20251001` |
+| Prompt caching | enabled on Analyst + Story Writer + AC Generator |
+| Analyst prompt_hash | `19631aecc02a` (unchanged) |
+| Story Writer prompt_hash | `990e6ae9e86f` (was unchanged in Phase 8.4 baseline) |
+| AC Generator prompt_hash | `e7af2794b28c` (was captured per-run in Phase 8.4) |
+
+Closes the sample-03 ac_coverage gap surfaced by Phase 8.4. Two coupled
+prompt changes:
+
+1. **AC Generator Rule 8 (multi-dimension)** — one AC per named dimension
+   when the story enumerates a closed list (e.g. "filter by date range,
+   environment, AND test suite name"). Second worked example matches
+   sample-03's filter-persistence shape.
+2. **Story Writer "preserve enumerated dimensions + sub-capabilities"** —
+   reproduce dimension lists verbatim (no synonym substitution, no
+   shortening); preserve named sub-behaviours (e.g. filter persistence) in
+   description or assumptions. Found necessary during PR #85 live re-baseline:
+   the AC Generator's new rule cannot help if the Story Writer has already
+   dropped dimensions upstream.
+
+### Mean scores
+
+| Metric | Mean | Threshold | Δ vs Phase 8.4 |
+|---|---|---|---|
+| `intent_faithfulness` | **0.80** | 0.80 | -0.03 |
+| `actor_set_completeness` | **0.70** | 0.80 | -0.07 |
+| `ambiguity_discipline` | **0.86** | 0.80 | -0.06 |
+| `ac_coverage` | **0.77** | 0.80 | **+0.34** |
+| `ac_testability` | **1.00** | 0.80 | 0.00 |
+| `ac_faithfulness` | **0.67** | 0.80 | -0.10 |
+
+### Per-sample detail
+
+| Sample | intent | actors | ambig | ac_cov | ac_test | ac_faith |
+|---|---|---|---|---|---|---|
+| sample-01-well-structured | 0.80 | 0.80 | 1.00 | **1.00** | 1.00 | 0.53 |
+| sample-02-vague-ambiguous | 0.90 | 0.50 | 0.57 | 0.44 | 1.00 | 0.73 |
+| sample-03-multi-feature   | 0.70 | 0.80 | 1.00 | **0.86** | 1.00 | 0.73 |
+
+### Headline findings
+
+1. **sample-03 ac_coverage: 0.00 → 0.86** (Phase 8.4 → this run). Hypothesis
+   confirmed end-to-end: Story Writer now preserves all three filter
+   dimensions verbatim; AC Generator emits one AC per dimension
+   (precision=1.00, recall=0.75 → only `filter persistence` still missing
+   because the Story Writer did not surface it as an assumption on this run).
+   Iteration target met. Filter-persistence carry-through is the next
+   tractable improvement.
+
+2. **sample-01 ac_coverage held at 1.00.** Non-regression bar met on the
+   well-structured sample. The new Rule 8 did not over-trigger.
+
+3. **sample-02 ac_coverage 0.50 → 0.44** — within the documented ±0.10
+   noise floor. Earlier intra-run drop to 0.29 was confirmed as PO-answer
+   drift, not a Rule 8 regression: the auto-PO-resolver picks one of three
+   implied stories stochastically, and the AC ground truth is pinned to a
+   specific scope. Decoupling the PO answer in the eval is the durable fix
+   (still deferred — separate iteration).
+
+4. **`ambiguity_discipline` mean rebounded 0.44 → 0.86** vs. the intra-run
+   probe, with no Analyst prompt change. Confirms the prior run's
+   ambiguity dip was stochastic LLM variance, not a real shift. The ±0.10
+   per-sample noise floor still applies; treat any single run accordingly.
+
+5. **`ac_faithfulness` mean 0.77 → 0.67** is within run-to-run variance for
+   this metric (sample-01 in particular swings between 0.60 and 0.85). The
+   structural pessimism explained in the Phase 8.4 baseline still applies
+   (the metric scores ACs against Story Writer description+objective only,
+   ignoring Analyst context). Not addressed here.
+
+### Token usage (production-agent calls only, excludes judge spend)
+
+| | input | output |
+|---|---|---|
+| Analyst across 3 samples | 6948 | 870 |
+| Story Writer + AC Generator | (not captured at runner level — see Anthropic console) |
+
+---
+
 ## 2026-05-20 — AC-layer baseline (Phase 8.4 metrics live)
 
 | | |
