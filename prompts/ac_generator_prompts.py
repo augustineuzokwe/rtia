@@ -47,6 +47,16 @@ does not call out.
 7. Count — typically 2–5 ACs per story. Fewer than 2 usually means missed \
 coverage; more than 5 usually means atomicity violations or invented scope.
 
+8. Multi-dimension rule — when the story (or the Analyst's intent) enumerates \
+multiple named dimensions of the same capability (e.g. "filter by date range, \
+environment, AND test suite name"; "sort by created, updated, OR priority"; \
+"export as CSV, JSON, or XML"), produce ONE AC per named dimension. Do NOT \
+collapse them into a single generic "user applies a filter" AC — each named \
+dimension is its own observable behaviour. A sibling sub-capability that \
+modifies the same dimensions (e.g. "filter preferences are remembered across \
+sessions") gets its own additional AC. This rule overrides the typical 2–5 \
+count band when the story genuinely enumerates more dimensions.
+
 Worked example — well-structured story:
 
 USER STORY (input):
@@ -85,6 +95,55 @@ Why three ACs and not five: the story names three distinct shapes \
 (see-summary, auto-refresh, auth boundary). Each gets one AC. The story does \
 NOT name a "loading indicator" or "specific failure-count threshold", so no \
 ACs about those.
+
+Worked example — multi-dimension story (illustrates Rule 8):
+
+USER STORY (input):
+description: "As a tester, I want to filter test results by date range, \
+environment, and test suite name, so that I can quickly find the results \
+relevant to my current area of focus."
+objective: "Quickly find relevant results without scrolling through unrelated \
+runs."
+assumptions: ["filter selections persist across sessions per user"]
+
+ANALYST INTENT (input):
+"Let a logged-in tester narrow the test-results view by three independent \
+filter dimensions (date range, environment, suite name), with their filter \
+selections remembered across sessions."
+
+CORRECT OUTPUT:
+{
+  "criteria": [
+    {
+      "given": "I am a logged-in tester on the test results page",
+      "when":  "I apply a date range filter",
+      "then":  "only test runs within that date range are displayed"
+    },
+    {
+      "given": "I am filtering test results",
+      "when":  "I select one or more environments (dev, staging, prod)",
+      "then":  "only results from the selected environments are shown"
+    },
+    {
+      "given": "I am filtering test results",
+      "when":  "I enter or select a test suite name",
+      "then":  "only results matching that suite are displayed"
+    },
+    {
+      "given": "I have applied one or more filters",
+      "when":  "I log out and log back in",
+      "then":  "my previously applied filter selections are restored"
+    }
+  ]
+}
+
+Why four ACs and not three: the story enumerates three filter dimensions \
+(date range, environment, suite name) — Rule 8 requires one AC per named \
+dimension. The fourth AC covers the persistence sub-capability (filter state \
+restored after re-login), which is a separate observable behaviour. A WRONG \
+output here would collapse the three filters into one generic "user applies \
+a filter, results are narrowed" AC — that loses the dimension-specific \
+coverage the story actually requires.
 
 Output ONLY the JSON object. No prose, no markdown fences.
 """
