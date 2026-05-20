@@ -27,6 +27,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+import yaml  # noqa: E402
 from dotenv import load_dotenv  # noqa: E402
 from langchain_anthropic import ChatAnthropic  # noqa: E402
 from langchain_core.messages import HumanMessage, SystemMessage  # noqa: E402
@@ -62,14 +63,17 @@ _AUTO_PO_ANSWER = (
     "Auto-resolved by eval runner: pick the first reasonable interpretation "
     "and proceed; do not block on this."
 )
-"""Canned PO answer for any CRITICAL ambiguity an Analyst flags during eval.
+"""Fallback PO answer when no per-sample directive fixture is present.
 
-The eval runner is unattended — we can't pause for PO input. Using a fixed
-answer keeps the downstream Story Writer behaviour deterministic across
-runs. The Story-Writer / AC-Generator quality on multi-feature samples is
-therefore upstream-coupled to this canned answer; it is documented in
-baselines.md so a reader knows what they are looking at.
+The eval runner is unattended — we can't pause for PO input. When a sample
+has no fixture under ``evals/ground-truth/po-answers/``, every CRITICAL
+ambiguity gets this constant string. Multi-feature samples should ship a
+fixture so AC-layer metrics measure AC quality against a known scope
+rather than against whatever the Story Writer guesses from this vague
+fallback. See ``evals/ground-truth/po-answers/README.md`` for the format.
 """
+
+PO_DIRECTIVES_DIR = Path(__file__).parent / "ground-truth" / "po-answers"
 
 REPORTS_DIR = Path(__file__).parent / "reports"
 
@@ -141,11 +145,35 @@ def _run_analyst_capturing_usage(text: str) -> tuple[AnalystOutput, UsageTelemet
     return parsed, telemetry
 
 
-def _auto_po_answers(analyst_output: AnalystOutput) -> dict[str, str]:
-    """Provide the canned PO answer for each CRITICAL Analyst ambiguity."""
-    return {
-        a.question: _AUTO_PO_ANSWER for a in analyst_output.ambiguities if a.severity == "critical"
-    }
+def _load_po_directive(sample_name: str) -> str | None:
+    """Return the per-sample PO directive string, or None if no fixture exists.
+
+    Looked up by exact ``sample_name`` (the filename stem, e.g.
+    ``sample-02-vague-ambiguous``). Fixtures live under
+    ``evals/ground-truth/po-answers/<sample_name>.yaml`` and contain a single
+    ``po_directive`` string. See that directory's README for rationale.
+    """
+    path = PO_DIRECTIVES_DIR / f"{sample_name}.yaml"
+    if not path.exists():
+        return None
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    directive = data.get("po_directive")
+    if not isinstance(directive, str) or not directive.strip():
+        return None
+    return directive.strip()
+
+
+def _auto_po_answers(sample_name: str, analyst_output: AnalystOutput) -> dict[str, str]:
+    """Provide the PO answer for each CRITICAL Analyst ambiguity.
+
+    Uses the per-sample directive fixture if present; otherwise falls back to
+    the legacy constant ``_AUTO_PO_ANSWER``. The same answer is applied to
+    every critical question — the Analyst's exact wording is stochastic, so
+    matching per-question would be fragile; the directive carries the scope
+    decision regardless of how the question was phrased.
+    """
+    answer = _load_po_directive(sample_name) or _AUTO_PO_ANSWER
+    return {a.question: answer for a in analyst_output.ambiguities if a.severity == "critical"}
 
 
 def _usage_from_response(response) -> UsageTelemetry:
@@ -208,7 +236,7 @@ def evaluate_sample(
     stays single-judge and the model-economics decision lives at the runner.
     """
     analyst_output, analyst_usage = _run_analyst_capturing_usage(sample.raw_requirement)
-    po_answers = _auto_po_answers(analyst_output)
+    po_answers = _auto_po_answers(sample.name, analyst_output)
 
     # Chain forward through the rest of the pipeline so AC-layer metrics
     # score against what the AC Generator actually produces. This couples

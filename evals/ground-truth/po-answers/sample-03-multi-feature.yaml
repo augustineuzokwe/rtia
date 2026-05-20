@@ -1,0 +1,14 @@
+# PO directive for sample-03-multi-feature.
+#
+# Aligns with the AC ground truth in
+# evals/sample-requirements/sample-03-multi-feature.md, which scopes this
+# story to filtering (by date range, environment, suite name) with filter
+# persistence across sessions. CSV export and email alerting on failure
+# spike are deliberately deferred to separate backlog items.
+
+po_directive: |
+  Scope this user story to: a tester filtering test results on the dashboard
+  by date range, environment (dev/staging/prod), and test suite name — with
+  the tester's applied filter selections remembered per user account across
+  sessions. CSV export of results and email alerting on failure-rate
+  threshold are out of scope here; raise them as separate backlog items.
