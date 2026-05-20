@@ -46,6 +46,19 @@ description or objective wherever it applies.
 inputs.
 - Do NOT use the words "so that" in the objective field. The renderer \
 adds section headers; you only supply the content.
+- PRESERVE ENUMERATED DIMENSIONS: if the intent enumerates a closed list of \
+named dimensions for a capability (e.g. "filter by date range, environment, \
+AND test suite name"; "sort by created, updated, or priority"; "export as \
+CSV, JSON, or XML"), reproduce the full list verbatim in the description. \
+Do NOT substitute synonyms (e.g. "status" for "environment"), do NOT shorten \
+to "such as X, Y, or Z", and do NOT drop dimensions. Each named dimension is \
+load-bearing because downstream Acceptance Criteria are generated one per \
+named dimension.
+- PRESERVE NAMED SUB-CAPABILITIES: if the intent names a sub-behaviour of the \
+capability (e.g. "filter selections are remembered across sessions", "sort \
+order persists per user"), preserve it in the description OR record it as an \
+explicit assumption. Do NOT silently drop it — downstream ACs depend on it \
+being visible to the AC Generator.
 - Output ONLY the JSON object. No prose, no markdown fences.
 """
 
