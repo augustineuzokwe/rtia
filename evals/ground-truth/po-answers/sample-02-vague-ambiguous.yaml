@@ -1,0 +1,15 @@
+# PO directive for sample-02-vague-ambiguous.
+#
+# Aligns with the AC ground truth in
+# evals/sample-requirements/sample-02-vague-ambiguous.md, which expects
+# capabilities: view defects list, update a defect, manager summary view.
+# Logging a new defect is deliberately out of scope (separate backlog item).
+
+po_directive: |
+  Scope this user story to: a QA team member viewing and updating defect
+  records in a central, shared tracker (replacing the spreadsheet), with the
+  team and managers seeing the same up-to-date view. Logging a brand-new
+  defect, full ticket workflow, and per-defect drill-down details are NOT
+  part of this story — those are separate backlog items. For "manager
+  visibility", treat it as a summary view of open defects (specific shape
+  is intentionally unspecified).
