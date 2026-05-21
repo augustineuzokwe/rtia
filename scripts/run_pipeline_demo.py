@@ -6,7 +6,7 @@ collects answers from stdin and resumes the graph. If all ambiguities
 are normal, the pipeline flows through without pausing. After the
 checkpoint, the User Story Writer produces a single user story.
 
-Requires `ANTHROPIC_API_KEY` in `.env` (see `.env.example`).
+Requires `GOOGLE_API_KEY` in `.env` (see `.env.example`).
 
 Run with:
     uv run python scripts/run_pipeline_demo.py                      # default: sample-01
@@ -106,9 +106,9 @@ def collect_story_review_response(payload: dict) -> dict:
 
 
 _COST_DISCLOSURE = (
-    "Cost disclosure: this demo makes 4 Gemini 2.5 Flash calls "
-    "(Analyst + Story Writer + AC Generator + Test Case Writer). "
-    "Estimated paid-tier spend ≈$0.005 per run on AI Studio's standard "
+    "Cost disclosure: this demo makes 5 Gemini 3.5 Flash calls "
+    "(Analyst + Story Writer + AC Generator + Test Case Writer + Reviewer). "
+    "Estimated paid-tier spend ≈$0.007 per run on AI Studio's standard "
     "pricing. Free-tier accounts: 20 RPD per project per model — see "
     "docs/adr-0006-provider-switch.md for the rationale."
 )
@@ -150,7 +150,7 @@ def main() -> None:
     config = {"configurable": {"thread_id": "demo-1"}}
 
     banner("INVOKING PIPELINE")
-    print("Calling Claude (Analyst)…")
+    print("Calling Gemini (Analyst)…")
     result = pipeline.invoke({"requirement_text": requirement_text}, config=config)
 
     # The pipeline has two interrupts (PO Checkpoint + Story Review Checkpoint).
@@ -197,6 +197,35 @@ def main() -> None:
     artifact = result["final_artifact"]
     banner("FINAL ARTIFACT (paste-ready markdown)")
     print(artifact.as_markdown())
+
+    if "review_report" in result:
+        report = result["review_report"]
+        banner(f"REVIEWER REPORT  [{report.overall_quality.upper()}]")
+        if report.coverage_gaps:
+            print("Coverage gaps:")
+            for gap in report.coverage_gaps:
+                print(f"  - {gap}")
+        if report.weak_acs:
+            print("Weak ACs:")
+            for item in report.weak_acs:
+                print(f"  - {item}")
+        if report.untestable_criteria:
+            print("Untestable criteria:")
+            for item in report.untestable_criteria:
+                print(f"  - {item}")
+        if report.recommendations:
+            print("Recommendations:")
+            for rec in report.recommendations:
+                print(f"  - {rec}")
+        if not any(
+            [
+                report.coverage_gaps,
+                report.weak_acs,
+                report.untestable_criteria,
+                report.recommendations,
+            ]
+        ):
+            print("No issues found — artifact looks solid.")
 
 
 if __name__ == "__main__":
