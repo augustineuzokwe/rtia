@@ -77,7 +77,7 @@ FAKE_TEST_CASE_RESPONSE = {
 
 
 def _llm_factory(payload: dict):
-    """Build a fake ChatAnthropic class whose instances return `payload`."""
+    """Build a fake ChatGoogleGenerativeAI class whose instances return `payload`."""
 
     def _factory(**_kwargs):
         instance = MagicMock()
@@ -93,27 +93,29 @@ def _mock_pipeline_llms(
     ac_payload: dict = FAKE_AC_RESPONSE,
     test_case_payload: dict = FAKE_TEST_CASE_RESPONSE,
 ):
-    """Patch each agent's `ChatAnthropic` symbol with its own fake.
+    """Patch each agent's `ChatGoogleGenerativeAI` symbol with its own fake.
 
-    `ChatAnthropic` is the same class object in every agent module, so patching
-    `.invoke` on the class would bleed across agents. Patching the symbol at
-    each import site keeps the mocks independent (see feedback memory
-    `feedback_mock_class_per_module`).
+    The LangChain wrapper is the same class object in every agent module, so
+    patching `.invoke` on the class would bleed across agents. Patching the
+    symbol at each import site keeps the mocks independent (see feedback
+    memory `feedback_mock_class_per_module`).
     """
     stack = ExitStack()
     stack.enter_context(
         patch(
-            "agents.requirements_analyst.ChatAnthropic", side_effect=_llm_factory(analyst_payload)
+            "agents.requirements_analyst.ChatGoogleGenerativeAI",
+            side_effect=_llm_factory(analyst_payload),
         )
     )
     stack.enter_context(
-        patch("agents.user_story_writer.ChatAnthropic", side_effect=_llm_factory(story_payload))
+        patch(
+            "agents.user_story_writer.ChatGoogleGenerativeAI",
+            side_effect=_llm_factory(story_payload),
+        )
     )
     stack.enter_context(
-        patch("agents.ac_generator.ChatAnthropic", side_effect=_llm_factory(ac_payload))
+        patch("agents.ac_generator.ChatGoogleGenerativeAI", side_effect=_llm_factory(ac_payload))
     )
-    # Test Case Writer runs on Gemini, not Anthropic — patch the symbol it
-    # actually imports (see agents/test_case_writer.py for the rationale).
     stack.enter_context(
         patch(
             "agents.test_case_writer.ChatGoogleGenerativeAI",

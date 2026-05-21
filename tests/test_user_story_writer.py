@@ -37,10 +37,10 @@ VALID_RESPONSE = {
 
 
 def _mock_invoke(payload: dict | str):
-    """Patch ChatAnthropic.invoke to return `payload` as the LLM response."""
+    """Patch ChatGoogleGenerativeAI.invoke to return `payload` as the LLM response."""
     content = payload if isinstance(payload, str) else json.dumps(payload)
     return patch(
-        "agents.user_story_writer.ChatAnthropic.invoke",
+        "agents.user_story_writer.ChatGoogleGenerativeAI.invoke",
         return_value=AIMessage(content=content),
     )
 

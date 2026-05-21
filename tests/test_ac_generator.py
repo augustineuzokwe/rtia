@@ -56,7 +56,7 @@ VALID_RESPONSE = {
 def _mock_invoke(payload: dict | str):
     content = payload if isinstance(payload, str) else json.dumps(payload)
     return patch(
-        "agents.ac_generator.ChatAnthropic.invoke",
+        "agents.ac_generator.ChatGoogleGenerativeAI.invoke",
         return_value=AIMessage(content=content),
     )
 
@@ -101,7 +101,7 @@ def test_prompt_includes_story_and_analyst_context():
         captured["messages"] = messages
         return AIMessage(content=json.dumps(VALID_RESPONSE))
 
-    with patch("agents.ac_generator.ChatAnthropic.invoke", new=fake_invoke):
+    with patch("agents.ac_generator.ChatGoogleGenerativeAI.invoke", new=fake_invoke):
         generate_acceptance_criteria(USER_STORY, ANALYST_OUTPUT, {"q?": "a"})
 
     human_text = captured["messages"][1].content

@@ -1,9 +1,7 @@
 """Analyst-layer metrics for the per-agent eval suite.
 
-Three metrics, each scored in [0.0, 1.0]:
+Two metrics, each scored in [0.0, 1.0]:
 
-- ``intent_faithfulness`` — judge call (GEval-style). Did the Analyst
-  capture the underlying goal without inventing scope?
 - ``actor_set_completeness`` — programmatic set comparison with a judge
   tiebreak for synonymous role names ("QA Lead" ≈ "test lead").
 - ``ambiguity_discipline`` — discrete count + category-coverage check.
@@ -14,24 +12,30 @@ Implied-story handling rides along with ``ambiguity_discipline`` because
 the prompt couples them: a multi-feature requirement must emit one
 CRITICAL pick-one ambiguity *and* populate ``implied_stories``.
 
-Metrics use the ``ClaudeJudge`` wrapper so the eval stack stays
-single-provider. Scores are returned as a plain dataclass — we do not
-inherit from ``deepeval.metrics.BaseMetric`` because GEval is the only
-deepeval metric we use directly, and these custom scorers are simpler
-expressed as functions.
+History — a third metric (``intent_faithfulness``) was deleted in the
+Gemini cutover (ADR-0006). It used deepeval's GEval against the
+Analyst's intent string; the metric was the noisiest one in the suite
+(documented ±0.10 single-run-variance on Analyst stochasticity) and
+required a stronger judge model to be reliable. A deterministic
+replacement (keyword-overlap against ground-truth key noun phrases) is
+captured under Epic #92 if/when we want intent coverage back.
+
+Metrics use the ``GeminiJudge`` wrapper so the eval stack runs on the
+same provider as the production agents. Scores are returned as a plain
+dataclass — we do not inherit from ``deepeval.metrics.BaseMetric``
+because none of the remaining custom scorers are GEval-style; functions
+are simpler.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from deepeval.metrics import GEval
-from deepeval.test_case import LLMTestCase, SingleTurnParams
 from pydantic import BaseModel, Field
 
 from agents.requirements_analyst import AnalystOutput
 from evals.dataset import ExpectedAnalystOutput
-from evals.judge import ClaudeJudge
+from evals.judge import GeminiJudge
 
 
 @dataclass(frozen=True)
@@ -41,53 +45,6 @@ class MetricResult:
     name: str
     score: float
     reason: str
-
-
-# ---------------------------------------------------------------------------
-# intent_faithfulness — GEval
-# ---------------------------------------------------------------------------
-
-_INTENT_CRITERION = (
-    "Compare the actual_output (the Analyst's one-or-two-sentence intent) to "
-    "the expected_output (ground-truth intent). Award high marks ONLY when "
-    "actual_output captures the same underlying goal as expected_output and "
-    "introduces no scope, fields, or behaviour that the ground truth omits. "
-    "Penalise: invented specificity (concrete fields, UI behaviours, "
-    "implementation choices not in the ground truth); rewordings that drift "
-    "into a different goal; and missing the core 'who does what for what "
-    "outcome' shape. Surface-level wording differences are NOT a penalty — "
-    "only meaning matters."
-)
-
-
-def build_intent_metric(judge: ClaudeJudge, threshold: float = 0.8) -> GEval:
-    """Construct the GEval metric for Analyst intent-faithfulness."""
-    return GEval(
-        name="intent_faithfulness",
-        criteria=_INTENT_CRITERION,
-        evaluation_params=[SingleTurnParams.ACTUAL_OUTPUT, SingleTurnParams.EXPECTED_OUTPUT],
-        model=judge,
-        threshold=threshold,
-    )
-
-
-def score_intent_faithfulness(
-    actual: AnalystOutput,
-    expected: ExpectedAnalystOutput,
-    judge: ClaudeJudge,
-) -> MetricResult:
-    metric = build_intent_metric(judge)
-    test_case = LLMTestCase(
-        input="(intent comparison)",
-        actual_output=actual.intent,
-        expected_output=expected.intent,
-    )
-    metric.measure(test_case)
-    return MetricResult(
-        name="intent_faithfulness",
-        score=float(metric.score or 0.0),
-        reason=metric.reason or "",
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +68,7 @@ def _normalise(label: str) -> str:
 def _judge_actor_match(
     actual_label: str,
     candidates: list[str],
-    judge: ClaudeJudge,
+    judge: GeminiJudge,
 ) -> str | None:
     """Ask the judge whether ``actual_label`` is a synonym of any candidate.
 
@@ -139,7 +96,7 @@ def _judge_actor_match(
 def score_actor_set_completeness(
     actual: AnalystOutput,
     expected: ExpectedAnalystOutput,
-    judge: ClaudeJudge,
+    judge: GeminiJudge,
 ) -> MetricResult:
     """F1 between expected and actual actor sets, with judge synonym matching.
 
@@ -215,7 +172,7 @@ class _CategoryCoverage(BaseModel):
 def _judge_ambiguity(
     ambiguity_text: str,
     expected_categories: list[str],
-    judge: ClaudeJudge,
+    judge: GeminiJudge,
 ) -> _CategoryCoverage:
     prompt = (
         "The Requirements Analyst is instructed to flag ONLY story-shape "
@@ -237,7 +194,7 @@ def _judge_ambiguity(
 def score_ambiguity_discipline(
     actual: AnalystOutput,
     expected: ExpectedAnalystOutput,
-    judge: ClaudeJudge,
+    judge: GeminiJudge,
 ) -> MetricResult:
     """Score how disciplined the Analyst was about flagging ambiguities.
 

@@ -1,15 +1,21 @@
-"""Per-agent eval runner — Analyst layer.
+"""Per-agent eval runner.
 
-Invokes the Requirements Analyst on every loaded sample, scores its
-output against the per-sample ground truth using the three Analyst
-metrics, captures token-usage telemetry from the Anthropic response
-metadata, and writes a JSON report under ``evals/reports/``.
+Invokes the Analyst → Story Writer → AC Generator chain on every loaded
+sample, scores their outputs against per-sample ground truth using the
+4-metric suite (post-Gemini cutover), and writes a JSON report under
+``evals/reports/``.
 
 Usage:
     uv run python evals/run_evals.py                 # all samples
     uv run python evals/run_evals.py sample-01       # single sample (by stem prefix)
 
-Requires ``ANTHROPIC_API_KEY`` in the environment (loaded via .env).
+Requires ``GOOGLE_API_KEY`` in the environment (loaded via .env).
+
+History — pre-cutover this used a Claude judge with a split between
+"GEval judge" (stronger model for subtle reasoning) and "match judge"
+(cheaper model for classification). The GEval metrics were dropped in
+the cutover (ADR-0006); the remaining 4 metrics are all classification
+or programmatic, so a single Gemini judge handles everything.
 """
 
 from __future__ import annotations
@@ -29,9 +35,10 @@ if str(_REPO_ROOT) not in sys.path:
 
 import yaml  # noqa: E402
 from dotenv import load_dotenv  # noqa: E402
-from langchain_anthropic import ChatAnthropic  # noqa: E402
 from langchain_core.messages import HumanMessage, SystemMessage  # noqa: E402
+from langchain_google_genai import ChatGoogleGenerativeAI  # noqa: E402
 
+from agents._llm_utils import strip_json_fence  # noqa: E402
 from agents.ac_generator import _PROMPT_HASH as AC_PROMPT_HASH  # noqa: E402
 from agents.ac_generator import AcGeneratorOutput, generate_acceptance_criteria  # noqa: E402
 from agents.config import (  # noqa: E402
@@ -41,18 +48,13 @@ from agents.config import (  # noqa: E402
 )
 from agents.requirements_analyst import _PROMPT_HASH, AnalystOutput  # noqa: E402
 from agents.user_story_writer import UserStory, write_user_story  # noqa: E402
-from evals.ac_metrics import (  # noqa: E402
-    score_ac_coverage,
-    score_ac_faithfulness,
-    score_ac_testability,
-)
+from evals.ac_metrics import score_ac_coverage, score_ac_testability  # noqa: E402
 from evals.dataset import SampleRecord, load_all_samples  # noqa: E402
-from evals.judge import ClaudeJudge  # noqa: E402
+from evals.judge import GeminiJudge  # noqa: E402
 from evals.metrics import (  # noqa: E402
     MetricResult,
     score_actor_set_completeness,
     score_ambiguity_discipline,
-    score_intent_faithfulness,
 )
 from prompts.requirements_analyst_prompts import (  # noqa: E402
     SYSTEM_PROMPT,
@@ -115,10 +117,10 @@ def _run_analyst_capturing_usage(text: str) -> tuple[AnalystOutput, UsageTelemet
 
     The library entry point (`analyze_requirement`) returns just the parsed
     output. We re-implement the small invoke here so the response metadata
-    (which carries `usage`) is available to the runner without leaking
-    telemetry plumbing into agent code.
+    (which carries `usage_metadata` on the LangChain response) is available
+    to the runner without leaking telemetry plumbing into agent code.
     """
-    llm = ChatAnthropic(
+    llm = ChatGoogleGenerativeAI(
         model=DEFAULT_MODEL,
         timeout=DEFAULT_TIMEOUT_SECONDS,
         max_retries=DEFAULT_MAX_RETRIES,
@@ -136,7 +138,7 @@ def _run_analyst_capturing_usage(text: str) -> tuple[AnalystOutput, UsageTelemet
     }
     response = llm.invoke(messages, config=config)
     raw = response.content if isinstance(response.content, str) else str(response.content)
-    parsed = AnalystOutput.model_validate(json.loads(raw))
+    parsed = AnalystOutput.model_validate(json.loads(strip_json_fence(raw)))
     usage_meta = getattr(response, "usage_metadata", None) or {}
     telemetry = UsageTelemetry(
         input_tokens=int(usage_meta.get("input_tokens", 0)),
@@ -176,91 +178,57 @@ def _auto_po_answers(sample_name: str, analyst_output: AnalystOutput) -> dict[st
     return {a.question: answer for a in analyst_output.ambiguities if a.severity == "critical"}
 
 
-def _usage_from_response(response) -> UsageTelemetry:
-    meta = getattr(response, "usage_metadata", None) or {}
-    return UsageTelemetry(
-        input_tokens=int(meta.get("input_tokens", 0)),
-        output_tokens=int(meta.get("output_tokens", 0)),
-    )
-
-
-def _run_story_writer_capturing_usage(
+def _run_story_writer(
     analyst_output: AnalystOutput, po_answers: dict[str, str]
 ) -> tuple[UserStory, UsageTelemetry]:
-    """Run the Story Writer via the library entry point and pull usage telemetry.
+    """Run the Story Writer via the library entry point.
 
-    The library call wraps its own LLM construction; we monkey-light it by
-    re-running the same path with a captured response is fragile. Instead we
-    call ``write_user_story`` (which has the prompt-cache + retry policy) and
-    accept that we miss per-call usage data here. We approximate token spend
-    by re-tokenising on the report side later if needed.
+    Library entry returns parsed UserStory only — per-call token telemetry
+    isn't available without restructuring the function. Return zero usage;
+    the LangSmith trace remains the source of truth on cost for this layer.
     """
-    # Pragmatic compromise: write_user_story returns just the parsed UserStory.
-    # To capture usage without forking the function, we'd need to either
-    # restructure that function or do the invoke ourselves. For now, return
-    # zeros — the Anthropic console remains the source of truth on cost; this
-    # file-level telemetry is informational, not billing.
     story = write_user_story(analyst_output, po_answers)
     return story, UsageTelemetry()
 
 
-def _run_ac_generator_capturing_usage(
+def _run_ac_generator(
     user_story: UserStory,
     analyst_output: AnalystOutput,
     po_answers: dict[str, str],
 ) -> tuple[AcGeneratorOutput, UsageTelemetry]:
-    """Run the AC Generator and return its output + zero-usage placeholder.
+    """Run the AC Generator via the library entry point.
 
-    Same trade-off as ``_run_story_writer_capturing_usage`` — see that
-    docstring. AC_PROMPT_HASH is imported so the report's metadata can
-    cite the AC Generator's prompt version even when token telemetry is
-    unavailable.
+    Same telemetry trade-off as ``_run_story_writer`` — see that docstring.
+    AC_PROMPT_HASH is imported so the report's metadata can cite the AC
+    Generator's prompt version even when token telemetry is unavailable.
     """
     result = generate_acceptance_criteria(user_story, analyst_output, po_answers)
     return result, UsageTelemetry()
 
 
-def evaluate_sample(
-    sample: SampleRecord,
-    geval_judge: ClaudeJudge,
-    match_judge: ClaudeJudge,
-) -> SampleReport:
-    """Score one sample with split judges.
+def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
+    """Score one sample with a single Gemini judge.
 
-    ``geval_judge`` (typically Opus) is used for the criterion-based GEval
-    metric where judge reasoning quality matters. ``match_judge`` (typically
-    a cheaper model like Haiku) handles the structured-output verdicts for
-    actor synonyms and ambiguity-category matching — these are short, narrow
-    classification calls where a smaller model is calibrated well enough.
-    Split established here, not pushed into metrics.py, so the metric API
-    stays single-judge and the model-economics decision lives at the runner.
+    All four surviving metrics are either programmatic (``ac_testability``)
+    or short classification calls — uniform judge use is appropriate
+    post-cutover.
     """
     analyst_output, analyst_usage = _run_analyst_capturing_usage(sample.raw_requirement)
     po_answers = _auto_po_answers(sample.name, analyst_output)
 
-    # Chain forward through the rest of the pipeline so AC-layer metrics
-    # score against what the AC Generator actually produces. This couples
-    # AC scores to upstream agent quality; the trade-off is documented in
-    # baselines.md. Failure here (e.g. Story Writer JSON parse) propagates
-    # as an exception — eval results for the AC layer are explicitly
-    # unavailable rather than silently zero'd.
-    story, story_usage = _run_story_writer_capturing_usage(analyst_output, po_answers)
-    ac_result, ac_usage = _run_ac_generator_capturing_usage(story, analyst_output, po_answers)
+    # Chain forward so AC-layer metrics score against what the AC Generator
+    # actually produces. Couples AC scores to upstream agent quality; the
+    # trade-off is documented in baselines.md. Failure here (e.g. Story
+    # Writer JSON parse) propagates as an exception — eval results for the
+    # AC layer are explicitly unavailable rather than silently zero'd.
+    story, story_usage = _run_story_writer(analyst_output, po_answers)
+    ac_result, ac_usage = _run_ac_generator(story, analyst_output, po_answers)
 
     metrics = [
-        # Analyst layer — intent + actor synonym matching stay on the stronger
-        # judge (both require nuanced reasoning). Ambiguity-category matching
-        # goes to the cheaper match judge — most-called metric, cheapest to
-        # downgrade, calibrated empirically (#77).
-        score_intent_faithfulness(analyst_output, sample.expected_analyst, geval_judge),
-        score_actor_set_completeness(analyst_output, sample.expected_analyst, geval_judge),
-        score_ambiguity_discipline(analyst_output, sample.expected_analyst, match_judge),
-        # AC layer — coverage uses the cheaper judge (short classification per
-        # AC), testability is fully programmatic (no judge), faithfulness uses
-        # GEval so calibration matches Analyst intent-faithfulness.
-        score_ac_coverage(ac_result, sample.expected_acs, match_judge),
+        score_actor_set_completeness(analyst_output, sample.expected_analyst, judge),
+        score_ambiguity_discipline(analyst_output, sample.expected_analyst, judge),
+        score_ac_coverage(ac_result, sample.expected_acs, judge),
         score_ac_testability(ac_result),
-        score_ac_faithfulness(ac_result, story, geval_judge),
     ]
 
     return SampleReport(
@@ -275,12 +243,7 @@ def evaluate_sample(
     )
 
 
-def _serialise(
-    reports: list[SampleReport],
-    *,
-    geval_judge_model: str,
-    match_judge_model: str,
-) -> dict:
+def _serialise(reports: list[SampleReport], *, judge_model: str) -> dict:
     aggregate_usage = UsageTelemetry()
     for r in reports:
         aggregate_usage.add(r.analyst_usage)
@@ -293,8 +256,7 @@ def _serialise(
     return {
         "generated_at": datetime.now(UTC).isoformat(),
         "model": DEFAULT_MODEL,
-        "geval_judge_model": geval_judge_model,
-        "match_judge_model": match_judge_model,
+        "judge_model": judge_model,
         "analyst_prompt_hash": _PROMPT_HASH,
         "ac_generator_prompt_hash": AC_PROMPT_HASH,
         "samples": [
@@ -317,7 +279,7 @@ def _serialise(
 
 def _print_summary(payload: dict) -> None:
     print(f"\nmodel={payload['model']}  prompt_hash={payload['analyst_prompt_hash']}")
-    print(f"judges: geval={payload['geval_judge_model']}  match={payload['match_judge_model']}")
+    print(f"judge: {payload['judge_model']}")
     print(f"samples evaluated: {len(payload['samples'])}\n")
     for s in payload["samples"]:
         print(f"  {s['name']}")
@@ -334,11 +296,23 @@ def _print_summary(payload: dict) -> None:
     )
 
 
+_COST_DISCLOSURE = (
+    "Cost disclosure: this eval run makes ≈4 production-agent calls per sample "
+    "plus ≈4–6 judge calls per sample (actor synonym tiebreaks, ambiguity "
+    "category mapping, AC→category classification). Default scope is 3 "
+    "samples ≈ 24–30 total Gemini 2.5 Flash calls. Estimated paid-tier spend "
+    "≈$0.03 per full run. Free-tier accounts will hit the 20-RPD cap mid-run "
+    "— use paid tier for routine eval work. See docs/adr-0006-provider-switch.md."
+)
+
+
 def main(argv: list[str] | None = None) -> int:
-    # override=True so a stale or empty ANTHROPIC_API_KEY in the calling
+    # override=True so a stale or empty GOOGLE_API_KEY in the calling
     # shell (common when running under sandboxed agent/CI environments)
     # doesn't shadow the value the user set in .env.
     load_dotenv(override=True)
+    print(_COST_DISCLOSURE)
+    print()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "sample",
@@ -352,21 +326,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Write JSON report to this path (default: evals/reports/run-<utc>.json).",
     )
     parser.add_argument(
-        "--geval-judge-model",
+        "--judge-model",
         default=DEFAULT_MODEL,
         help=(
-            "Model for the GEval intent-faithfulness judge — keep at the default "
-            "(Opus) unless you have a specific reason; downgrading degrades the "
-            "metric you most rely on."
-        ),
-    )
-    parser.add_argument(
-        "--match-judge-model",
-        default="claude-haiku-4-5-20251001",
-        help=(
-            "Model for short structured-output judge calls (actor synonyms, "
-            "ambiguity-category matching). Defaults to Haiku 4.5 to keep eval "
-            "spend low; bump to Opus if you suspect classification drift."
+            "Model for the single Gemini judge. Defaults to DEFAULT_MODEL. "
+            "Override only for calibration experiments (e.g. testing a newer "
+            "Gemini version against the baseline)."
         ),
     )
     args = parser.parse_args(argv)
@@ -378,14 +343,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"No samples match {args.sample!r}", file=sys.stderr)
             return 2
 
-    geval_judge = ClaudeJudge(model=args.geval_judge_model)
-    match_judge = ClaudeJudge(model=args.match_judge_model)
-    reports = [evaluate_sample(s, geval_judge, match_judge) for s in samples]
-    payload = _serialise(
-        reports,
-        geval_judge_model=args.geval_judge_model,
-        match_judge_model=args.match_judge_model,
-    )
+    judge = GeminiJudge(model=args.judge_model)
+    reports = [evaluate_sample(s, judge) for s in samples]
+    payload = _serialise(reports, judge_model=args.judge_model)
     _print_summary(payload)
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)

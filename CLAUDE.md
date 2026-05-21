@@ -130,15 +130,15 @@ When in doubt, surface the choice to the user. Don't quietly pick.
 
 ### 4.7 Mock per import-site, not per class
 
-When tests need different LLM responses per agent, and multiple agents import the same class (e.g. `ChatAnthropic`):
+When tests need different LLM responses per agent, and multiple agents import the same class (e.g. `ChatGoogleGenerativeAI`):
 
 ```python
-# WRONG — bleeds across modules because ChatAnthropic is the same class object
-patch("agents.requirements_analyst.ChatAnthropic.invoke", return_value=...)
+# WRONG — bleeds across modules because the class is the same object everywhere
+patch("agents.requirements_analyst.ChatGoogleGenerativeAI.invoke", return_value=...)
 
 # RIGHT — patches each module's import symbol independently
-patch("agents.requirements_analyst.ChatAnthropic", side_effect=_factory(payload_a))
-patch("agents.user_story_writer.ChatAnthropic", side_effect=_factory(payload_b))
+patch("agents.requirements_analyst.ChatGoogleGenerativeAI", side_effect=_factory(payload_a))
+patch("agents.user_story_writer.ChatGoogleGenerativeAI", side_effect=_factory(payload_b))
 ```
 
 See `tests/test_graph.py` for the working pattern.
@@ -152,6 +152,22 @@ Before committing, audit your change for:
 - **No surprise side effects**: are you touching files outside the stated scope without callout?
 
 This complements 4.6 — review for these, not for "did I follow clean-architecture textbook patterns."
+
+### 4.9 Default model is paid Gemini Flash; other paid models require justification
+
+`agents.config.DEFAULT_MODEL = "gemini-2.5-flash"`. All four production agents and the eval-suite judge run on Gemini 2.5 Flash via `langchain-google-genai`. The default tier is **paid** Google AI Studio (a few cents per session) — the free tier exists but is capped at 20 requests per day per project per model and is too tight for routine demos + evals (see [ADR-0006](docs/adr-0006-provider-switch.md) for the cost analysis).
+
+Cost expectations under the default stack:
+- Full pipeline demo: ≈$0.005
+- Full eval run (3 samples, judge included): ≈$0.03
+- ~10× cheaper than the prior Claude Opus 4.7 baseline (≈$0.30–0.50 per demo, ≈$1–2 per eval).
+
+Adding any *other* paid LLM call (Anthropic Claude, OpenAI, larger Gemini Pro) requires:
+1. A named reason `gemini-2.5-flash` cannot do the task — usually a specific benchmarked failure mode.
+2. PR-body justification of why the cost is worth paying.
+3. Explicit user cost approval per `feedback_cost_approval`.
+
+This rule exists because the workshop's cost target is "as close to $0 as quality allows" — not strict $0. The Gemini cutover proved RTIA's quality is fine on Flash; the paid tier removes the 20 RPD ceiling without meaningfully changing the cost target.
 
 ---
 
@@ -183,18 +199,31 @@ Don't start work on a phase without first reading the relevant section of the pl
 
 ## 7. Things that have bitten us (read these before they bite again)
 
-- **Opus 4.7 rejects `temperature`** — pass it only when explicitly set, default to `None`. See `agents/requirements_analyst.py:91`.
+- **Gemini's caching API ≠ Anthropic's `cache_control`** — Gemini uses a separate `client.caches.create()` call referenced via the `cached_content` kwarg. Anthropic-style inline `cache_control: ephemeral` blocks do not exist on Gemini and were removed in the ADR-0006 cutover. We currently use no caching (prompts are small enough; free tier removes cost driver).
+- **Gemini's max-tokens kwarg is `max_output_tokens`** — not `max_tokens`. Pre-cutover agent code used `max_tokens`; renamed across the pipeline in the ADR-0006 cutover.
+- **Gemini's LangChain wrapper validates `GOOGLE_API_KEY` at construction time** — Anthropic's defers to `invoke`. Tests need a placeholder key via `tests/conftest.py`'s autouse fixture, or `ChatGoogleGenerativeAI(...)` raises `pydantic.ValidationError` before any mock can intercept.
+- **Gemini sometimes wraps JSON output in ` ```json ` fences** despite a "no fences" instruction. `agents/_llm_utils.py:strip_json_fence()` trims them defensively. Apply to every Gemini agent.
 - **Single-sample testing is overfitting** — always test prompt changes on all 3 sample types (well-structured, vague, multi-feature). The behavior on one sample is *not* the behavior on others.
 - **Worked examples beat prose rules** — when the model isn't following a prompt rule, add a concrete worked example with correct output. Far stronger than rule iteration.
 - **Worktrees can quietly switch** — Bash `cd` doesn't persist between tool calls in some Claude Code environments. Use absolute paths and `pwd && git status` at start of multi-step blocks.
 - **msgpack deserialization warning** — `AnalystOutput` etc. need to be registered for checkpointing. Phase 2.2 fixes; until then, the warning is benign noise.
-- **`claude-opus-4-7` is an alias** — not pinned to a date. Phase 1.4 will swap to a dated `claude-opus-*-YYYYMMDD` ID for reproducibility.
+- **`gemini-2.5-flash` is an alias** — not pinned to a date. When Google publishes dated suffixes for the 2.5 line, bump `DEFAULT_MODEL` for reproducibility.
 
 ---
 
-## 8. Personal learning notes
+## 8. LEARNINGS.md is a continuous consideration
 
-`LEARNINGS.md` at the repo root is the maintainer's personal learning log (gitignored). It captures durable lessons from each session — append rather than replace. If you complete substantive work, propose an entry for that file at the end of your session.
+`LEARNINGS.md` at the repo root (gitignored) is the maintainer's personal learning log. RTIA is a workshop — the codebase is the artifact, but **the learning is the deliverable**.
+
+**Always consider** whether the work in progress has produced a durable lesson worth appending. Do not wait for session end. Trigger moments:
+
+- After verifying a non-obvious choice worked
+- After resolving a confusing-then-clarified moment ("I thought X, then learned Y")
+- After surfacing a hidden constraint or quirk
+- After a meta-decision that explains *why* code looks the way it does
+- After deciding NOT to do something for a reason worth remembering
+
+Append, don't replace. Lead with the lesson, not the task that produced it. One short paragraph or 2-3 bullets per entry. Specific over vague. Include enough context that the lesson reads cold.
 
 ---
 

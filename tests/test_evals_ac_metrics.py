@@ -12,11 +12,9 @@ from typing import Any
 
 from agents.ac_generator import AcGeneratorOutput
 from agents.final_artifact import AcceptanceCriterion
-from agents.user_story_writer import UserStory
 from evals.ac_metrics import (
     _AcClassification,
     score_ac_coverage,
-    score_ac_faithfulness,
     score_ac_testability,
 )
 from evals.dataset import ExpectedAcceptanceCriteria
@@ -24,12 +22,12 @@ from evals.dataset import ExpectedAcceptanceCriteria
 
 @dataclass
 class _StubJudge:
-    """Deterministic stand-in for ClaudeJudge.
+    """Deterministic stand-in for GeminiJudge.
 
-    For coverage: keyed by AC.then, returns the verdict to use.
-    For faithfulness (GEval): unused — faithfulness needs a real GEval-
-    compatible judge to ``measure()`` a test case. The faithfulness metric
-    is exercised end-to-end in the live baseline run, not here.
+    Keyed by AC.then text — returns the verdict to use when the runner
+    asks the judge to classify the AC against the ground-truth bundle.
+    Post-cutover (ADR-0006) the AC-layer suite only has classification
+    judge calls (no GEval), so this stub is sufficient for the full surface.
     """
 
     coverage_verdicts: dict[str, _AcClassification]
@@ -192,17 +190,6 @@ def test_ac_testability_empty_list_scores_zero_not_one() -> None:
     assert result.score == 0.0
 
 
-# ---------------------------------------------------------------------------
-# ac_faithfulness — empty-case only (GEval path needs live judge to exercise)
-# ---------------------------------------------------------------------------
-
-
-def test_ac_faithfulness_empty_list_scores_zero() -> None:
-    story = UserStory(
-        description="As a user, I want X.", objective="Y is achieved.", assumptions=[]
-    )
-    generated = AcGeneratorOutput(criteria=[])
-    # Judge unused for the empty path — None would crash if called, which is
-    # the guarantee we want.
-    result = score_ac_faithfulness(generated, story, judge=None)  # type: ignore[arg-type]
-    assert result.score == 0.0
+# ac_faithfulness was deleted in ADR-0006 (Gemini cutover). The metric was
+# documented as structurally pessimistic and used GEval, which we dropped to
+# get zero-cost reproducible evals.

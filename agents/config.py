@@ -5,45 +5,40 @@ and resilience knobs. Centralizing here means a model bump or a default
 timeout change happens in one place and propagates to every agent, instead
 of needing matching edits across agents/*.py.
 
-See `docs/adr-0001-model-pinning.md` for the rationale behind the model
-choice and the version-pinning policy.
+See `docs/adr-0006-provider-switch.md` for the rationale behind the current
+provider/model choice (Gemini 2.5 Flash on Google AI Studio free tier).
+ADR-0001 captures the prior Claude Opus 4.7 choice and is now superseded.
 """
 
 from __future__ import annotations
 
 import hashlib
 
-DEFAULT_MODEL = "claude-opus-4-7"
-"""Canonical Anthropic model ID for v1.
+DEFAULT_MODEL = "gemini-2.5-flash"
+"""Canonical Gemini model ID used by all production agents.
 
-NOTE: Anthropic does not publish a dated suffix for models 4.6+ — verified
-via `client.models.list()` against the API on 2026-05-19. When Anthropic
-publishes dated forms (e.g. `claude-opus-4-7-YYYYMMDD`), update this
-constant to the dated ID for full reproducibility. See ADR-0001.
+Stable, free-tier-eligible on Google AI Studio (verified 2026-05-21:
+≥10 RPM / 250 RPD quota; selection confirmed against the live
+`models.list` endpoint). Bump cautiously — newer Gemini IDs (3.x) are
+preview-only at time of writing and their behaviour can shift without
+notice. See ADR-0006 for the cutover rationale from Claude Opus 4.7.
 """
 
 DEFAULT_TIMEOUT_SECONDS = 60.0
-"""Wall-clock seconds per Claude call. Caps stuck network requests."""
+"""Wall-clock seconds per LLM call. Caps stuck network requests."""
 
 DEFAULT_MAX_RETRIES = 5
-"""Anthropic SDK retry count. See `docs/adr-0003-llm-resilience.md`.
+"""LangChain retry count for transient errors.
 
-What the SDK retries (verified from `anthropic._base_client._should_retry`):
-    408 Request Timeout
-    409 Lock Timeout
-    429 Rate Limit
-    >= 500 Server Errors (includes 529 Overloaded that Opus 4.7 emits)
+The Gemini wrapper retries on rate limits and transient server errors with
+exponential backoff. Patience budget with N=5 is comparable to the
+Anthropic-era setting documented in ADR-0003 — tuned so a brief load event
+doesn't wedge an interactive demo while a sustained outage fails fast.
+Override per call when the agent runs in a different SLO context
+(tight: 2; batch: 10+).
 
-Backoff: exponential `min(0.5 * 2^n, 8.0)` seconds with jitter; respects
-`Retry-After` header when ≤ 60s.
-
-Patience budget with N=5: ~0.5+1+2+4+8 = ~15.5s of total wait. Tuned so
-a brief Anthropic load event doesn't wedge an interactive demo, while a
-sustained outage fails fast. Override per call when the agent runs in a
-different SLO context (tight: 2; batch: 10+).
-
-NOTE: retries are silent at the SDK layer. LangSmith trace metadata
-exposes `x-stainless-retry-count` so latency spikes remain debuggable.
+NOTE: retries are silent at the wrapper layer. LangSmith trace metadata
+remains the place to surface retry counts if/when needed for debugging.
 """
 
 

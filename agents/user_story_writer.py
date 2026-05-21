@@ -11,16 +11,19 @@ This is the shape that maps cleanly to the future `FinalUserStory`
 artifact (Phase 3 of the prod-readiness plan): description and objective
 become the corresponding sections of the final artifact, with
 Acceptance Criteria and Test Cases populated by later agents.
+
+Provider: Gemini 2.5 Flash. See ADR-0006.
 """
 
 from __future__ import annotations
 
 import json
 
-from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
+from agents._llm_utils import strip_json_fence
 from agents.config import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
@@ -80,7 +83,7 @@ def write_user_story(
     temperature: float | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     max_retries: int = DEFAULT_MAX_RETRIES,
-    max_tokens: int | None = None,
+    max_output_tokens: int | None = None,
 ) -> UserStory:
     """Run the User Story Writer agent.
 
@@ -90,38 +93,30 @@ def write_user_story(
     to be the single source of truth about what was asked, and gives the
     Story Writer a clean, validated contract to work against.
 
-    Resilience knobs mirror `analyze_requirement` so both agents share one
-    operational model. See that function's docstring for per-parameter notes.
+    Resilience knobs mirror `analyze_requirement`. See that function's
+    docstring for per-parameter notes.
     """
     llm_kwargs: dict[str, object] = {
         "model": model,
         "timeout": timeout,
         "max_retries": max_retries,
-        "max_tokens": max_tokens,
+        "max_output_tokens": max_output_tokens,
     }
     if temperature is not None:
         llm_kwargs["temperature"] = temperature
 
-    llm = ChatAnthropic(**llm_kwargs)
+    llm = ChatGoogleGenerativeAI(**llm_kwargs)
     user_prompt = USER_PROMPT_TEMPLATE.format(
         intent=analyst_output.intent,
         actors="\n".join(f"- {actor}" for actor in analyst_output.actors) or "(none)",
         ambiguities=_format_ambiguities(analyst_output),
         po_answers=_format_po_answers(po_answers),
     )
-    # Cache the static system prompt — see agents/requirements_analyst.py for
-    # the rationale; same pattern, same TTL, same ~10% billing on cache hits.
     messages = [
-        SystemMessage(
-            content=[
-                {"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
-            ]
-        ),
+        SystemMessage(content=SYSTEM_PROMPT),
         HumanMessage(content=user_prompt),
     ]
-    # Attach prompt_hash to LangSmith trace metadata so every traced run is
-    # attributable to the exact prompt version. See agents.config.prompt_hash.
     config = {"metadata": {"agent": "user_story_writer", "prompt_hash": _PROMPT_HASH}}
     response = llm.invoke(messages, config=config)
     raw = response.content if isinstance(response.content, str) else str(response.content)
-    return UserStory.model_validate(json.loads(raw))
+    return UserStory.model_validate(json.loads(strip_json_fence(raw)))

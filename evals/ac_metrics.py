@@ -1,6 +1,6 @@
 """Acceptance-Criteria-layer metrics for the per-agent eval suite.
 
-Three metrics, each scored in [0.0, 1.0]:
+Two metrics, each scored in [0.0, 1.0]:
 
 - ``ac_coverage`` — F1 of (required categories covered) vs (in-scope ACs / total
   ACs). Catches both **under-coverage** (a required category has no AC) and
@@ -9,29 +9,28 @@ Three metrics, each scored in [0.0, 1.0]:
 - ``ac_testability`` — programmatic. Each AC must have non-empty
   given/when/then, no non-observable verbs in ``then`` ("feels", "thinks",
   "knows"), and each field must fit a sane length cap. No LLM calls.
-- ``ac_faithfulness`` — GEval-style judge: for each AC, does it introduce
-  scope (concrete fields, behaviours, UI elements) that the user story does
-  not name? Uses the GEval judge so calibration matches the Analyst-layer
-  intent metric.
+
+History — a third metric (``ac_faithfulness``) was deleted in the Gemini
+cutover (ADR-0006). It used deepeval's GEval to flag invented scope vs.
+the user story; the metric was documented as structurally pessimistic
+(scored ACs against Story Writer output only, ignoring Analyst context
+the AC Generator legitimately reads). A deterministic alternative is
+captured under Epic #92 if needed later.
 
 Metric API mirrors ``evals/metrics.py``: each function returns a
-``MetricResult`` (name + score + reason). The judge split (which judge model
-gets which call) lives in the runner, not here.
+``MetricResult`` (name + score + reason).
 """
 
 from __future__ import annotations
 
 import re
 
-from deepeval.metrics import GEval
-from deepeval.test_case import LLMTestCase, SingleTurnParams
 from pydantic import BaseModel, Field
 
 from agents.ac_generator import AcGeneratorOutput
 from agents.final_artifact import AcceptanceCriterion
-from agents.user_story_writer import UserStory
 from evals.dataset import ExpectedAcceptanceCriteria
-from evals.judge import ClaudeJudge
+from evals.judge import GeminiJudge
 from evals.metrics import MetricResult
 
 # ---------------------------------------------------------------------------
@@ -60,7 +59,7 @@ class _AcClassification(BaseModel):
 def _classify_ac(
     ac: AcceptanceCriterion,
     expected: ExpectedAcceptanceCriteria,
-    judge: ClaudeJudge,
+    judge: GeminiJudge,
 ) -> _AcClassification:
     prompt = (
         "You are classifying one acceptance criterion against a ground-truth "
@@ -89,7 +88,7 @@ def _classify_ac(
 def score_ac_coverage(
     generated: AcGeneratorOutput,
     expected: ExpectedAcceptanceCriteria,
-    judge: ClaudeJudge,
+    judge: GeminiJudge,
 ) -> MetricResult:
     """F1 of category-coverage recall × in-scope precision.
 
@@ -203,72 +202,3 @@ def score_ac_testability(generated: AcGeneratorOutput) -> MetricResult:
         f"issues={bad}" if bad else ""
     )
     return MetricResult(name="ac_testability", score=score, reason=reason.strip())
-
-
-# ---------------------------------------------------------------------------
-# ac_faithfulness
-# ---------------------------------------------------------------------------
-
-_FAITHFULNESS_CRITERION = (
-    "Compare each acceptance criterion (actual_output) to the user story it "
-    "was generated from (expected_output, which combines the story's "
-    "description and objective). Award high marks ONLY when the AC asserts "
-    "behaviour that is stated or directly implied by the story. Penalise: "
-    "ACs that introduce concrete fields, specific UI elements, fixed "
-    "numeric thresholds, or behaviours the story does not name. Wording "
-    "differences are NOT a penalty — only invented scope is."
-)
-
-
-def _build_faithfulness_metric(judge: ClaudeJudge, threshold: float = 0.8) -> GEval:
-    return GEval(
-        name="ac_faithfulness",
-        criteria=_FAITHFULNESS_CRITERION,
-        evaluation_params=[SingleTurnParams.ACTUAL_OUTPUT, SingleTurnParams.EXPECTED_OUTPUT],
-        model=judge,
-        threshold=threshold,
-    )
-
-
-def score_ac_faithfulness(
-    generated: AcGeneratorOutput,
-    user_story: UserStory,
-    judge: ClaudeJudge,
-) -> MetricResult:
-    """Mean GEval score across all generated ACs against the source story.
-
-    One judge call per AC keeps reasoning granular — a single AC that
-    invents scope is otherwise diluted in a batched verdict.
-    """
-    if not generated.criteria:
-        return MetricResult(
-            name="ac_faithfulness",
-            score=0.0,
-            reason="No ACs to score.",
-        )
-
-    metric = _build_faithfulness_metric(judge)
-    story_text = (
-        f"User story description: {user_story.description}\n"
-        f"User story objective: {user_story.objective}"
-    )
-
-    scores: list[float] = []
-    reasons: list[str] = []
-    for i, ac in enumerate(generated.criteria):
-        ac_text = f"Given {ac.given}; When {ac.when}; Then {ac.then}"
-        test_case = LLMTestCase(
-            input="(AC faithfulness against story)",
-            actual_output=ac_text,
-            expected_output=story_text,
-        )
-        metric.measure(test_case)
-        scores.append(float(metric.score or 0.0))
-        reasons.append(f"AC#{i}: {float(metric.score or 0.0):.2f}")
-
-    mean = sum(scores) / len(scores)
-    return MetricResult(
-        name="ac_faithfulness",
-        score=mean,
-        reason=f"mean={mean:.2f} across {len(scores)} ACs. per-AC: {reasons}",
-    )
