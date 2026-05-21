@@ -58,6 +58,23 @@ FAKE_AC_RESPONSE = {
     ]
 }
 
+FAKE_TEST_CASE_RESPONSE = {
+    "cases": [
+        {
+            "scenario": "Happy path — user does X",
+            "type": "happy_path",
+            "steps": ["Log in as a user.", "Do thing X."],
+            "expected": "Outcome Y is observed.",
+        },
+        {
+            "scenario": "Unauthenticated user blocked",
+            "type": "negative",
+            "steps": ["Open the page without logging in."],
+            "expected": "The user is redirected to login before doing X.",
+        },
+    ]
+}
+
 
 def _llm_factory(payload: dict):
     """Build a fake ChatAnthropic class whose instances return `payload`."""
@@ -74,6 +91,7 @@ def _mock_pipeline_llms(
     analyst_payload: dict,
     story_payload: dict = FAKE_STORY_RESPONSE,
     ac_payload: dict = FAKE_AC_RESPONSE,
+    test_case_payload: dict = FAKE_TEST_CASE_RESPONSE,
 ):
     """Patch each agent's `ChatAnthropic` symbol with its own fake.
 
@@ -93,6 +111,14 @@ def _mock_pipeline_llms(
     )
     stack.enter_context(
         patch("agents.ac_generator.ChatAnthropic", side_effect=_llm_factory(ac_payload))
+    )
+    # Test Case Writer runs on Gemini, not Anthropic — patch the symbol it
+    # actually imports (see agents/test_case_writer.py for the rationale).
+    stack.enter_context(
+        patch(
+            "agents.test_case_writer.ChatGoogleGenerativeAI",
+            side_effect=_llm_factory(test_case_payload),
+        )
     )
     return stack
 
@@ -121,7 +147,10 @@ def test_pipeline_flows_through_when_no_critical_ambiguities():
     # AC Generator (Phase 8) populates this slot from FAKE_AC_RESPONSE.
     assert len(result["final_artifact"].acceptance_criteria) == 1
     assert result["final_artifact"].acceptance_criteria[0].then == "outcome Y appears"
-    assert result["final_artifact"].test_cases == []  # Phase 9 will fill
+    # Test Case Writer (Phase 9) populates this slot from FAKE_TEST_CASE_RESPONSE.
+    assert len(result["final_artifact"].test_cases) == 2
+    types = {tc.type for tc in result["final_artifact"].test_cases}
+    assert {"happy_path", "negative"} <= types
 
 
 def test_pipeline_pauses_when_critical_ambiguity_present():
@@ -191,6 +220,7 @@ def test_pipeline_state_v1_schema_is_stable():
         "analyst_output",
         "po_answers",
         "user_story",
+        "test_cases",
         "final_artifact",
     }
     actual_fields = set(PipelineState.__annotations__.keys())
@@ -215,6 +245,7 @@ def test_checkpoint_allowlist_covers_all_pydantic_state_types():
         ("agents.requirements_analyst", "Ambiguity"),
         ("agents.requirements_analyst", "ImpliedStory"),
         ("agents.user_story_writer", "UserStory"),
+        ("agents.test_case_writer", "TestCaseWriterOutput"),
         ("agents.final_artifact", "FinalUserStory"),
         ("agents.final_artifact", "AcceptanceCriterion"),
         ("agents.final_artifact", "TestCase"),

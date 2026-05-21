@@ -32,6 +32,7 @@ from agents.requirements_analyst import (
     ImpliedStory,
     analyze_requirement,
 )
+from agents.test_case_writer import TestCaseWriterOutput, write_test_cases
 from agents.user_story_writer import UserStory, write_user_story
 
 DEFAULT_CHECKPOINT_DB = "~/.rtia/state.db"
@@ -55,6 +56,7 @@ _CHECKPOINT_ALLOWLIST: list[tuple[str, ...]] = [
     ("agents.requirements_analyst", "ImpliedStory"),
     ("agents.user_story_writer", "UserStory"),
     ("agents.ac_generator", "AcGeneratorOutput"),
+    ("agents.test_case_writer", "TestCaseWriterOutput"),
     ("agents.final_artifact", "FinalUserStory"),
     ("agents.final_artifact", "AcceptanceCriterion"),
     ("agents.final_artifact", "TestCase"),
@@ -77,6 +79,7 @@ class PipelineState(TypedDict, total=False):
     po_answers: dict[str, str]
     user_story: UserStory
     acceptance_criteria: list[AcceptanceCriterion]
+    test_cases: list[TestCase]
     final_artifact: FinalUserStory
 
 
@@ -185,22 +188,37 @@ def ac_generator_node(state: PipelineState) -> dict:
     return {"acceptance_criteria": result.criteria}
 
 
+def test_case_writer_node(state: PipelineState) -> dict:
+    """Run the Test Case Writer on the user story + generated ACs.
+
+    Sits after the AC Generator so the ACs are already pinned down before
+    test cases derive from them. The Writer never re-reads the original
+    requirement or the Analyst output — the story and ACs are its sole
+    sources of truth.
+    """
+    result = write_test_cases(
+        state["user_story"],
+        list(state.get("acceptance_criteria", [])),
+    )
+    return {"test_cases": result.cases}
+
+
 def composer_node(state: PipelineState) -> dict:
     """Assemble the final artifact from current pipeline state.
 
     Pure transformation (no LLM call): description + objective +
     assumptions come from the Story Writer; acceptance criteria come
-    from the AC Generator; test cases stay empty until the Test Case
-    agent lands (Phase 9). This node is the explicit sink of the
-    pipeline; downstream agents WRITE into their respective state
-    slots and the composer assembles whatever's currently there.
+    from the AC Generator; test cases come from the Test Case Writer.
+    This node is the explicit sink of the pipeline; upstream agents
+    WRITE into their respective state slots and the composer assembles
+    whatever's currently there.
     """
     story = state["user_story"]
     artifact = FinalUserStory(
         description=story.description,
         objective=story.objective,
         acceptance_criteria=list(state.get("acceptance_criteria", [])),
-        test_cases=[],
+        test_cases=list(state.get("test_cases", [])),
         assumptions=list(story.assumptions),
         metadata={},
     )
@@ -262,13 +280,15 @@ def build_pipeline(checkpointer: BaseCheckpointSaver | None = None):
     builder.add_node("story_writer", story_writer_node)
     builder.add_node("story_review_checkpoint", story_review_checkpoint_node)
     builder.add_node("ac_generator", ac_generator_node)
+    builder.add_node("test_case_writer", test_case_writer_node)
     builder.add_node("composer", composer_node)
     builder.add_edge(START, "analyst")
     builder.add_edge("analyst", "po_checkpoint")
     builder.add_edge("po_checkpoint", "story_writer")
     builder.add_edge("story_writer", "story_review_checkpoint")
     builder.add_edge("story_review_checkpoint", "ac_generator")
-    builder.add_edge("ac_generator", "composer")
+    builder.add_edge("ac_generator", "test_case_writer")
+    builder.add_edge("test_case_writer", "composer")
     builder.add_edge("composer", END)
     return builder.compile(checkpointer=checkpointer)
 
@@ -285,6 +305,7 @@ __all__ = [
     "PIPELINE_STATE_VERSION",
     "PipelineState",
     "TestCase",
+    "TestCaseWriterOutput",
     "UserStory",
     "_CHECKPOINT_ALLOWLIST",
     "_allowlisted_serde",
