@@ -1,7 +1,7 @@
 # ADR-0006: Switch all agents and the eval judge from Anthropic Claude to Google Gemini
 
 **Status:** Accepted (2026-05-21)
-**Supersedes:** [ADR-0001: Anthropic model pinning policy](adr-0001-model-pinning.md) (the model-ID provider stays the same — Anthropic — but no Anthropic model ID is used by RTIA agents anymore)
+**Supersedes:** [ADR-0001: Anthropic model pinning policy](adr-0001-model-pinning.md) — RTIA agents no longer use any Anthropic model ID; the model-pinning *concern* (immutable dated IDs for reproducibility) still applies to Gemini and is restated in the "Notes for the future" section below.
 **Author:** augustineuzokwe
 
 ## Context
