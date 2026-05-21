@@ -21,6 +21,92 @@ See ADR-0006 §"Dropped metrics" for the rationale.
 
 ---
 
+## 2026-05-22 — Story Writer + AC Generator + Analyst prompt sharpening (#98)
+
+Adds a PRESERVE NAMED USER-FACING DETAIL rule (plus a worked example)
+across all three prompt files. The rule covers named metrics
+("total tests, passed, failed, skipped"), named UX guarantees ("without
+a full page reload"), and named quantifiers ("every 30 seconds") — all
+the user-facing specifics `docs/user-story-vs-implementation.md`
+designates as MUST-keep.
+
+Prompt hashes changed:
+- Analyst:           `19631aecc02a` → `e3d1643bc3fd`
+- Story Writer:      `990e6ae9e86f` → `9e01e22b05e2`
+- AC Generator:      `e7af2794b28c` → `71f4e07b514e`
+
+### Why the Analyst prompt needed updating too
+
+The first iteration of this fix only touched Story Writer + AC
+Generator. Live eval showed sample-01 requirement_fidelity went only
+0.17 → 0.33. Root cause: **the Analyst's `intent` field already drops
+the named metrics** ("test run metrics" generic instead of "passed,
+failed, skipped"). Downstream agents read the intent — not the raw
+requirement — so what the Analyst loses is lost forever.
+
+Fix: add the same PRESERVE NAMED USER-FACING DETAIL rule to the
+Analyst's intent-field description. With that, the named detail
+propagates through the whole pipeline. Sample-01 went 0.17 → 1.00.
+
+This is LEARNINGS.md §30's lesson: in a multi-agent pipeline, an
+agent can only preserve what an upstream agent didn't drop.
+
+### Mean scores — all 8 metrics on 3.5-flash after #98
+
+| Metric | Mean | Floor | Δ vs prior section |
+|---|---|---|---|
+| `actor_set_completeness` | 1.00 | 0.70 | 0.00 |
+| `ambiguity_discipline` | 0.44 | 0.30 | -0.23 (stochastic — see below) |
+| `intent_keyword_overlap` | 0.93 | 0.40 | 0.00 |
+| **`requirement_fidelity`** | **1.00** | **0.70** | **+0.28 from 0.72** |
+| `ac_coverage` | 0.93 | 0.80 | +0.06 |
+| `ac_testability` | 1.00 | 0.80 | 0.00 |
+| `tc_coverage_breadth` | 0.90 | 0.80 | -0.06 (within band) |
+| `tc_executability` | 1.00 | 0.80 | 0.00 |
+
+### Per-sample requirement_fidelity
+
+| Sample | Pre-#98 | **Post-#98** |
+|---|---|---|
+| sample-01-well-structured | 0.17 (1/6) | **1.00 (6/6)** |
+| sample-02-vague-ambiguous | 1.00 | 1.00 |
+| sample-03-multi-feature   | 1.00 | 1.00 |
+
+### Threshold update
+
+`requirement_fidelity` floor raised: **0.50 → 0.70**. With all 3
+samples now at 1.00, the gate has full headroom. Floor 0.70 still
+catches any regression that drops named user-facing detail
+meaningfully. Tighten to 0.80 once multi-run-mean stability is
+observed.
+
+### About the `ambiguity_discipline` dip
+
+Mean dropped 0.67 → 0.44 on this run. Same stochastic band
+(0.33-0.86) documented in prior sections. The Analyst prompt change
+added text to the intent-field description but did not touch the
+ambiguity-surfacing rules. This is single-run variance, not a
+regression caused by #98. Tracked under Epic #92.
+
+### Cost
+
+Input tokens grew 4717 → 5086 (+8%) because the Analyst intent string
+is longer when it preserves named detail. Output tokens went 4296 →
+5600 because downstream agents now reproduce more text. Both are
+expected and harmless — full eval cost stays in the ≈$0.04 band.
+
+### Headline
+
+The #98 fix is **the second LEARNINGS §28 win this week**: not only
+does the eval suite have a new metric that catches dropped
+user-facing detail (#99), but the dropped-detail failure mode is now
+**closed at the source** — three prompts that previously taught the
+model to compress now teach it to preserve. The cooking analogy
+matures: the tasting panel found the bug; the recipe was rewritten;
+the next batch tastes right.
+
+---
+
 ## 2026-05-22 — `requirement_fidelity` deterministic metric added (#99)
 
 Adds an 8th metric — `requirement_fidelity` — that scores whether

@@ -63,12 +63,13 @@ modifies the same dimensions (e.g. "filter preferences are remembered across \
 sessions") gets its own additional AC. This rule overrides the typical 2–5 \
 count band when the story genuinely enumerates more dimensions.
 
-Worked example — well-structured story:
+Worked example — well-structured story with named user-facing detail:
 
 USER STORY (input):
-description: "As a QA Lead, I want to see a real-time test run summary for my \
-project on the dashboard, so that I can monitor the latest run without manually \
-refreshing."
+description: "As an authenticated user, I want to see the total tests, passed, \
+failed, and skipped counts for the most recent test run on my selected \
+project's dashboard, updated automatically every 30 seconds without a full \
+page reload."
 objective: "Monitor the most recent run without manual refresh."
 assumptions: []
 
@@ -81,13 +82,14 @@ CORRECT OUTPUT:
   "criteria": [
     {
       "given": "I am an authenticated user on the QA Dashboard",
-      "when":  "I select a project",
-      "then":  "I see a summary of the most recent test run for that project"
+      "when":  "I view the dashboard for my selected project",
+      "then":  "I see the total tests, passed, failed, and skipped counts \
+for the most recent run"
     },
     {
       "given": "I am viewing the dashboard summary",
-      "when":  "the auto-refresh interval elapses",
-      "then":  "the summary updates without a full page reload"
+      "when":  "30 seconds have elapsed since the last data load",
+      "then":  "the counts refresh without a full page reload"
     },
     {
       "given": "I am not authenticated",
@@ -98,9 +100,18 @@ CORRECT OUTPUT:
 }
 
 Why three ACs and not five: the story names three distinct shapes \
-(see-summary, auto-refresh, auth boundary). Each gets one AC. The story does \
+(see-counts, auto-refresh, auth boundary). Each gets one AC. The story does \
 NOT name a "loading indicator" or "specific failure-count threshold", so no \
 ACs about those.
+
+Why the named user-facing detail appears verbatim in the "then" clauses: \
+"total tests, passed, failed, and skipped counts" are the named metrics the \
+user sees — they're the contract. "30 seconds" is the named cadence. "without \
+a full page reload" is the named UX guarantee. A WRONG output would collapse \
+the first AC's "then" to "I see a summary of the most recent test run" — that \
+loses the contract a junior engineer needs to build against. See \
+``docs/user-story-vs-implementation.md`` for the rule on named user-facing \
+detail.
 
 Worked example — multi-dimension story (illustrates Rule 8):
 

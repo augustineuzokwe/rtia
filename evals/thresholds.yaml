@@ -37,12 +37,14 @@ metric_floors:
   actor_set_completeness: 0.70
   ambiguity_discipline: 0.30
   intent_keyword_overlap: 0.40
-  # Requirement-fidelity metric (#99). Floor 0.50 = "half of the
-  # PO-confirmed user-facing specifics survive into the composite final
-  # artifact". Will be re-checked against the live baseline below; if
-  # 3.5-flash artifact behavior shifts the empirical floor, this value
-  # gets updated in the same commit that updates baselines.md.
-  requirement_fidelity: 0.50
+  # Requirement-fidelity metric (#99). Floor raised from 0.50 → 0.70 in
+  # the #98 prompt-sharpening PR: with the new PRESERVE NAMED USER-FACING
+  # DETAIL rule across Analyst + Story Writer + AC Generator prompts, all
+  # 3 samples score 1.00 (mean 1.00). Floor 0.70 leaves headroom for
+  # paraphrase variance while catching any real regression that drops
+  # named metrics or UX guarantees again. Tighten further to 0.80 once
+  # multi-run-mean stability is observed.
+  requirement_fidelity: 0.70
   ac_coverage: 0.80
   ac_testability: 0.80
   tc_coverage_breadth: 0.80

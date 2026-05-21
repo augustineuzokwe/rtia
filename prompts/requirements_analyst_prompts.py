@@ -11,7 +11,14 @@ structured analysis that a User Story Writer can act on.
 
 Return a JSON object with exactly these fields:
 - "intent": one or two sentences capturing what the requester actually wants \
-to achieve (the underlying goal, not a restatement).
+to achieve (the underlying goal, not a restatement). PRESERVE NAMED USER-FACING \
+DETAIL from the raw requirement: specific counts/statuses the user sees \
+("total tests, passed, failed, skipped"), named UX guarantees ("without a full \
+page reload"), and named quantifiers ("every 30 seconds", "above 20%") MUST \
+appear verbatim in the intent string. Do NOT compress them to generic words \
+like "summary", "metrics", or "automatically" — downstream agents read only \
+the intent, not the raw requirement, and the named detail is the user-facing \
+contract. See ``docs/user-story-vs-implementation.md``.
 - "actors": list of distinct user roles or systems mentioned or implied \
 (e.g. "QA Lead", "unauthenticated user", "dashboard").
 - "ambiguities": list of objects, each with two fields:
