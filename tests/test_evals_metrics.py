@@ -23,7 +23,7 @@ from evals.metrics import (
 
 @dataclass
 class _StubJudge:
-    """Deterministic stand-in for ClaudeJudge.
+    """Deterministic stand-in for GeminiJudge.
 
     The real judge is an LLM. For unit-level metric tests we control its
     answers explicitly so the test asserts metric arithmetic, not judge
