@@ -225,3 +225,6 @@ LEARNINGS.md
 # Eval run artifacts — regenerated per run, baselines.md is the curated record
 evals/reports/
 .deepeval*
+
+# Claude Code per-checkout state — scheduled-task lock + local settings
+.claude/
