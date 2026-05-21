@@ -21,6 +21,50 @@ See ADR-0006 §"Dropped metrics" for the rationale.
 
 ---
 
+## 2026-05-21 — `intent_keyword_overlap` on gemini-3.5-flash (#103, post-rebase)
+
+`intent_keyword_overlap` was first introduced in PR #103 with a
+2.5-flash baseline. After ADR-0007 swapped to 3.5-flash, the metric
+was re-measured against the new model.
+
+### Mean scores — all 7 metrics on 3.5-flash
+
+| Metric | Mean | Floor | Notes |
+|---|---|---|---|
+| `actor_set_completeness` | 1.00 | 0.70 | unchanged from ADR-0007 section |
+| `ambiguity_discipline` | 0.33 | 0.30 | unchanged — same systematic dip |
+| **`intent_keyword_overlap`** | **0.93** | 0.40 | **+0.20 vs 2.5-flash baseline (was 0.73)** |
+| `ac_coverage` | 0.83 | 0.80 | within ±0.10 band |
+| `ac_testability` | 1.00 | 0.80 | unchanged |
+| `tc_coverage_breadth` | 0.90 | 0.80 | within ±0.10 band |
+| `tc_executability` | 1.00 | 0.80 | unchanged |
+
+### Headline finding
+
+**3.5-flash preserves named domain terms in the intent string much
+better than 2.5-flash did.** Where 2.5-flash dropped "filter",
+"export", "failure" from sample-03's intent (scoring 0.40),
+3.5-flash retains them — pushing the metric mean from 0.73 → 0.93.
+
+This is the *second* named-entity-faithfulness win from the model
+switch, after `actor_set_completeness` went 0.83 → 1.00 in the
+ADR-0007 section. Worth noting because the two metrics measure
+distinct things (actor labels vs. domain terms in prose) and both
+improved — suggests 3.5-flash is broadly more faithful to named
+entities in the requirement text.
+
+### Floor for `intent_keyword_overlap`
+
+Floor stays at 0.40 (unchanged from #103). With 3.5-flash sitting at
+0.93 mean, the gate has wide headroom; tightening to 0.70 would still
+be safe, but 0.40 was set to catch a wholly-wrong intent (mutation
+test threshold) and that ceiling is the right shape for the gate's
+job. The Analyst-prompt iteration follow-up referenced in the #103
+section is effectively *complete via the model swap* — sample-03 no
+longer drops named features.
+
+---
+
 ## 2026-05-21 — Model switch: gemini-2.5-flash → gemini-3.5-flash (ADR-0007)
 
 Driven by repeated 503 UNAVAILABLE errors on GitHub-hosted runners

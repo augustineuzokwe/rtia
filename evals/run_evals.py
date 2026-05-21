@@ -57,6 +57,7 @@ from evals.metrics import (  # noqa: E402
     MetricResult,
     score_actor_set_completeness,
     score_ambiguity_discipline,
+    score_intent_keyword_overlap,
 )
 from evals.tc_metrics import score_tc_coverage_breadth, score_tc_executability  # noqa: E402
 from prompts.requirements_analyst_prompts import (  # noqa: E402
@@ -249,6 +250,7 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
     metrics = [
         score_actor_set_completeness(analyst_output, sample.expected_analyst, judge),
         score_ambiguity_discipline(analyst_output, sample.expected_analyst, judge),
+        score_intent_keyword_overlap(analyst_output, sample.expected_analyst),
         score_ac_coverage(ac_result, sample.expected_acs, judge),
         score_ac_testability(ac_result),
         score_tc_coverage_breadth(tc_result.cases, ac_result.criteria),

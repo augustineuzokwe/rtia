@@ -16,9 +16,9 @@ History — a third metric (``intent_faithfulness``) was deleted in the
 Gemini cutover (ADR-0006). It used deepeval's GEval against the
 Analyst's intent string; the metric was the noisiest one in the suite
 (documented ±0.10 single-run-variance on Analyst stochasticity) and
-required a stronger judge model to be reliable. A deterministic
-replacement (keyword-overlap against ground-truth key noun phrases) is
-captured under Epic #92 if/when we want intent coverage back.
+required a stronger judge model to be reliable. ``intent_keyword_overlap``
+below is the deterministic substitute landed under #103 — it restores
+intent-coverage signal without re-introducing GEval / judge cost.
 
 Metrics use the ``GeminiJudge`` wrapper so the eval stack runs on the
 same provider as the production agents. Scores are returned as a plain
@@ -263,3 +263,66 @@ def score_ambiguity_discipline(
         f"out_of_scope={out_of_scope}"
     )
     return MetricResult(name="ambiguity_discipline", score=f1, reason=reason)
+
+
+# ---------------------------------------------------------------------------
+# intent_keyword_overlap — deterministic replacement for the dropped
+# intent_faithfulness GEval metric (ADR-0006).
+# ---------------------------------------------------------------------------
+
+
+def score_intent_keyword_overlap(
+    actual: AnalystOutput,
+    expected: ExpectedAnalystOutput,
+) -> MetricResult:
+    """Fraction of expected key terms that appear (case-insensitive) in actual intent.
+
+    Restores intent-coverage signal that was lost when the GEval
+    ``intent_faithfulness`` metric was dropped in the Gemini cutover
+    (ADR-0006). Pure programmatic check — no LLM calls, no judge cost.
+
+    Design history (worth knowing before touching):
+
+    The first attempt scored token-overlap on the full expected intent
+    prose against the full actual intent prose. That failed on live
+    eval: Analyst paraphrases swap synonyms freely ("let" → "enable",
+    "monitor" → "view"), driving scores to 0.20-0.47 even when the
+    intent is captured. The bands for "good paraphrase" and "wrong
+    topic" overlapped — the metric carried no useful signal.
+
+    The current design checks ``expected.intent_key_terms`` instead:
+    hand-curated, load-bearing domain phrases for each sample (e.g.
+    "test run summary" for sample-01, "defect tracking" for sample-02).
+    Each term is matched as a case-insensitive substring against the
+    actual intent. A good paraphrase preserves these terms; a
+    wrong-topic mutation doesn't.
+
+    When ``intent_key_terms`` is empty (sample doesn't pin terms yet),
+    the metric returns 0.0 with a clear reason. This surfaces the gap
+    rather than silently passing.
+    """
+    if not expected.intent_key_terms:
+        return MetricResult(
+            name="intent_keyword_overlap",
+            score=0.0,
+            reason=(
+                "Ground truth has no intent_key_terms pinned — add an "
+                "'Intent Key Terms' section to the sample requirements file."
+            ),
+        )
+    if not actual.intent.strip():
+        return MetricResult(
+            name="intent_keyword_overlap",
+            score=0.0,
+            reason="Analyst produced an empty intent string.",
+        )
+
+    actual_lower = actual.intent.lower()
+    hits = [t for t in expected.intent_key_terms if t.lower() in actual_lower]
+    score = len(hits) / len(expected.intent_key_terms)
+    missing = [t for t in expected.intent_key_terms if t.lower() not in actual_lower]
+    reason = (
+        f"{len(hits)}/{len(expected.intent_key_terms)} key terms present. "
+        f"hits={hits}, missing={missing}."
+    )
+    return MetricResult(name="intent_keyword_overlap", score=score, reason=reason)

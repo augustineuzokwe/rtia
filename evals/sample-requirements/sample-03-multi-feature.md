@@ -61,6 +61,16 @@ As a tester, I want to filter test results by date range, environment, and test 
 ### Intent
 Improve the test-results dashboard with filtering (with persisted preferences) and CSV export, and alert the QA Lead when a test suite's failure rate crosses a threshold.
 
+### Intent Key Terms
+Load-bearing domain phrases (case-insensitive substring match). A good
+paraphrase preserves these even when verbs and connectives change.
+
+- filter
+- export
+- alert
+- QA Lead
+- failure
+
 ### Actors (expected set)
 - tester
 - QA Lead
