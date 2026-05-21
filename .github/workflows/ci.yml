@@ -117,7 +117,7 @@ jobs:
       # UNAVAILABLE during a high-demand spike and the in-library
       # tenacity retries exhausted before the spike cleared).
       #
-      # 3 attempts × 30s wait. Worst-case cost: 3 × $0.03 = $0.09 per
+      # 2 attempts × 30s wait. Worst-case cost: 2 × $0.03 = $0.06 per
       # CI run, and only on actually-flaky days. Median run still costs
       # $0.03. Threshold enforcement does NOT retry — a metric below
       # floor is a real signal worth investigating, not transient noise.
@@ -129,7 +129,7 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
         with:
           timeout_minutes: 5
-          max_attempts: 3
+          max_attempts: 2
           retry_wait_seconds: 30
           command: uv run python evals/run_evals.py --report-path evals/reports/ci-run.json
 
