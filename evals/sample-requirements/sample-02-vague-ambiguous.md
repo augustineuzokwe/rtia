@@ -55,6 +55,16 @@ As a QA team member, I want to view and update defect records in a central tool,
 ### Intent
 Replace spreadsheet-based defect tracking with a shared, central tool so the QA team can update defects quickly and managers can see what is going on.
 
+### Intent Key Terms
+Load-bearing domain phrases (case-insensitive substring match). A good
+paraphrase preserves these even when verbs and connectives change.
+
+- defect
+- spreadsheet
+- manager
+- team
+- update
+
 ### Actors (expected set)
 - team member
 - manager

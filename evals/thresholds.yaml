@@ -24,6 +24,11 @@
 #   catches an absolute "discipline collapsed to zero" failure. Tighten
 #   when Epic #92's calibration work lands or the Analyst prompt is
 #   sharpened for the new model.
+# - intent_keyword_overlap (#103) — 0.40 floor. Based on the post-#103
+#   2.5-flash baseline (sample-01 0.80, sample-02 1.00, sample-03 0.40).
+#   The rebase-onto-3.5-flash live eval re-verifies this is still the
+#   right floor; if 3.5-flash intent behavior shifts the empirical floor,
+#   this value gets updated in the same commit that updates baselines.md.
 #
 # A metric not listed here has NO floor enforced (CI gate ignores it).
 # Add a key here to start gating on a new metric.
@@ -31,6 +36,7 @@
 metric_floors:
   actor_set_completeness: 0.70
   ambiguity_discipline: 0.30
+  intent_keyword_overlap: 0.40
   ac_coverage: 0.80
   ac_testability: 0.80
   tc_coverage_breadth: 0.80

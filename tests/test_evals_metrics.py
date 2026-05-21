@@ -180,3 +180,84 @@ def test_ambiguity_discipline_mixed_in_and_out_of_scope() -> None:
     result = score_ambiguity_discipline(actual, expected, judge)
     # precision=1/2=0.5, recall=1/1=1.0, F1≈0.667
     assert 0.6 < result.score < 0.7
+
+
+# ---------------------------------------------------------------------------
+# intent_keyword_overlap — programmatic, no judge
+# ---------------------------------------------------------------------------
+
+
+from evals.metrics import score_intent_keyword_overlap  # noqa: E402
+
+
+def _expected_with_terms(key_terms: list[str]) -> ExpectedAnalystOutput:
+    return ExpectedAnalystOutput(
+        intent="(prose unused by this metric in the key-terms design)",
+        actors=[],
+        ambiguity_categories=[],
+        implied_story_titles=[],
+        intent_key_terms=list(key_terms),
+    )
+
+
+def _analyst_with_intent(intent: str) -> AnalystOutput:
+    return AnalystOutput(intent=intent, actors=[], ambiguities=[], implied_stories=[])
+
+
+def test_intent_keyword_overlap_all_terms_present_scores_one() -> None:
+    expected = _expected_with_terms(["authenticated", "test run", "dashboard"])
+    actual = _analyst_with_intent(
+        "Let an authenticated user monitor the latest test run summary on their dashboard."
+    )
+    result = score_intent_keyword_overlap(actual, expected)
+    assert result.score == 1.0
+
+
+def test_intent_keyword_overlap_paraphrase_above_match_threshold() -> None:
+    """Per issue #103: ≥0.8 when the Analyst captured the goal — synonyms allowed."""
+    expected = _expected_with_terms(
+        ["authenticated", "test run", "dashboard", "project", "refresh"]
+    )
+    # Same goal, different verbs ("Enable" vs "Let", "view" vs "monitor")
+    actual = _analyst_with_intent(
+        "Enable authenticated users to view test run summaries for chosen projects "
+        "on a dedicated dashboard, with automatic data refresh."
+    )
+    result = score_intent_keyword_overlap(actual, expected)
+    assert result.score >= 0.8
+
+
+def test_intent_keyword_overlap_wrong_topic_below_mutation_threshold() -> None:
+    """Per issue #103: <0.3 on a synthetic-mutation (wrong-topic) intent."""
+    expected = _expected_with_terms(
+        ["authenticated", "test run", "dashboard", "project", "refresh"]
+    )
+    actual = _analyst_with_intent(
+        "Allow a manager to export quarterly financial spreadsheets to email."
+    )
+    result = score_intent_keyword_overlap(actual, expected)
+    assert result.score < 0.3
+
+
+def test_intent_keyword_overlap_case_insensitive() -> None:
+    expected = _expected_with_terms(["QA Lead", "Failure Rate"])
+    actual = _analyst_with_intent("alert the qa lead when the failure rate spikes.")
+    result = score_intent_keyword_overlap(actual, expected)
+    assert result.score == 1.0
+
+
+def test_intent_keyword_overlap_empty_actual_scores_zero() -> None:
+    expected = _expected_with_terms(["foo", "bar"])
+    actual = _analyst_with_intent("")
+    result = score_intent_keyword_overlap(actual, expected)
+    assert result.score == 0.0
+    assert "empty" in result.reason.lower()
+
+
+def test_intent_keyword_overlap_missing_key_terms_surfaces_gap() -> None:
+    """Sample with no pinned key terms scores zero with a clear reason — not silent pass."""
+    expected = _expected_with_terms([])
+    actual = _analyst_with_intent("anything well-formed")
+    result = score_intent_keyword_overlap(actual, expected)
+    assert result.score == 0.0
+    assert "key_terms" in result.reason.lower() or "key terms" in result.reason.lower()

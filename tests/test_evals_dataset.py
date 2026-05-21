@@ -35,6 +35,14 @@ def test_sample_01_well_structured_ground_truth() -> None:
     assert expected.ambiguity_categories == ["project selection mechanism"]
     assert expected.implied_story_titles == []
     assert "authenticated QA user" in expected.intent
+    # #103: intent_key_terms field is parsed from the new optional section.
+    assert expected.intent_key_terms == [
+        "authenticated",
+        "test run",
+        "dashboard",
+        "project",
+        "refresh",
+    ]
 
 
 def test_sample_02_vague_ambiguity_categories_extracted() -> None:

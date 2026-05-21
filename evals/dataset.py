@@ -17,6 +17,7 @@ SAMPLES_DIR = Path(__file__).parent / "sample-requirements"
 _RAW_REQ_HEADER = "## Raw Requirement"
 _ANALYST_HEADER = "## Expected Analyst Output"
 _INTENT_HEADER = "### Intent"
+_INTENT_KEY_TERMS_HEADER = "### Intent Key Terms"
 _ACTORS_HEADER = "### Actors (expected set)"
 _AMBIGUITY_HEADER = "### Ambiguity Categories"
 _IMPLIED_HEADER = "### Implied Stories"
@@ -48,6 +49,15 @@ class ExpectedAnalystOutput:
     sample says "(none expected)"."""
     implied_story_titles: list[str]
     """Short story titles. Empty list when the sample says "(none expected)"."""
+    intent_key_terms: list[str] = field(default_factory=list)
+    """Load-bearing domain phrases the Analyst's intent string must mention
+    (case-insensitive substring match). Hand-curated per sample because
+    token-overlap against the full prose intent is too coarse — too many
+    interchangeable verbs ("monitor"/"view", "let"/"enable") collapse the
+    score. Substring match on a small set of *named* domain terms
+    survives Analyst paraphrasing. See ``score_intent_keyword_overlap``.
+    Empty list when no per-sample key terms are pinned yet (metric scores
+    0.0 with a clear reason in that case, surfacing the gap)."""
 
 
 @dataclass(frozen=True)
@@ -141,12 +151,21 @@ def _parse_expected_analyst(content: str) -> ExpectedAnalystOutput:
     actors_body = _extract_section(analyst_block, _ACTORS_HEADER, ["###", "## "])
     ambig_body = _extract_section(analyst_block, _AMBIGUITY_HEADER, ["###", "## "])
     implied_body = _extract_section(analyst_block, _IMPLIED_HEADER, ["###", "## "])
+    # Intent Key Terms is an OPTIONAL section. When absent, the list
+    # stays empty and the metric consumer scores zero with a diagnostic
+    # message — not silent ignore. We don't use _extract_section here
+    # because it raises on missing sections by design.
+    if _INTENT_KEY_TERMS_HEADER in analyst_block:
+        key_terms_body = _extract_section(analyst_block, _INTENT_KEY_TERMS_HEADER, ["###", "## "])
+    else:
+        key_terms_body = ""
 
     return ExpectedAnalystOutput(
         intent=intent_body,
         actors=[_bullet_label(b) for b in _bullets(actors_body)],
         ambiguity_categories=[_bullet_label(b) for b in _bullets(ambig_body)],
         implied_story_titles=[_bullet_label(b) for b in _bullets(implied_body)],
+        intent_key_terms=[_bullet_label(b) for b in _bullets(key_terms_body)],
     )
 
 

@@ -45,6 +45,16 @@ As a QA Lead, I want to see a real-time test run summary for my selected project
 ### Intent
 Let an authenticated QA user monitor the health of the most recent test run for a selected project on the dashboard, with the data refreshing on its own.
 
+### Intent Key Terms
+Load-bearing domain phrases (case-insensitive substring match). A good
+paraphrase preserves these even when verbs and connectives change.
+
+- authenticated
+- test run
+- dashboard
+- project
+- refresh
+
 ### Actors (expected set)
 - authenticated user
 - unauthenticated user

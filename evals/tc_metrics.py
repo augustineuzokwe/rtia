@@ -25,6 +25,7 @@ from __future__ import annotations
 import re
 
 from agents.final_artifact import AcceptanceCriterion, TestCase
+from evals._text_utils import token_overlap
 from evals.metrics import MetricResult
 
 # ---------------------------------------------------------------------------
@@ -38,78 +39,6 @@ _REQUIRED_TYPES: frozenset[str] = frozenset({"happy_path", "edge_case", "negativ
 # the AC to count as "covered". Tunable; start permissive and tighten if
 # the metric proves too easy to satisfy on real runs.
 _AC_TC_OVERLAP_THRESHOLD = 0.3
-
-# Tokens we don't count toward overlap — pure connective noise. Kept
-# small on purpose; expand only with evidence from real eval runs.
-_STOPWORDS: frozenset[str] = frozenset(
-    {
-        "the",
-        "a",
-        "an",
-        "is",
-        "are",
-        "was",
-        "were",
-        "be",
-        "been",
-        "being",
-        "and",
-        "or",
-        "but",
-        "if",
-        "then",
-        "so",
-        "to",
-        "of",
-        "in",
-        "on",
-        "at",
-        "for",
-        "with",
-        "by",
-        "from",
-        "as",
-        "that",
-        "this",
-        "these",
-        "those",
-        "it",
-        "its",
-        "their",
-        "there",
-        "i",
-        "you",
-        "we",
-        "they",
-        "user",
-        "system",
-        "should",
-        "will",
-        "shall",
-        "must",
-        "can",
-        "may",
-    }
-)
-
-
-def _tokenize(text: str) -> set[str]:
-    return {t for t in re.findall(r"[a-zA-Z0-9]+", text.lower()) if t not in _STOPWORDS}
-
-
-def _token_overlap(a: str, b: str) -> float:
-    """Fraction of meaningful tokens in ``a`` that also appear in ``b``.
-
-    Asymmetric on purpose — we ask "does the test case ``expected`` cover
-    the AC's ``then``?", not the reverse. An AC with a tight ``then``
-    clause shouldn't be over-credited just because the test case wrote a
-    verbose ``expected``.
-    """
-    ta = _tokenize(a)
-    if not ta:
-        return 0.0
-    tb = _tokenize(b)
-    return len(ta & tb) / len(ta)
 
 
 def score_tc_coverage_breadth(
@@ -139,8 +68,7 @@ def score_tc_coverage_breadth(
             1
             for ac in acceptance_criteria
             if any(
-                _token_overlap(ac.then, tc.expected) >= _AC_TC_OVERLAP_THRESHOLD
-                for tc in test_cases
+                token_overlap(ac.then, tc.expected) >= _AC_TC_OVERLAP_THRESHOLD for tc in test_cases
             )
         )
         ac_score = covered_acs / len(acceptance_criteria)
