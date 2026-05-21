@@ -43,6 +43,16 @@ def test_sample_01_well_structured_ground_truth() -> None:
         "project",
         "refresh",
     ]
+    # #99: requirement_key_terms is parsed from the new top-level
+    # `## Requirement Key Terms` section.
+    assert sample.requirement_key_terms == [
+        "passed",
+        "failed",
+        "skipped",
+        "30 seconds",
+        "full page reload",
+        "authenticated",
+    ]
 
 
 def test_sample_02_vague_ambiguity_categories_extracted() -> None:

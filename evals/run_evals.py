@@ -58,6 +58,7 @@ from evals.metrics import (  # noqa: E402
     score_actor_set_completeness,
     score_ambiguity_discipline,
     score_intent_keyword_overlap,
+    score_requirement_fidelity,
 )
 from evals.tc_metrics import score_tc_coverage_breadth, score_tc_executability  # noqa: E402
 from prompts.requirements_analyst_prompts import (  # noqa: E402
@@ -247,6 +248,20 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
     ac_result, ac_usage = _run_ac_generator(story, analyst_output, po_answers)
     tc_result, tc_usage = _run_test_case_writer(story, ac_result)
 
+    # Composite artifact text for the requirement_fidelity metric — the
+    # everything-a-junior-engineer-would-read concatenation across all
+    # four agents' outputs. Keep this assembly local to the runner; it's
+    # not a project-wide abstraction yet.
+    artifact_text = " ".join(
+        [
+            story.description,
+            story.objective,
+            " ".join(story.assumptions),
+            " ".join(f"{c.given} {c.when} {c.then}" for c in ac_result.criteria),
+            " ".join(f"{tc.scenario} {' '.join(tc.steps)} {tc.expected}" for tc in tc_result.cases),
+        ]
+    )
+
     metrics = [
         score_actor_set_completeness(analyst_output, sample.expected_analyst, judge),
         score_ambiguity_discipline(analyst_output, sample.expected_analyst, judge),
@@ -255,6 +270,7 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
         score_ac_testability(ac_result),
         score_tc_coverage_breadth(tc_result.cases, ac_result.criteria),
         score_tc_executability(tc_result.cases),
+        score_requirement_fidelity(artifact_text, sample.requirement_key_terms),
     ]
 
     return SampleReport(

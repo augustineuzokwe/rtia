@@ -21,6 +21,97 @@ See ADR-0006 §"Dropped metrics" for the rationale.
 
 ---
 
+## 2026-05-22 — `requirement_fidelity` deterministic metric added (#99)
+
+Adds an 8th metric — `requirement_fidelity` — that scores whether
+PO-confirmed user-facing specifics from the original requirement
+survive into the **composite final artifact** (description + objective
++ assumptions + ACs + test cases). Pure programmatic, zero judge cost.
+Mirrors the `intent_keyword_overlap` architecture but checks the whole
+artifact instead of just the Analyst intent string.
+
+Why we needed this: the existing 7 metrics measure coverage breadth,
+AC testability, AC-category coverage, intent fidelity, etc. — but
+none measured whether the requirement's enumerated user-facing detail
+("display total tests, passed, failed, skipped" / "no full page
+reload") survived past the Story Writer + AC Generator into something
+a junior engineer could build from. That's the LEARNINGS.md §28 gap.
+
+| | |
+|---|---|
+| Metric count | 8 (7 prior + `requirement_fidelity`) |
+| Provider / model / hashes | unchanged from prior sections |
+
+### Mean scores — all 8 metrics on 3.5-flash
+
+| Metric | Mean | Floor | Note |
+|---|---|---|---|
+| `actor_set_completeness` | 1.00 | 0.70 | unchanged |
+| `ambiguity_discipline` | 0.67 | 0.30 | within band |
+| `intent_keyword_overlap` | 1.00 | 0.40 | unchanged from post-rebase section |
+| **`requirement_fidelity`** | **0.72** | **0.50** | **new** |
+| `ac_coverage` | 0.87 | 0.80 | unchanged |
+| `ac_testability` | 1.00 | 0.80 | unchanged |
+| `tc_coverage_breadth` | 0.96 | 0.80 | unchanged |
+| `tc_executability` | 1.00 | 0.80 | unchanged |
+
+### Per-sample requirement_fidelity
+
+| Sample | Score | Hits / Misses |
+|---|---|---|
+| sample-01-well-structured | **0.17** | hits: `authenticated`. **misses: passed, failed, skipped, 30 seconds, full page reload** |
+| sample-02-vague-ambiguous | 1.00 | hits: defect, spreadsheet, manager, update |
+| sample-03-multi-feature   | 1.00 | hits: date range, environment, test suite, filter |
+
+### Headline finding
+
+**Sample-01 0.17 is the artifact-level confirmation of the gap
+LEARNINGS.md §28 / `docs/user-story-vs-implementation.md` / issue #98
+all describe.** The Story Writer + AC Generator collapse the
+requirement's enumerated user-facing detail ("display total tests,
+passed, failed, skipped") into "summary of the most recent test run,"
+and soften "every 30 seconds without a full page reload" to "updated
+automatically." A junior engineer building from this artifact alone
+would not know to surface those four specific counts or to avoid a
+full reload.
+
+**This is a real Story-Writer/AC-Generator-prompt finding, not a
+metric flaw.** The 3.5-flash model swap addressed *intent-string*
+fidelity (intent_keyword_overlap went 0.40 → 1.00 on sample-03) but
+the same model still drops named user-facing detail from the
+*artifact*. The two are different surfaces; the gain on one doesn't
+imply the gain on the other.
+
+The fix is issue #98 (Story Writer + AC Generator prompt sharpening
+with a worked example) — now backed by a deterministic metric that
+will verify the prompt change worked.
+
+### Floor choice — 0.50 (mean)
+
+Picked deliberately:
+- 0.72 mean × 3 samples = headroom against single-sample regressions.
+- Sample-01 currently 0.17; if sample-02 OR sample-03 dropped to 0.25
+  the mean would still be (0.17 + 0.25 + 1.00)/3 ≈ 0.47 → gate fails.
+  That's the regression bar the floor enforces.
+- Once #98 lifts sample-01 above 0.50, raise this floor to 0.70.
+
+### What this baseline establishes
+
+- The eval suite now has a **deterministic, judge-free check that the
+  Story Writer + AC Generator preserve PO-confirmed specifics into
+  the artifact**. The cooking-analogy in LEARNINGS.md becomes
+  literal: the tasting panel now tastes the dish for the specific
+  ingredients the recipe listed.
+- Issue #98's motivating gap is **still present on 3.5-flash for
+  sample-01**. The model swap was not a free fix. Prompt iteration is
+  the next move.
+- The "key-terms" pattern is now used in three places (intent metric,
+  AC→TC token overlap, this metric). Per CLAUDE.md §4.6 with three
+  consumers we could justifiably extract a shared abstraction; the
+  current copies are small enough that the abstraction can wait.
+
+---
+
 ## 2026-05-21 — `intent_keyword_overlap` on gemini-3.5-flash (#103, post-rebase)
 
 `intent_keyword_overlap` was first introduced in PR #103 with a
