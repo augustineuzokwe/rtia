@@ -46,8 +46,10 @@ As a QA Lead, I want to see a real-time test run summary for my selected project
 Let an authenticated QA user monitor the health of the most recent test run for a selected project on the dashboard, with the data refreshing on its own.
 
 ### Actors (expected set)
-- QA Lead (authenticated user)
+- authenticated user
 - unauthenticated user
+
+> **Note (post-Gemini calibration, #102):** the raw requirement says only "authenticated users" — the "QA Lead" qualifier was an inference from the dashboard's domain context. Demanding the Analyst echo that qualifier was over-fitting to Claude's tendency to over-qualify roles. The judge's synonym match correctly declined "authenticated user" ≈ "QA Lead (authenticated user)" because they're structurally different labels. Relaxed to match the requirement text.
 
 ### Ambiguity Categories
 - **project selection mechanism** — the requirement says the dashboard shows a summary "for a selected project" but never specifies HOW selection happens (dropdown? URL parameter? remembered last-used? default to the user's only project?). This is a story-shape question — it changes the user's flow into the feature, not just the UI polish. A disciplined Analyst is expected to surface it as a critical ambiguity. This category was added in the post-Gemini calibration: the question is genuinely worth asking, and forcing the Analyst to suppress it would penalise legitimate scope-shape inquiry.

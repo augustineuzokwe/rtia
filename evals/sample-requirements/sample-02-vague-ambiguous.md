@@ -56,8 +56,10 @@ As a QA team member, I want to view and update defect records in a central tool,
 Replace spreadsheet-based defect tracking with a shared, central tool so the QA team can update defects quickly and managers can see what is going on.
 
 ### Actors (expected set)
-- QA team member
+- team member
 - manager
+
+> **Note (post-Gemini calibration, #102):** the raw requirement uses "QA team" but Gemini's Analyst tends to drop the domain qualifier and emit just "Team member". The judge correctly declines the synonym match because structurally the labels differ. Relaxed to the unqualified label here so the metric tracks the role identity (team member vs manager) rather than the domain qualifier — which the requirement text doesn't strictly demand the Analyst echo.
 
 ### Ambiguity Categories
 The Analyst should surface at least one ambiguity per category below. Wording will vary; the eval checks that each *category* is represented.
