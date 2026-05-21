@@ -18,6 +18,7 @@ _RAW_REQ_HEADER = "## Raw Requirement"
 _ANALYST_HEADER = "## Expected Analyst Output"
 _INTENT_HEADER = "### Intent"
 _INTENT_KEY_TERMS_HEADER = "### Intent Key Terms"
+_REQUIREMENT_KEY_TERMS_HEADER = "## Requirement Key Terms"
 _ACTORS_HEADER = "### Actors (expected set)"
 _AMBIGUITY_HEADER = "### Ambiguity Categories"
 _IMPLIED_HEADER = "### Implied Stories"
@@ -87,6 +88,13 @@ class SampleRecord:
     raw_requirement: str
     expected_analyst: ExpectedAnalystOutput
     expected_acs: ExpectedAcceptanceCriteria
+    requirement_key_terms: list[str] = field(default_factory=list)
+    """User-facing specifics from the raw requirement that MUST survive into
+    the composite final artifact (description + objective + ACs + test
+    cases). Consumed by ``score_requirement_fidelity``. Lives at the
+    SampleRecord level rather than ``ExpectedAnalystOutput`` because it's
+    artifact-wide ground truth, not per-agent. Empty list = no terms
+    pinned yet (metric returns 0.0 with a diagnostic message)."""
     extra: dict[str, str] = field(default_factory=dict)
     """Reserved for future per-agent ground-truth blocks (Test Case agent,
     Reviewer agent, …) once those agents land."""
@@ -194,12 +202,20 @@ def load_sample(path: Path) -> SampleRecord:
     """Parse a single sample-requirements file into a SampleRecord."""
     content = path.read_text(encoding="utf-8")
     raw = _strip_blockquote(_extract_section(content, _RAW_REQ_HEADER, ["## "]))
+    # Requirement Key Terms is an OPTIONAL ## section. Same shape as
+    # Intent Key Terms (optional, drives score_requirement_fidelity).
+    if _REQUIREMENT_KEY_TERMS_HEADER in content:
+        req_terms_body = _extract_section(content, _REQUIREMENT_KEY_TERMS_HEADER, ["## "])
+        requirement_key_terms = [_bullet_label(b) for b in _bullets(req_terms_body)]
+    else:
+        requirement_key_terms = []
     return SampleRecord(
         name=path.stem,
         path=path,
         raw_requirement=raw,
         expected_analyst=_parse_expected_analyst(content),
         expected_acs=_parse_expected_acs(content),
+        requirement_key_terms=requirement_key_terms,
     )
 
 

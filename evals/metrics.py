@@ -326,3 +326,66 @@ def score_intent_keyword_overlap(
         f"hits={hits}, missing={missing}."
     )
     return MetricResult(name="intent_keyword_overlap", score=score, reason=reason)
+
+
+# ---------------------------------------------------------------------------
+# requirement_fidelity — do PO-confirmed user-facing specifics from the
+# original requirement survive into the composite final artifact?
+# ---------------------------------------------------------------------------
+
+
+def score_requirement_fidelity(
+    artifact_text: str,
+    expected_terms: list[str],
+) -> MetricResult:
+    """Fraction of expected requirement key terms that appear in the composite artifact.
+
+    The artifact is the concatenation of the Story Writer's description +
+    objective + assumptions, the AC Generator's Given/When/Then clauses,
+    and the Test Case Writer's scenarios + steps + expected outcomes —
+    i.e. everything a junior engineer reading the final user-story
+    artifact would see.
+
+    The metric catches the failure mode documented in LEARNINGS.md §28
+    and ``docs/user-story-vs-implementation.md``: a requirement enumerates
+    named user-facing detail ("display total tests, passed, failed,
+    skipped"; "no full page reload"; "every 30 seconds") and the artifact
+    silently compresses it to "summary of the most recent test run" —
+    losing the contract the team needs to build against.
+
+    Architecture matches ``score_intent_keyword_overlap``: case-
+    insensitive substring match of a hand-curated term list (per-sample
+    ``requirement_key_terms``) against the artifact text. The terms are
+    the *user-facing specifics* the requirement names — not implementation
+    detail, not story-shape questions — and SHOULD survive Story Writer
+    + AC Generator + Test Case Writer paraphrasing.
+
+    When ``expected_terms`` is empty (sample doesn't pin terms yet), the
+    metric returns 0.0 with a clear reason. Same surface-the-gap shape
+    as the intent metric.
+    """
+    if not expected_terms:
+        return MetricResult(
+            name="requirement_fidelity",
+            score=0.0,
+            reason=(
+                "Ground truth has no requirement_key_terms pinned — add a "
+                "'Requirement Key Terms' section to the sample requirements file."
+            ),
+        )
+    if not artifact_text.strip():
+        return MetricResult(
+            name="requirement_fidelity",
+            score=0.0,
+            reason="Composite artifact text is empty — pipeline produced no output.",
+        )
+
+    artifact_lower = artifact_text.lower()
+    hits = [t for t in expected_terms if t.lower() in artifact_lower]
+    score = len(hits) / len(expected_terms)
+    missing = [t for t in expected_terms if t.lower() not in artifact_lower]
+    reason = (
+        f"{len(hits)}/{len(expected_terms)} key terms present in artifact. "
+        f"hits={hits}, missing={missing}."
+    )
+    return MetricResult(name="requirement_fidelity", score=score, reason=reason)

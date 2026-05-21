@@ -11,6 +11,17 @@ We need something to track our defects better. Right now everything is in spread
 
 ---
 
+## Requirement Key Terms
+
+User-facing specifics from the raw requirement above that MUST survive into the composite final artifact. The vague sample has fewer named specifics by design — that's the point of the sample — but the named nouns and the verb "update" still need to land in the artifact.
+
+- defect
+- spreadsheet
+- manager
+- update
+
+---
+
 ## Ambiguities RTIA Should Flag
 
 The Requirements Analyst Agent should identify and surface at least the following before generating a user story:

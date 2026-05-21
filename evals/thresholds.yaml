@@ -37,6 +37,12 @@ metric_floors:
   actor_set_completeness: 0.70
   ambiguity_discipline: 0.30
   intent_keyword_overlap: 0.40
+  # Requirement-fidelity metric (#99). Floor 0.50 = "half of the
+  # PO-confirmed user-facing specifics survive into the composite final
+  # artifact". Will be re-checked against the live baseline below; if
+  # 3.5-flash artifact behavior shifts the empirical floor, this value
+  # gets updated in the same commit that updates baselines.md.
+  requirement_fidelity: 0.50
   ac_coverage: 0.80
   ac_testability: 0.80
   tc_coverage_breadth: 0.80

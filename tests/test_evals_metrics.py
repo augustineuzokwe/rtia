@@ -261,3 +261,68 @@ def test_intent_keyword_overlap_missing_key_terms_surfaces_gap() -> None:
     result = score_intent_keyword_overlap(actual, expected)
     assert result.score == 0.0
     assert "key_terms" in result.reason.lower() or "key terms" in result.reason.lower()
+
+
+# ---------------------------------------------------------------------------
+# requirement_fidelity — programmatic, no judge, operates on artifact text
+# ---------------------------------------------------------------------------
+
+
+from evals.metrics import score_requirement_fidelity  # noqa: E402
+
+
+def test_requirement_fidelity_all_terms_present_scores_one() -> None:
+    """Every PO-confirmed specific survives into the artifact → score 1.0."""
+    artifact = (
+        "As an authenticated user, I want to see the test run summary "
+        "with passed, failed, and skipped counts on the dashboard. "
+        "The data refreshes every 30 seconds without a full page reload."
+    )
+    terms = ["passed", "failed", "skipped", "30 seconds", "full page reload", "authenticated"]
+    result = score_requirement_fidelity(artifact, terms)
+    assert result.score == 1.0
+
+
+def test_requirement_fidelity_dropped_specific_is_flagged() -> None:
+    """Per issue #99 verification: deliberately omitting specifics drops the score."""
+    # Sample-01-like artifact with pass/fail/skip silently compressed to "summary"
+    # and the no-full-reload UX guarantee softened to "automatically".
+    artifact = (
+        "As an authenticated user, I want to see a summary of the most "
+        "recent test run on the dashboard, updated automatically."
+    )
+    terms = ["passed", "failed", "skipped", "30 seconds", "full page reload", "authenticated"]
+    result = score_requirement_fidelity(artifact, terms)
+    # Only "authenticated" survives in the paraphrased artifact. 1/6 ≈ 0.167.
+    assert result.score < 0.3
+    assert "passed" in result.reason
+    assert "failed" in result.reason
+    assert "skipped" in result.reason
+
+
+def test_requirement_fidelity_case_insensitive() -> None:
+    artifact = "Send an Email Alert to the QA LEAD on Failure."
+    terms = ["email", "QA Lead", "failure"]
+    result = score_requirement_fidelity(artifact, terms)
+    assert result.score == 1.0
+
+
+def test_requirement_fidelity_empty_artifact_scores_zero() -> None:
+    result = score_requirement_fidelity("", ["foo", "bar"])
+    assert result.score == 0.0
+    assert "empty" in result.reason.lower()
+
+
+def test_requirement_fidelity_no_terms_pinned_surfaces_gap() -> None:
+    """Sample without curated terms scores zero with a clear reason — not silent pass."""
+    result = score_requirement_fidelity("anything well-formed", [])
+    assert result.score == 0.0
+    assert "requirement_key_terms" in result.reason.lower() or "key terms" in result.reason.lower()
+
+
+def test_requirement_fidelity_multi_word_term_substring_match() -> None:
+    """Multi-word terms are substring-matched verbatim (preserves named UX phrases)."""
+    artifact = "The summary updates without a full page reload."
+    terms = ["full page reload"]
+    result = score_requirement_fidelity(artifact, terms)
+    assert result.score == 1.0

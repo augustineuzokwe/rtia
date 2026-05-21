@@ -15,6 +15,19 @@ Only authenticated users should be able to view the dashboard. Unauthenticated u
 
 ---
 
+## Requirement Key Terms
+
+User-facing specifics from the raw requirement above that MUST survive into the composite final artifact (description + objective + ACs + test cases). Consumed by `score_requirement_fidelity`. Case-insensitive substring match. Each entry is a thing a junior engineer reading the artifact would need to see, per `docs/user-story-vs-implementation.md`.
+
+- passed
+- failed
+- skipped
+- 30 seconds
+- full page reload
+- authenticated
+
+---
+
 ## Expected Output (ground truth for eval dataset)
 
 ### User Story

@@ -15,6 +15,17 @@ Test results should be exportable to CSV. The applied filter state should be sav
 
 ---
 
+## Requirement Key Terms
+
+User-facing specifics from the raw requirement above that MUST survive into the composite final artifact. Note that sample-03 is a multi-feature requirement; RTIA's Analyst surfaces a "pick-one" critical ambiguity, and the PO-directive fixture (`evals/ground-truth/po-answers/sample-03-multi-feature.yaml`) picks the filtering story as the scoped one. The key terms below are scoped to that one — the email-alert and CSV-export features belong to other implied stories and should NOT appear in this story's artifact (covered by the AC Generator's out-of-scope check, not by this metric).
+
+- date range
+- environment
+- test suite
+- filter
+
+---
+
 ## Features Contained (RTIA should identify these)
 
 1. **Filtering with persistence** — filter by date range, environment, test suite name; filter state saved per user account across sessions
