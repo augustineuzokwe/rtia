@@ -75,6 +75,14 @@ FAKE_TEST_CASE_RESPONSE = {
     ]
 }
 
+FAKE_REVIEW_RESPONSE = {
+    "coverage_gaps": [],
+    "weak_acs": [],
+    "untestable_criteria": [],
+    "recommendations": [],
+    "overall_quality": "strong",
+}
+
 
 def _llm_factory(payload: dict):
     """Build a fake ChatGoogleGenerativeAI class whose instances return `payload`."""
@@ -92,6 +100,7 @@ def _mock_pipeline_llms(
     story_payload: dict = FAKE_STORY_RESPONSE,
     ac_payload: dict = FAKE_AC_RESPONSE,
     test_case_payload: dict = FAKE_TEST_CASE_RESPONSE,
+    review_payload: dict = FAKE_REVIEW_RESPONSE,
 ):
     """Patch each agent's `ChatGoogleGenerativeAI` symbol with its own fake.
 
@@ -120,6 +129,12 @@ def _mock_pipeline_llms(
         patch(
             "agents.test_case_writer.ChatGoogleGenerativeAI",
             side_effect=_llm_factory(test_case_payload),
+        )
+    )
+    stack.enter_context(
+        patch(
+            "agents.reviewer.ChatGoogleGenerativeAI",
+            side_effect=_llm_factory(review_payload),
         )
     )
     return stack
@@ -153,6 +168,13 @@ def test_pipeline_flows_through_when_no_critical_ambiguities():
     assert len(result["final_artifact"].test_cases) == 2
     types = {tc.type for tc in result["final_artifact"].test_cases}
     assert {"happy_path", "negative"} <= types
+    # Reviewer (Phase 10) populates this slot from FAKE_REVIEW_RESPONSE.
+    assert "review_report" in result
+    assert result["review_report"].overall_quality == "strong"
+    assert result["review_report"].coverage_gaps == []
+    # Reviewer appends a summary to the artifact's metadata.
+    assert "review_summary" in result["final_artifact"].metadata
+    assert "[strong]" in result["final_artifact"].metadata["review_summary"]
 
 
 def test_pipeline_pauses_when_critical_ambiguity_present():

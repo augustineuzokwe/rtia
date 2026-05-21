@@ -32,6 +32,7 @@ from agents.requirements_analyst import (
     ImpliedStory,
     analyze_requirement,
 )
+from agents.reviewer import ReviewReport, review_artifact
 from agents.test_case_writer import TestCaseWriterOutput, write_test_cases
 from agents.user_story_writer import UserStory, write_user_story
 
@@ -60,6 +61,7 @@ _CHECKPOINT_ALLOWLIST: list[tuple[str, ...]] = [
     ("agents.final_artifact", "FinalUserStory"),
     ("agents.final_artifact", "AcceptanceCriterion"),
     ("agents.final_artifact", "TestCase"),
+    ("agents.reviewer", "ReviewReport"),
 ]
 
 
@@ -81,6 +83,7 @@ class PipelineState(TypedDict, total=False):
     acceptance_criteria: list[AcceptanceCriterion]
     test_cases: list[TestCase]
     final_artifact: FinalUserStory
+    review_report: ReviewReport
 
 
 def analyst_node(state: PipelineState) -> dict:
@@ -225,6 +228,34 @@ def composer_node(state: PipelineState) -> dict:
     return {"final_artifact": artifact}
 
 
+def reviewer_node(state: PipelineState) -> dict:
+    """Run the Reviewer on the assembled artifact.
+
+    Reads the original requirement text and the FinalUserStory produced by
+    the Composer. Writes the full ReviewReport into state so evals and the
+    demo can inspect individual fields. Also appends a one-line quality
+    summary to final_artifact.metadata so the rendered markdown always
+    surfaces review notes alongside the artifact.
+    """
+    artifact = state["final_artifact"]
+    report = review_artifact(state["requirement_text"], artifact)
+
+    summary_parts = []
+    if report.coverage_gaps:
+        summary_parts.append(f"gaps: {'; '.join(report.coverage_gaps)}")
+    if report.weak_acs:
+        summary_parts.append(f"weak ACs: {'; '.join(report.weak_acs)}")
+    if report.recommendations:
+        summary_parts.append(f"recommendations: {'; '.join(report.recommendations)}")
+    tag = f"[{report.overall_quality}]"
+    summary = f"{tag} " + " | ".join(summary_parts) if summary_parts else tag
+
+    updated_artifact = artifact.model_copy(
+        update={"metadata": {**artifact.metadata, "review_summary": summary}}
+    )
+    return {"final_artifact": updated_artifact, "review_report": report}
+
+
 def _allowlisted_serde() -> JsonPlusSerializer:
     """Build the serializer with our Pydantic types pre-registered.
 
@@ -282,6 +313,7 @@ def build_pipeline(checkpointer: BaseCheckpointSaver | None = None):
     builder.add_node("ac_generator", ac_generator_node)
     builder.add_node("test_case_writer", test_case_writer_node)
     builder.add_node("composer", composer_node)
+    builder.add_node("reviewer", reviewer_node)
     builder.add_edge(START, "analyst")
     builder.add_edge("analyst", "po_checkpoint")
     builder.add_edge("po_checkpoint", "story_writer")
@@ -289,7 +321,8 @@ def build_pipeline(checkpointer: BaseCheckpointSaver | None = None):
     builder.add_edge("story_review_checkpoint", "ac_generator")
     builder.add_edge("ac_generator", "test_case_writer")
     builder.add_edge("test_case_writer", "composer")
-    builder.add_edge("composer", END)
+    builder.add_edge("composer", "reviewer")
+    builder.add_edge("reviewer", END)
     return builder.compile(checkpointer=checkpointer)
 
 
@@ -304,6 +337,7 @@ __all__ = [
     "ImpliedStory",
     "PIPELINE_STATE_VERSION",
     "PipelineState",
+    "ReviewReport",
     "TestCase",
     "TestCaseWriterOutput",
     "UserStory",
