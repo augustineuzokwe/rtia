@@ -83,58 +83,62 @@ jobs:
             echo "run=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # Fork detection + key presence — combined so the failure mode is
-      # explicit. In-repo PRs MUST have a key (hard fail). Fork PRs are
-      # allowed to skip (we can't expose secrets to forks, but we still
-      # want their PRs to surface unit-test results).
-      - name: Verify Gemini API key (fork PR may skip; in-repo PR may not)
-        id: key_check
+      # Key presence is mandatory whenever the eval is meant to run.
+      # A missing key always hard-fails — silently passing without the
+      # eval would defeat the gate's purpose. The previous fork-PR skip
+      # branch was removed (#107 review): RTIA is a personal repo, no
+      # fork PRs to handle, and the failure mode is sharper without it.
+      # If this ever becomes a multi-contributor project, reintroduce
+      # the fork branch with a real motivating example.
+      - name: Verify Gemini API key
         if: steps.should_run.outputs.run == 'true'
         env:
           KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
-          IS_FORK: ${{ github.event.pull_request.head.repo.fork || 'false' }}
         run: |
           set -euo pipefail
-          if [ -n "${KEY:-}" ]; then
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          if [ -z "${KEY:-}" ]; then
+            echo "::error::No Gemini API key available. Set GOOGLE_API_KEY_CI (preferred) or GOOGLE_API_KEY in repo secrets."
+            exit 1
           fi
-          if [ "${IS_FORK}" = "true" ]; then
-            echo "::warning::Fork PR has no access to Gemini API key. Eval gate skipped — maintainer must run evals/run_evals.py locally before merging."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "::error::In-repo PR has no Gemini API key available. Set GOOGLE_API_KEY_CI (preferred) or GOOGLE_API_KEY in repo secrets. Until then, this gate fails by design — silently passing without the eval defeats the gate's purpose."
-          exit 1
 
       - name: Install uv
-        if: steps.should_run.outputs.run == 'true' && steps.key_check.outputs.skip != 'true'
+        if: steps.should_run.outputs.run == 'true'
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
           python-version-file: .python-version
 
       - name: Install dependencies
-        if: steps.should_run.outputs.run == 'true' && steps.key_check.outputs.skip != 'true'
+        if: steps.should_run.outputs.run == 'true'
         run: uv sync --all-groups
 
-      - name: Run eval suite
-        if: steps.should_run.outputs.run == 'true' && steps.key_check.outputs.skip != 'true'
+      # Wrapped in nick-fields/retry to ride out transient Gemini 503s
+      # (observed on PR #107 first live run — Gemini returned 503
+      # UNAVAILABLE during a high-demand spike and the in-library
+      # tenacity retries exhausted before the spike cleared).
+      #
+      # 3 attempts × 30s wait. Worst-case cost: 3 × $0.03 = $0.09 per
+      # CI run, and only on actually-flaky days. Median run still costs
+      # $0.03. Threshold enforcement does NOT retry — a metric below
+      # floor is a real signal worth investigating, not transient noise.
+      - name: Run eval suite (with retry for transient 503s)
+        if: steps.should_run.outputs.run == 'true'
+        uses: nick-fields/retry@v3
         env:
-          # CI-scoped key first; fall back to the standard key for the
-          # transition period before the dedicated CI key is provisioned.
-          # Keep this expression in sync with the key_check step above.
+          # Keep this in sync with the Verify Gemini API key step above.
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
-        run: |
-          set -euo pipefail
-          uv run python evals/run_evals.py --report-path evals/reports/ci-run.json
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: uv run python evals/run_evals.py --report-path evals/reports/ci-run.json
 
       - name: Enforce metric floors
-        if: steps.should_run.outputs.run == 'true' && steps.key_check.outputs.skip != 'true'
+        if: steps.should_run.outputs.run == 'true'
         run: uv run python evals/check_thresholds.py evals/reports/ci-run.json
 
       - name: Upload eval report
-        if: always() && steps.should_run.outputs.run == 'true' && steps.key_check.outputs.skip != 'true'
+        if: always() && steps.should_run.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: eval-report-${{ github.event.pull_request.number || github.run_id }}
