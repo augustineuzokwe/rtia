@@ -50,7 +50,9 @@ Let an authenticated QA user monitor the health of the most recent test run for 
 - unauthenticated user
 
 ### Ambiguity Categories
-- (none expected) — the requirement is well-scoped, single-feature, and names its role, behaviour, refresh cadence, and auth boundary explicitly. The Analyst should return an empty `ambiguities` list. Any flagged item is most likely an implementation/UX detail the prompt's scope rule forbids (e.g. refresh indicator, retry on network error, redirect target after login).
+- **project selection mechanism** — the requirement says the dashboard shows a summary "for a selected project" but never specifies HOW selection happens (dropdown? URL parameter? remembered last-used? default to the user's only project?). This is a story-shape question — it changes the user's flow into the feature, not just the UI polish. A disciplined Analyst is expected to surface it as a critical ambiguity. This category was added in the post-Gemini calibration: the question is genuinely worth asking, and forcing the Analyst to suppress it would penalise legitimate scope-shape inquiry.
+
+Items that would still indicate a discipline failure (implementation/UX detail the prompt's scope rule forbids — these are NOT categories, just illustrative anti-patterns): specific refresh-indicator UI (spinner, "last updated" timestamp), retry-on-network-error behaviour, redirect-target choice after successful login.
 
 ### Implied Stories
 - (none expected) — single-story requirement.

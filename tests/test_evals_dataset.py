@@ -25,7 +25,11 @@ def test_sample_01_well_structured_ground_truth() -> None:
     assert "real-time test run summary" in sample.raw_requirement
     expected = sample.expected_analyst
     assert expected.actors == ["QA Lead (authenticated user)", "unauthenticated user"]
-    assert expected.ambiguity_categories == []
+    # Post-Phase-9.3 calibration (#101): the "project selection mechanism"
+    # ambiguity is now expected. The requirement is silent on how
+    # selection happens — that's a legitimate scope-shape question and
+    # forcing the Analyst to suppress it would penalise legitimate inquiry.
+    assert expected.ambiguity_categories == ["project selection mechanism"]
     assert expected.implied_story_titles == []
     assert "authenticated QA user" in expected.intent
 
