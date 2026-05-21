@@ -24,7 +24,10 @@ def test_sample_01_well_structured_ground_truth() -> None:
     sample = load_sample(SAMPLES_DIR / "sample-01-well-structured.md")
     assert "real-time test run summary" in sample.raw_requirement
     expected = sample.expected_analyst
-    assert expected.actors == ["QA Lead (authenticated user)", "unauthenticated user"]
+    # Post-#102 calibration: relaxed from "QA Lead (authenticated user)" to
+    # just "authenticated user" to match the raw requirement text. See the
+    # sample file's Actors section note for rationale.
+    assert expected.actors == ["authenticated user", "unauthenticated user"]
     # Post-Phase-9.3 calibration (#101): the "project selection mechanism"
     # ambiguity is now expected. The requirement is silent on how
     # selection happens — that's a legitimate scope-shape question and
@@ -37,7 +40,9 @@ def test_sample_01_well_structured_ground_truth() -> None:
 def test_sample_02_vague_ambiguity_categories_extracted() -> None:
     sample = load_sample(SAMPLES_DIR / "sample-02-vague-ambiguous.md")
     expected = sample.expected_analyst
-    assert expected.actors == ["QA team member", "manager"]
+    # Post-#102 calibration: relaxed from "QA team member" to just
+    # "team member" — see the sample file's Actors section note.
+    assert expected.actors == ["team member", "manager"]
     # Categories are derived from the bold prefix of each bullet.
     assert expected.ambiguity_categories == [
         "actor scoping",

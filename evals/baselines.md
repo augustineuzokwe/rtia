@@ -21,6 +21,57 @@ See ADR-0006 §"Dropped metrics" for the rationale.
 
 ---
 
+## 2026-05-21 — Actor-label recalibration (Issue #102)
+
+Relaxes the two over-qualified ground-truth actor labels that were
+implicitly tuned to Claude's tendency to qualify roles. Gemini emits
+the shorter form ("authenticated user", "team member") and the synonym
+judge correctly declined the match (structurally different labels).
+The raw requirements don't strictly demand the qualifier — the
+"QA Lead" / "QA team member" forms were inferences carried into the
+ground truth, not requirement text. **No prompt change.**
+
+| | |
+|---|---|
+| Provider / model / hashes | unchanged from prior sections |
+| sample-01 actor 1 | was `QA Lead (authenticated user)`, now `authenticated user` |
+| sample-02 actor 1 | was `QA team member`, now `team member` |
+
+### Mean scores (all 6 metrics)
+
+| Metric | Mean | Δ vs #101 section | Threshold |
+|---|---|---|---|
+| `actor_set_completeness` | **0.87** | **+0.20** | 0.80 |
+| `ambiguity_discipline` | 0.67 | -0.19 | 0.80 |
+| `ac_coverage` | 0.90 | -0.10 | 0.80 |
+| `ac_testability` | 1.00 | 0.00 | 0.80 |
+| `tc_coverage_breadth` | 0.96 | -0.04 | 0.80 |
+| `tc_executability` | 1.00 | 0.00 | 0.80 |
+
+### Per-sample detail
+
+| Sample | actors | ambig | ac_cov | ac_test | tc_cov | tc_exec |
+|---|---|---|---|---|---|---|
+| sample-01-well-structured | **0.81** | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| sample-02-vague-ambiguous | **1.00** | 0.33 | 0.89 | 1.00 | 1.00 | 1.00 |
+| sample-03-multi-feature   | 0.80 | 1.00 | 1.00 | 1.00 | 0.88 | 1.00 |
+
+### Headline findings
+
+1. **`actor_set_completeness` mean went 0.67 → 0.87.** Target (≥0.75 per #102) cleared. Sample-01 lifted 0.50 → 0.81 (still has minor noise from the judge's "authenticated user" handling — Gemini sometimes emits "authenticated user" plus a second qualified form, costing precision). Sample-02 went 0.50 → 1.00 — the dominant win. Sample-03 dropped 1.00 → 0.80 because Gemini invented a third actor on this run (manager-style label not in the expected set); pure stochasticity, not caused by this change.
+
+2. **Five of six metrics clear the 0.80 threshold on mean.** The lone exception is `ambiguity_discipline` (0.67), which regressed from 0.86 on the prior section. **Not caused by this PR** — sample-02's Analyst run today matched only 1 of 5 expected categories instead of 2; same prompt hash, different stochastic surfacing. This sits in the same calibration-vs-stochasticity grey zone documented in earlier sections. Tracked under Epic #92 / #98 / #99.
+
+3. **`ac_coverage` mean dropped 1.00 → 0.90.** Sample-02 had one out-of-scope AC ("4/5 in-scope"). Again same prompt hash, stochasticity within the documented ±0.10 band.
+
+### What this baseline establishes
+
+- The two over-qualified actor labels were over-fitting to Claude's role-qualification tendency. The relaxed labels are more faithful to the requirement text AND make the metric stable on Gemini.
+- The remaining `ambiguity_discipline` and `ac_coverage` mean fluctuations are stochasticity, not regressions. Confirmed by stable Analyst prompt hash + per-sample swings that point in different directions across runs.
+- A CI eval gate (Phase 11) should set thresholds at the **mean across multiple runs**, not single-run snapshots — single-run variance is wide enough on these two metrics that a single-snapshot gate would false-flag on noise.
+
+---
+
 ## 2026-05-21 — Sample-01 ambiguity recalibration (Issue #101)
 
 Recalibrates sample-01's Analyst ground truth to **expect** the
