@@ -5,23 +5,29 @@ and resilience knobs. Centralizing here means a model bump or a default
 timeout change happens in one place and propagates to every agent, instead
 of needing matching edits across agents/*.py.
 
-See `docs/adr-0006-provider-switch.md` for the rationale behind the current
-provider/model choice (Gemini 2.5 Flash on Google AI Studio free tier).
-ADR-0001 captures the prior Claude Opus 4.7 choice and is now superseded.
+See `docs/adr-0007-gemini-3-5-flash-switch.md` for the rationale behind the
+current Gemini 3.5 Flash choice. ADR-0006 documents the prior 2.5 Flash
+era; ADR-0001 captures the original Claude Opus 4.7 choice.
 """
 
 from __future__ import annotations
 
 import hashlib
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-3.5-flash"
 """Canonical Gemini model ID used by all production agents.
 
-Stable, free-tier-eligible on Google AI Studio (verified 2026-05-21:
-≥10 RPM / 250 RPD quota; selection confirmed against the live
-`models.list` endpoint). Bump cautiously — newer Gemini IDs (3.x) are
-preview-only at time of writing and their behaviour can shift without
-notice. See ADR-0006 for the cutover rationale from Claude Opus 4.7.
+Switched from ``gemini-2.5-flash`` on 2026-05-21 after the 2.5-flash
+alias hit repeated 503 UNAVAILABLE errors on GitHub-hosted CI runners
+(PRs #107, #109). Live probing showed ``gemini-3.5-flash`` routes to
+a separate, healthy backend pool — the 503s were not a global Google
+outage but a backend-specific congestion on whichever pool the
+2.5-flash alias mapped to. See ADR-0007 for the full rationale plus
+the live-probe data that motivated the choice.
+
+Still an alias (no dated 3.5-flash suffix exists at switch time).
+When Google publishes a dated suffix for the 3.5 line, bump this for
+reproducibility — same caveat that applied to 2.5-flash.
 """
 
 DEFAULT_TIMEOUT_SECONDS = 60.0

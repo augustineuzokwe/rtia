@@ -18,7 +18,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
-from agents._llm_utils import strip_json_fence
+from agents._llm_utils import coerce_response_text, strip_json_fence
 from agents.config import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
@@ -129,5 +129,5 @@ def analyze_requirement(
     # attributable to the exact prompt version. See agents.config.prompt_hash.
     config = {"metadata": {"agent": "requirements_analyst", "prompt_hash": _PROMPT_HASH}}
     response = llm.invoke(messages, config=config)
-    raw = response.content if isinstance(response.content, str) else str(response.content)
+    raw = coerce_response_text(response.content)
     return AnalystOutput.model_validate(json.loads(strip_json_fence(raw)))

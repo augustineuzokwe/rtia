@@ -155,7 +155,7 @@ This complements 4.6 — review for these, not for "did I follow clean-architect
 
 ### 4.9 Default model is paid Gemini Flash; other paid models require justification
 
-`agents.config.DEFAULT_MODEL = "gemini-2.5-flash"`. All four production agents and the eval-suite judge run on Gemini 2.5 Flash via `langchain-google-genai`. The default tier is **paid** Google AI Studio (a few cents per session) — the free tier exists but is capped at 20 requests per day per project per model and is too tight for routine demos + evals (see [ADR-0006](docs/adr-0006-provider-switch.md) for the cost analysis).
+`agents.config.DEFAULT_MODEL = "gemini-3.5-flash"`. All four production agents and the eval-suite judge run on Gemini 3.5 Flash via `langchain-google-genai`. The default tier is **paid** Google AI Studio (a few cents per session) — the free tier exists but is capped at 20 requests per day per project per model and is too tight for routine demos + evals (see [ADR-0006](docs/adr-0006-provider-switch.md) for the original Anthropic-to-Gemini cost analysis, and [ADR-0007](docs/adr-0007-gemini-3-5-flash-switch.md) for the 2.5-flash → 3.5-flash switch driven by 503s on GitHub-hosted runners).
 
 Cost expectations under the default stack:
 - Full pipeline demo: ≈$0.005
@@ -163,7 +163,7 @@ Cost expectations under the default stack:
 - ~10× cheaper than the prior Claude Opus 4.7 baseline (≈$0.30–0.50 per demo, ≈$1–2 per eval).
 
 Adding any *other* paid LLM call (Anthropic Claude, OpenAI, larger Gemini Pro) requires:
-1. A named reason `gemini-2.5-flash` cannot do the task — usually a specific benchmarked failure mode.
+1. A named reason `gemini-3.5-flash` cannot do the task — usually a specific benchmarked failure mode.
 2. PR-body justification of why the cost is worth paying.
 3. Explicit user cost approval per `feedback_cost_approval`.
 
@@ -207,7 +207,8 @@ Don't start work on a phase without first reading the relevant section of the pl
 - **Worked examples beat prose rules** — when the model isn't following a prompt rule, add a concrete worked example with correct output. Far stronger than rule iteration.
 - **Worktrees can quietly switch** — Bash `cd` doesn't persist between tool calls in some Claude Code environments. Use absolute paths and `pwd && git status` at start of multi-step blocks.
 - **msgpack deserialization warning** — `AnalystOutput` etc. need to be registered for checkpointing. Phase 2.2 fixes; until then, the warning is benign noise.
-- **`gemini-2.5-flash` is an alias** — not pinned to a date. When Google publishes dated suffixes for the 2.5 line, bump `DEFAULT_MODEL` for reproducibility.
+- **`gemini-3.5-flash` is an alias** — not pinned to a date. When Google publishes dated suffixes for the 3.5 line, bump `DEFAULT_MODEL` for reproducibility. Same caveat applied to `gemini-2.5-flash` before the ADR-0007 switch.
+- **Gemini 503s are backend-pool specific, not global.** A Gemini model alias that 503s on GitHub-hosted runners can simultaneously respond fine from a maintainer laptop — Google routes runner IP ranges to a specific backend pool. When a 503 storm hits, probe sibling models live (`client.models.list()` + a 1-token `invoke`) before assuming Google is globally down. See ADR-0007 §"What we proved with live probing".
 
 ---
 

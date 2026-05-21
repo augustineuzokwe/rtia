@@ -38,7 +38,7 @@ from dotenv import load_dotenv  # noqa: E402
 from langchain_core.messages import HumanMessage, SystemMessage  # noqa: E402
 from langchain_google_genai import ChatGoogleGenerativeAI  # noqa: E402
 
-from agents._llm_utils import strip_json_fence  # noqa: E402
+from agents._llm_utils import coerce_response_text, strip_json_fence  # noqa: E402
 from agents.ac_generator import _PROMPT_HASH as AC_PROMPT_HASH  # noqa: E402
 from agents.ac_generator import AcGeneratorOutput, generate_acceptance_criteria  # noqa: E402
 from agents.config import (  # noqa: E402
@@ -143,7 +143,7 @@ def _run_analyst_capturing_usage(text: str) -> tuple[AnalystOutput, UsageTelemet
         }
     }
     response = llm.invoke(messages, config=config)
-    raw = response.content if isinstance(response.content, str) else str(response.content)
+    raw = coerce_response_text(response.content)
     parsed = AnalystOutput.model_validate(json.loads(strip_json_fence(raw)))
     usage_meta = getattr(response, "usage_metadata", None) or {}
     telemetry = UsageTelemetry(
