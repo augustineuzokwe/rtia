@@ -9,9 +9,17 @@ name: Eval gate
 # config itself trigger the suite. Doc-only / test-only / CI-config PRs
 # skip it — those changes cannot regress LLM behaviour.
 #
-# **Forks**: this workflow requires the GOOGLE_API_KEY secret. PRs from
-# forks won't have it; the workflow exits early with a notice instead of
-# failing. Maintainer-owned PRs (same repo branches) always run the gate.
+# **Secrets**: the gate prefers `GOOGLE_API_KEY_CI` (a key dedicated to
+# CI, with its own per-day spend cap on the Google side) and falls back
+# to `GOOGLE_API_KEY` if the CI-specific one isn't set. Same pattern as
+# `ANTHROPIC_API_KEY_INTEGRATION || ANTHROPIC_API_KEY` in
+# nightly-integration.yml — keeping CI and local-dev usage on separate
+# keys means a CI leak rotates without disrupting local work, and the
+# billing dashboard shows CI spend as its own line.
+#
+# **Forks**: PRs from forks don't have either secret; the workflow exits
+# early with a notice instead of failing. Maintainer-owned PRs (same
+# repo branches) always run the gate.
 #
 # Required-check setting on `main`: this workflow must be added to the
 # branch-protection rules in GitHub settings — the YAML alone does not
@@ -44,14 +52,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check for GOOGLE_API_KEY (fork PRs skip the gate)
+      - name: Check for Gemini API key (fork PRs skip the gate)
         id: key_check
         env:
-          KEY: ${{ secrets.GOOGLE_API_KEY }}
+          # CI-scoped key takes precedence; falls back to the standard
+          # key for ad-hoc maintainer dispatches before the CI key is
+          # provisioned. Forks see neither and skip below.
+          KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
         run: |
           if [ -z "${KEY:-}" ]; then
             echo "no_key=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::GOOGLE_API_KEY is not available (likely a fork PR). Eval gate skipped."
+            echo "::notice::No Gemini API key available (likely a fork PR). Eval gate skipped."
           else
             echo "no_key=false" >> "$GITHUB_OUTPUT"
           fi
@@ -70,7 +81,8 @@ jobs:
       - name: Run eval suite
         if: steps.key_check.outputs.no_key != 'true'
         env:
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          # Same precedence as the key-check step above — keep them in sync.
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
         run: |
           set -euo pipefail
           uv run python evals/run_evals.py --report-path evals/reports/ci-run.json
