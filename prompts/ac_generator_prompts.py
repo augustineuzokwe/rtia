@@ -2,6 +2,12 @@
 
 Kept as a Python module (not a .txt file) so prompts can be versioned alongside
 the agent code, type-checked, and import-tested in CI.
+
+Canonical reference for what counts as user-facing detail (vs.
+implementation that belongs to the team): ``docs/user-story-vs-implementation.md``.
+The Faithfulness rule below ("do NOT invent scope") and the
+implementation-detail filter in this prompt both implement that doc's
+contract. Update both when the rule changes.
 """
 
 SYSTEM_PROMPT = """\
