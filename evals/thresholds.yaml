@@ -1,0 +1,32 @@
+# Per-metric mean-score floors enforced by the CI eval gate.
+#
+# Floors are NOT the "good" target — they are the "do not regress past this"
+# line. Set per-metric based on the empirical stability observed in
+# baselines.md (post-Gemini, hashes 19631aecc02a / 990e6ae9e86f /
+# e7af2794b28c / 5811bba6f6c8 as of 2026-05-21):
+#
+# - Programmatic metrics (ac_testability, tc_executability) — pinned at
+#   0.80 because they don't move with stochasticity. Any drop indicates a
+#   real structural regression in the agent's output shape.
+# - Coverage metrics (ac_coverage, tc_coverage_breadth) — 0.80 floor.
+#   Single-run variance observed within ±0.10; floor leaves headroom.
+# - actor_set_completeness — 0.70 floor. Observed mean post-#102 = 0.87
+#   with sample-03 swinging to 0.80 on actor-invention runs. 0.70 catches
+#   real regressions without false-flagging on the occasional invented
+#   third actor.
+# - ambiguity_discipline — 0.50 floor. This metric has the widest single-
+#   run variance (0.33-0.86 observed on the same prompt hash). 0.50 is
+#   "the Analyst's discipline hasn't completely collapsed" — anything
+#   below that means a real regression worth blocking on. Once Epic #92
+#   tightens this metric's calibration, raise the floor.
+#
+# A metric not listed here has NO floor enforced (CI gate ignores it).
+# Add a key here to start gating on a new metric.
+
+metric_floors:
+  actor_set_completeness: 0.70
+  ambiguity_discipline: 0.50
+  ac_coverage: 0.80
+  ac_testability: 0.80
+  tc_coverage_breadth: 0.80
+  tc_executability: 0.80
