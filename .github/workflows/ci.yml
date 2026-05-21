@@ -1,9 +1,31 @@
 name: CI
 
+# Two-stage pipeline:
+#   1. quality    — lint, format, unit tests (always runs; fast; ~30s)
+#   2. regression — full eval suite against the 3 golden samples + gate
+#                   on per-metric thresholds (only runs when agent code,
+#                   prompts, evals, or this workflow itself changed; ~60-90s)
+#
+# regression `needs: quality` — if lint or unit tests fail, the eval
+# never starts. No point spending Gemini API calls on a PR that has a
+# syntax error or a unit-test regression.
+#
+# Cost: each `regression` run is ≈$0.03 of paid Gemini Flash. The path
+# filter keeps doc-only and CI-config PRs free of API spend.
+
 on:
   pull_request:
   push:
     branches: [main]
+
+permissions:
+  contents: read
+
+# A new push to the same PR cancels the in-flight CI run — no point
+# paying for a stale eval when the head has already moved on.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   quality:
@@ -27,3 +49,95 @@ jobs:
 
       - name: Run tests
         run: uv run pytest -q
+
+  regression:
+    name: Regression (eval gate, Gemini Flash, 3 samples, 6 metrics)
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Need history to diff against base ref for the path filter.
+          fetch-depth: 0
+
+      # Path filter — done with native git diff to avoid pulling in a
+      # third-party action. We treat a `push` to main as always relevant
+      # (the eval should run on every merge so baselines.md stays
+      # honest). For PRs, we diff against the PR's base SHA.
+      - name: Detect agent / prompt / eval changes
+        id: should_run
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "::notice::push to main — regression always runs."
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if git diff --quiet "$BASE" -- agents/ prompts/ evals/ .github/workflows/ci.yml; then
+            echo "::notice::No changes to agents/, prompts/, evals/, or this workflow — regression not applicable on this PR. Subsequent steps will skip."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Fork detection + key presence — combined so the failure mode is
+      # explicit. In-repo PRs MUST have a key (hard fail). Fork PRs are
+      # allowed to skip (we can't expose secrets to forks, but we still
+      # want their PRs to surface unit-test results).
+      - name: Verify Gemini API key (fork PR may skip; in-repo PR may not)
+        id: key_check
+        if: steps.should_run.outputs.run == 'true'
+        env:
+          KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork || 'false' }}
+        run: |
+          set -euo pipefail
+          if [ -n "${KEY:-}" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${IS_FORK}" = "true" ]; then
+            echo "::warning::Fork PR has no access to Gemini API key. Eval gate skipped — maintainer must run evals/run_evals.py locally before merging."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::error::In-repo PR has no Gemini API key available. Set GOOGLE_API_KEY_CI (preferred) or GOOGLE_API_KEY in repo secrets. Until then, this gate fails by design — silently passing without the eval defeats the gate's purpose."
+          exit 1
+
+      - name: Install uv
+        if: steps.should_run.outputs.run == 'true' && steps.key_check.outputs.skip != 'true'
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version-file: .python-version
+
+      - name: Install dependencies
+        if: steps.should_run.outputs.run == 'true' && steps.key_check.outputs.skip != 'true'
+        run: uv sync --all-groups
+
+      - name: Run eval suite
+        if: steps.should_run.outputs.run == 'true' && steps.key_check.outputs.skip != 'true'
+        env:
+          # CI-scoped key first; fall back to the standard key for the
+          # transition period before the dedicated CI key is provisioned.
+          # Keep this expression in sync with the key_check step above.
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
+        run: |
+          set -euo pipefail
+          uv run python evals/run_evals.py --report-path evals/reports/ci-run.json
+
+      - name: Enforce metric floors
+        if: steps.should_run.outputs.run == 'true' && steps.key_check.outputs.skip != 'true'
+        run: uv run python evals/check_thresholds.py evals/reports/ci-run.json
+
+      - name: Upload eval report
+        if: always() && steps.should_run.outputs.run == 'true' && steps.key_check.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report-${{ github.event.pull_request.number || github.run_id }}
+          path: evals/reports/ci-run.json
+          if-no-files-found: ignore
+          retention-days: 14
