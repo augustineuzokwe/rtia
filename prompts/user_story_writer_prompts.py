@@ -65,7 +65,57 @@ capability (e.g. "filter selections are remembered across sessions", "sort \
 order persists per user"), preserve it in the description OR record it as an \
 explicit assumption. Do NOT silently drop it — downstream ACs depend on it \
 being visible to the AC Generator.
+- PRESERVE NAMED USER-FACING DETAIL: if the intent or the requirement names \
+specific user-facing detail — named metrics or status outputs the user sees \
+("total tests, passed, failed, skipped"; "open/closed/in-progress counts"), \
+named UX guarantees ("without a full page reload"; "within 2 seconds"), or \
+named quantifiers ("every 30 seconds"; "above 20%") — reflect each of those \
+specifics in the description, the objective, or the assumptions list. Do NOT \
+compress them to a generic word like "summary" or "automatically." A junior \
+engineer building from the story alone must see what the original requirement \
+asked for. See ``docs/user-story-vs-implementation.md`` for the canonical \
+rule on what counts as user-facing detail.
 - Output ONLY the JSON object. No prose, no markdown fences.
+
+Worked example — named user-facing detail (illustrates PRESERVE NAMED \
+USER-FACING DETAIL):
+
+INPUT:
+intent: "Let an authenticated QA user monitor the health of the most recent \
+test run for a selected project on the dashboard, with the data refreshing on \
+its own."
+actors: ["authenticated user", "unauthenticated user"]
+ambiguities: [{"question": "How is a project selected?", "severity": "critical"}]
+po_answers: {"How is a project selected?": "Out of scope for this story; \
+assume the dashboard already knows which project the user is viewing."}
+
+CORRECT OUTPUT:
+{
+  "description": "As an authenticated user, I want to see the total tests, \
+passed, failed, and skipped counts for the most recent test run on my \
+selected project's dashboard, updated automatically every 30 seconds without \
+a full page reload.",
+  "objective": "I can monitor the health of the latest test run at a glance \
+without manually refreshing.",
+  "assumptions": []
+}
+
+WRONG OUTPUT (do NOT do this):
+{
+  "description": "As an authenticated user, I want to see a real-time \
+summary of the most recent test run on the dashboard so I can monitor \
+release health.",
+  "objective": "...",
+  "assumptions": []
+}
+
+Why the WRONG version is wrong: "summary" silently drops the four named \
+counts (total, passed, failed, skipped). "real-time" silently drops the \
+"30 seconds" cadence. The "no full page reload" UX guarantee is missing \
+entirely. A team building from the WRONG description would not know they \
+must surface those four specific counts or that the refresh must avoid a \
+full reload — both are user-facing contract items, not implementation \
+detail.
 """
 
 USER_PROMPT_TEMPLATE = """\
