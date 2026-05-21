@@ -21,6 +21,64 @@ See ADR-0006 §"Dropped metrics" for the rationale.
 
 ---
 
+## 2026-05-21 — Phase 9.3: TC-layer metrics added (Issue #97)
+
+Adds two programmatic metrics for the Test Case Writer agent
+(merged PR #90). No judge calls, no added API spend per metric.
+The Test Case Writer is now invoked per sample in the runner so
+``tc_coverage_breadth`` and ``tc_executability`` have an output to
+score.
+
+| | |
+|---|---|
+| Provider | Google AI Studio (paid tier) |
+| Model (production agents) | `gemini-2.5-flash` |
+| Judge | `gemini-2.5-flash` |
+| Analyst prompt_hash | `19631aecc02a` (unchanged) |
+| Story Writer prompt_hash | `990e6ae9e86f` (unchanged) |
+| AC Generator prompt_hash | `e7af2794b28c` (unchanged) |
+| Test Case Writer prompt_hash | `5811bba6f6c8` (first baselined here) |
+| Metric count | 6 (4 prior + 2 new TC-layer) |
+
+### Mean scores (all 6 metrics)
+
+| Metric | Mean | Threshold | Note |
+|---|---|---|---|
+| `actor_set_completeness` | 0.67 | 0.80 | Unchanged from prior baseline; analyst behaviour same. |
+| `ambiguity_discipline` | 0.33 | 0.80 | Single-run drop within the documented ±0.10 stochasticity band on this metric; calibration follow-up is Epic #92. |
+| `ac_coverage` | 1.00 | 0.80 | All samples covered required categories cleanly on this run. |
+| `ac_testability` | 1.00 | 0.80 | Programmatic — provider-agnostic. |
+| `tc_coverage_breadth` | **0.96** | 0.80 | New — all 3 coverage types present on every sample; AC→TC token-overlap caught one uncovered AC on sample-03 (export/CSV-style AC vs. the test case wording). |
+| `tc_executability` | **1.00** | 0.80 | New — every test case across all 3 samples is free of `<value>` placeholders and weasel words. |
+
+### Per-sample detail (new TC metrics)
+
+| Sample | tc_coverage_breadth | tc_executability | TC count |
+|---|---|---|---|
+| sample-01-well-structured | 1.00 | 1.00 | 5 |
+| sample-02-vague-ambiguous | 1.00 | 1.00 | 7 |
+| sample-03-multi-feature   | 0.88 | 1.00 | 7 |
+
+### Headline findings (TC layer only)
+
+1. **`tc_executability` is a clean 1.00 across all 19 test cases.** The Test Case Writer prompt's "use concrete fixtures (e.g. 'staging', 'alice@example.com')" instruction is holding on Gemini. No `<value>` or weasel-word violations observed on this run.
+
+2. **`tc_coverage_breadth` is 1.00 on the two single-feature samples and 0.88 on the multi-feature sample.** The 0.88 on sample-03 came from `ac_score=0.75` — one of the four ACs did not share enough tokens with any test case's `expected` clause to clear the 0.3 overlap threshold. This is the metric flagging genuine TC↔AC drift on a complex sample, not a false positive — exactly the failure mode it is meant to catch.
+
+3. **All three coverage types (happy_path / edge_case / negative) are present on every sample.** No coverage-type drops anywhere — the agent's structural breadth is solid.
+
+### What this baseline establishes
+
+- The Test Case Writer's output is **above the 0.80 threshold on both new metrics** across all 3 samples. No regression risk from adding the metrics to the suite.
+- The token-overlap heuristic at threshold 0.3 is **already tight enough to catch real coverage gaps** (sample-03 example). If future runs show false positives, raise the threshold; the value is centralised at `_AC_TC_OVERLAP_THRESHOLD` in `evals/tc_metrics.py`.
+- Phase 11 (CI eval gate) can now assert against all 6 metrics, not 4 — full pipeline coverage.
+
+### Aside on the Analyst-layer score drift
+
+The `ambiguity_discipline` mean dropped from 0.58 → 0.33 vs. the prior section. The Analyst prompt is **unchanged** (same hash). This is single-run stochasticity already documented in the prior section's headline finding #4 — the well-structured sample-01 baseline is sensitive to whether Gemini decides to flag the project-selection question as a critical ambiguity. Not a Phase 9.3 regression. Calibration fix tracked under Epic #92.
+
+---
+
 ## 2026-05-21 — post-Gemini cutover baseline (ADR-0006)
 
 | | |

@@ -47,6 +47,8 @@ from agents.config import (  # noqa: E402
     DEFAULT_TIMEOUT_SECONDS,
 )
 from agents.requirements_analyst import _PROMPT_HASH, AnalystOutput  # noqa: E402
+from agents.test_case_writer import _PROMPT_HASH as TC_PROMPT_HASH  # noqa: E402
+from agents.test_case_writer import TestCaseWriterOutput, write_test_cases  # noqa: E402
 from agents.user_story_writer import UserStory, write_user_story  # noqa: E402
 from evals.ac_metrics import score_ac_coverage, score_ac_testability  # noqa: E402
 from evals.dataset import SampleRecord, load_all_samples  # noqa: E402
@@ -56,6 +58,7 @@ from evals.metrics import (  # noqa: E402
     score_actor_set_completeness,
     score_ambiguity_discipline,
 )
+from evals.tc_metrics import score_tc_coverage_breadth, score_tc_executability  # noqa: E402
 from prompts.requirements_analyst_prompts import (  # noqa: E402
     SYSTEM_PROMPT,
     USER_PROMPT_TEMPLATE,
@@ -98,10 +101,12 @@ class SampleReport:
     analyst_output: dict
     story_output: dict | None = None
     ac_output: dict | None = None
+    tc_output: dict | None = None
     metrics: list[MetricResult] = field(default_factory=list)
     analyst_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
     story_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
     ac_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
+    tc_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
 
     @property
     def pipeline_usage(self) -> UsageTelemetry:
@@ -109,6 +114,7 @@ class SampleReport:
         total.add(self.analyst_usage)
         total.add(self.story_usage)
         total.add(self.ac_usage)
+        total.add(self.tc_usage)
         return total
 
 
@@ -206,6 +212,21 @@ def _run_ac_generator(
     return result, UsageTelemetry()
 
 
+def _run_test_case_writer(
+    user_story: UserStory,
+    ac_output: AcGeneratorOutput,
+) -> tuple[TestCaseWriterOutput, UsageTelemetry]:
+    """Run the Test Case Writer via the library entry point.
+
+    Same telemetry trade-off as the other downstream agents. Failure
+    propagates as an exception so TC-layer metrics are explicitly
+    unavailable rather than silently zero'd, matching the pattern used
+    for the AC layer.
+    """
+    result = write_test_cases(user_story, ac_output.criteria)
+    return result, UsageTelemetry()
+
+
 def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
     """Score one sample with a single Gemini judge.
 
@@ -223,12 +244,15 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
     # AC layer are explicitly unavailable rather than silently zero'd.
     story, story_usage = _run_story_writer(analyst_output, po_answers)
     ac_result, ac_usage = _run_ac_generator(story, analyst_output, po_answers)
+    tc_result, tc_usage = _run_test_case_writer(story, ac_result)
 
     metrics = [
         score_actor_set_completeness(analyst_output, sample.expected_analyst, judge),
         score_ambiguity_discipline(analyst_output, sample.expected_analyst, judge),
         score_ac_coverage(ac_result, sample.expected_acs, judge),
         score_ac_testability(ac_result),
+        score_tc_coverage_breadth(tc_result.cases, ac_result.criteria),
+        score_tc_executability(tc_result.cases),
     ]
 
     return SampleReport(
@@ -236,10 +260,12 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
         analyst_output=analyst_output.model_dump(),
         story_output=story.model_dump(),
         ac_output=ac_result.model_dump(),
+        tc_output=tc_result.model_dump(),
         metrics=metrics,
         analyst_usage=analyst_usage,
         story_usage=story_usage,
         ac_usage=ac_usage,
+        tc_usage=tc_usage,
     )
 
 
@@ -259,12 +285,14 @@ def _serialise(reports: list[SampleReport], *, judge_model: str) -> dict:
         "judge_model": judge_model,
         "analyst_prompt_hash": _PROMPT_HASH,
         "ac_generator_prompt_hash": AC_PROMPT_HASH,
+        "test_case_writer_prompt_hash": TC_PROMPT_HASH,
         "samples": [
             {
                 "name": r.name,
                 "analyst_output": r.analyst_output,
                 "story_output": r.story_output,
                 "ac_output": r.ac_output,
+                "tc_output": r.tc_output,
                 "metrics": [asdict(m) for m in r.metrics],
                 "usage": asdict(r.analyst_usage),
             }
@@ -298,11 +326,13 @@ def _print_summary(payload: dict) -> None:
 
 _COST_DISCLOSURE = (
     "Cost disclosure: this eval run makes ≈4 production-agent calls per sample "
-    "plus ≈4–6 judge calls per sample (actor synonym tiebreaks, ambiguity "
-    "category mapping, AC→category classification). Default scope is 3 "
-    "samples ≈ 24–30 total Gemini 2.5 Flash calls. Estimated paid-tier spend "
-    "≈$0.03 per full run. Free-tier accounts will hit the 20-RPD cap mid-run "
-    "— use paid tier for routine eval work. See docs/adr-0006-provider-switch.md."
+    "(Analyst, Story Writer, AC Generator, Test Case Writer) plus ≈4–6 judge "
+    "calls per sample (actor synonym tiebreaks, ambiguity category mapping, "
+    "AC→category classification). The two TC-layer metrics are programmatic "
+    "and add zero judge cost. Default scope is 3 samples ≈ 24–30 total "
+    "Gemini 2.5 Flash calls. Estimated paid-tier spend ≈$0.03–0.04 per full "
+    "run. Free-tier accounts will hit the 20-RPD cap mid-run — use paid "
+    "tier for routine eval work. See docs/adr-0006-provider-switch.md."
 )
 
 
