@@ -40,7 +40,7 @@ def _full_artifact() -> FinalUserStory:
             )
         ],
         assumptions=["Assumed 30s refresh interval"],
-        metadata={"model": "claude-opus-4-7"},
+        metadata={"model": "gemini-2.5-flash"},
     )
 
 

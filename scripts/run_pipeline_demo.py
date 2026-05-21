@@ -105,8 +105,20 @@ def collect_story_review_response(payload: dict) -> dict:
     }
 
 
+_COST_DISCLOSURE = (
+    "Cost disclosure: this demo makes 4 Gemini 2.5 Flash calls "
+    "(Analyst + Story Writer + AC Generator + Test Case Writer). "
+    "Estimated paid-tier spend ≈$0.005 per run on AI Studio's standard "
+    "pricing. Free-tier accounts: 20 RPD per project per model — see "
+    "docs/adr-0006-provider-switch.md for the rationale."
+)
+
+
 def main() -> None:
     load_dotenv()
+
+    print(_COST_DISCLOSURE)
+    print()
 
     tracing = tracing_status()
     print(tracing.status_line())

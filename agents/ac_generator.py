@@ -9,18 +9,18 @@ Schema-wise it produces ``list[AcceptanceCriterion]`` — the same
 ``AcceptanceCriterion`` model already declared on the FinalUserStory
 contract, so the composer just slots the list straight into the artifact.
 
-Resilience knobs (timeout / retries / prompt caching) mirror the Analyst
-and Story Writer so the three agents share one operational model.
+Provider: Gemini 2.5 Flash. See ADR-0006.
 """
 
 from __future__ import annotations
 
 import json
 
-from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
+from agents._llm_utils import strip_json_fence
 from agents.config import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
@@ -71,7 +71,7 @@ def generate_acceptance_criteria(
     temperature: float | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     max_retries: int = DEFAULT_MAX_RETRIES,
-    max_tokens: int | None = None,
+    max_output_tokens: int | None = None,
 ) -> AcGeneratorOutput:
     """Run the AC Generator on a Story Writer output + Analyst context.
 
@@ -88,12 +88,12 @@ def generate_acceptance_criteria(
         "model": model,
         "timeout": timeout,
         "max_retries": max_retries,
-        "max_tokens": max_tokens,
+        "max_output_tokens": max_output_tokens,
     }
     if temperature is not None:
         llm_kwargs["temperature"] = temperature
 
-    llm = ChatAnthropic(**llm_kwargs)
+    llm = ChatGoogleGenerativeAI(**llm_kwargs)
     user_prompt = USER_PROMPT_TEMPLATE.format(
         description=user_story.description,
         objective=user_story.objective,
@@ -102,18 +102,11 @@ def generate_acceptance_criteria(
         actors=_format_actors(analyst_output),
         po_answers=_format_po_answers(po_answers),
     )
-    # Cache the static system prompt — same pattern as Analyst and Story Writer.
     messages = [
-        SystemMessage(
-            content=[
-                {"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
-            ]
-        ),
+        SystemMessage(content=SYSTEM_PROMPT),
         HumanMessage(content=user_prompt),
     ]
-    # Attach prompt_hash to LangSmith trace metadata so every traced run is
-    # attributable to the exact prompt version.
     config = {"metadata": {"agent": "ac_generator", "prompt_hash": _PROMPT_HASH}}
     response = llm.invoke(messages, config=config)
     raw = response.content if isinstance(response.content, str) else str(response.content)
-    return AcGeneratorOutput.model_validate(json.loads(raw))
+    return AcGeneratorOutput.model_validate(json.loads(strip_json_fence(raw)))

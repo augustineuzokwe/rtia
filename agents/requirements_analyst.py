@@ -4,7 +4,9 @@ First node in the RTIA pipeline. Takes raw requirement text and returns a
 structured analysis (intent, actors, ambiguities) for the User Story Writer
 to consume.
 
-Walking-skeleton scope: a single function, no LangGraph orchestration yet.
+Provider: Gemini 2.5 Flash on Google AI Studio's free tier. See ADR-0006
+for the cost-driven cutover from Claude Opus 4.7. All four agents share
+this provider as of the cutover.
 """
 
 from __future__ import annotations
@@ -12,10 +14,11 @@ from __future__ import annotations
 import json
 from typing import Literal
 
-from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
+from agents._llm_utils import strip_json_fence
 from agents.config import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
@@ -87,49 +90,39 @@ def analyze_requirement(
     temperature: float | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     max_retries: int = DEFAULT_MAX_RETRIES,
-    max_tokens: int | None = None,
+    max_output_tokens: int | None = None,
 ) -> AnalystOutput:
     """Run the Requirements Analyst agent on a raw requirement.
 
-    Reads ANTHROPIC_API_KEY from the environment (via python-dotenv in callers).
+    Reads GOOGLE_API_KEY from the environment (via python-dotenv in callers).
 
     LLM resilience knobs (all overridable per caller — a FastAPI endpoint with a
     tight SLO will set different values than a batch eval job):
 
-    - temperature: sampling temperature. None means use the model's default.
-      Some Anthropic models (e.g. Claude Opus 4.7) reject the temperature
-      parameter entirely and only accept their built-in sampling, so we only
-      forward it when explicitly set. Pass temperature=0 for older models
-      where deterministic sampling is needed for reproducibility.
-    - timeout: wall-clock seconds per Claude call. Caps stuck network requests.
+    - temperature: sampling temperature. None means use the model's default
+      (Gemini's default is 1.0). Pass 0.0 if deterministic sampling is
+      needed for a specific reproducibility scenario.
+    - timeout: wall-clock seconds per call. Caps stuck network requests.
     - max_retries: retries on transient errors (429, 5xx, network blips) with
-      exponential backoff. NOTE: retries are silent — the caller (e.g. the API
-      layer) should surface retry counts in logs/traces so latency spikes
-      remain debuggable.
-    - max_tokens: hard cap on response length. None means use the model's
-      default. Set explicitly only if you need cost/latency protection;
-      setting it too low will truncate the JSON and trigger a parse error.
+      exponential backoff. Silent at the SDK layer; surface retry counts in
+      logs/traces so latency spikes remain debuggable.
+    - max_output_tokens: hard cap on response length (the Gemini name; the
+      Anthropic-era parameter was max_tokens). None means use the model's
+      default. Set explicitly only for cost/latency protection; too low
+      will truncate the JSON and trigger a parse error.
     """
     llm_kwargs: dict[str, object] = {
         "model": model,
         "timeout": timeout,
         "max_retries": max_retries,
-        "max_tokens": max_tokens,
+        "max_output_tokens": max_output_tokens,
     }
     if temperature is not None:
         llm_kwargs["temperature"] = temperature
 
-    llm = ChatAnthropic(**llm_kwargs)
-    # Mark the (large, static) system prompt as cacheable so Anthropic's prompt
-    # cache reuses it across calls within the 5-minute TTL window. Cached input
-    # tokens are billed at ~10% of the standard rate, which is the bulk of the
-    # savings on burst workloads like an eval-suite run.
+    llm = ChatGoogleGenerativeAI(**llm_kwargs)
     messages = [
-        SystemMessage(
-            content=[
-                {"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
-            ]
-        ),
+        SystemMessage(content=SYSTEM_PROMPT),
         HumanMessage(content=USER_PROMPT_TEMPLATE.format(requirement_text=requirement_text)),
     ]
     # Attach prompt_hash to LangSmith trace metadata so every traced run is
@@ -137,4 +130,4 @@ def analyze_requirement(
     config = {"metadata": {"agent": "requirements_analyst", "prompt_hash": _PROMPT_HASH}}
     response = llm.invoke(messages, config=config)
     raw = response.content if isinstance(response.content, str) else str(response.content)
-    return AnalystOutput.model_validate(json.loads(raw))
+    return AnalystOutput.model_validate(json.loads(strip_json_fence(raw)))

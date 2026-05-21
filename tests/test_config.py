@@ -18,21 +18,21 @@ from agents.config import (
 
 def test_defaults_are_present_and_typed():
     """Shared defaults are exposed and have the expected shapes."""
-    assert isinstance(DEFAULT_MODEL, str) and DEFAULT_MODEL.startswith("claude-")
+    assert isinstance(DEFAULT_MODEL, str) and DEFAULT_MODEL.startswith("gemini-")
     assert isinstance(DEFAULT_TIMEOUT_SECONDS, float) and DEFAULT_TIMEOUT_SECONDS > 0
     assert isinstance(DEFAULT_MAX_RETRIES, int) and DEFAULT_MAX_RETRIES >= 0
 
 
 def test_default_max_retries_in_resilience_window():
-    """Patience budget must ride out brief Anthropic load events without wedging.
+    """Patience budget must ride out brief load events without wedging.
 
-    Anthropic SDK backoff: min(0.5 * 2^n, 8.0) per retry. The total wait
-    for max_retries=5 is ~15.5s (0.5+1+2+4+8), tuned for an interactive
-    demo. See docs/adr-0003-llm-resilience.md for the budget table.
+    Window unchanged from the Claude era (ADR-0003 budget table still
+    applies — exponential backoff with N=5 buys ~15.5s of total wait,
+    appropriate for an interactive demo). Bound check kept so an accidental
+    downgrade or runaway upgrade is caught.
 
     Lower bound (>=4) catches an accidental downgrade that re-introduces
-    the Phase 1.3 sample-03 failure mode (sustained 529 storms wedged a
-    3-retry budget).
+    the Phase 1.3 sample-03 failure mode.
     Upper bound (<=10) catches an accidental upgrade that would block an
     interactive demo for ~47s on a genuinely-down endpoint.
     """
