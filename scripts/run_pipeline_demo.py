@@ -27,7 +27,7 @@ from langgraph.types import Command
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from agents._llm_errors import LLMPipelineError  # noqa: E402
+from agents._llm_errors import PipelineStepError  # noqa: E402
 from agents._logging import configure_logging  # noqa: E402
 from agents._secret_scan import SecretInInputError, raise_if_secrets_found  # noqa: E402
 from agents.graph import build_pipeline, build_stub_artifact_from_error  # noqa: E402
@@ -207,9 +207,15 @@ def main() -> None:
     # See agents/_llm_errors.py and docs/adr-0009-llm-fallback.md.
     try:
         result = pipeline.invoke({"requirement_text": requirement_text}, config=config)
-    except LLMPipelineError as exc:
+    except PipelineStepError as exc:
+        # Phase 13.4 — catches both the narrower LLMPipelineError
+        # (Gemini retry budget exhausted) and any other unexpected node
+        # failure that graph.py has wrapped (Pydantic validation, JSON
+        # parse, programmer errors). The stub artifact carries the
+        # structured detail in metadata['error'] regardless of which
+        # subclass fired.
         stub = build_stub_artifact_from_error(exc)
-        banner("LLM FAILURE — pipeline aborted")
+        banner("PIPELINE FAILURE — aborted")
         print(stub.as_markdown())
         print(f"\n{exc}", file=sys.stderr)
         sys.exit(3)
@@ -230,13 +236,15 @@ def main() -> None:
         else:
             raise RuntimeError(f"Unknown interrupt payload shape: {sorted(payload)}")
         banner("RESUMING PIPELINE")
-        # Same Phase 12.5 catch as the first invoke — downstream agents
-        # (AC Generator, Test Case Writer, Reviewer) can also raise.
+        # Same Phase 12.5 + 13.4 catch as the first invoke — downstream
+        # agents (AC Generator, Test Case Writer, Reviewer) can also raise
+        # LLMPipelineError, and any node can raise PipelineStepError for
+        # unexpected non-LLM failures (Pydantic validation, JSON parse).
         try:
             result = pipeline.invoke(Command(resume=resume_value), config=config)
-        except LLMPipelineError as exc:
+        except PipelineStepError as exc:
             stub = build_stub_artifact_from_error(exc)
-            banner("LLM FAILURE — pipeline aborted")
+            banner("PIPELINE FAILURE — aborted")
             print(stub.as_markdown())
             print(f"\n{exc}", file=sys.stderr)
             sys.exit(3)
