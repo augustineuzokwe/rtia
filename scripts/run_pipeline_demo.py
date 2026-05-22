@@ -28,6 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from agents._llm_errors import LLMPipelineError  # noqa: E402
+from agents._logging import configure_logging  # noqa: E402
 from agents._secret_scan import SecretInInputError, raise_if_secrets_found  # noqa: E402
 from agents.graph import build_pipeline, build_stub_artifact_from_error  # noqa: E402
 from agents.observability import (  # noqa: E402
@@ -122,6 +123,12 @@ _COST_DISCLOSURE = (
 
 def main() -> None:
     load_dotenv()
+
+    # Phase 13.2 — install the JSON log handler before any agent runs.
+    # Logs go to stderr by default so the rendered artifact on stdout
+    # remains paste-ready. RTIA_LOG_DESTINATION=stdout, RTIA_LOG_LEVEL,
+    # and friends are the operator-facing knobs (see agents/_logging.py).
+    configure_logging()
 
     # Phase 12.4 — refuse to start with RTIA_ENV=production AND
     # LANGSMITH_TRACING truthy. See docs/adr-0008-pii-langsmith.md.

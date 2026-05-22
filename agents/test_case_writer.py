@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from agents._llm_errors import wrap_llm_exception
 from agents._llm_utils import coerce_response_text, strip_json_fence
+from agents._logging import log_agent_invocation
 from agents.config import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
@@ -102,9 +103,13 @@ def write_test_cases(
     ]
     config = {"metadata": {"agent": "test_case_writer", "prompt_hash": _PROMPT_HASH}}
     # Phase 12.5 — see analyze_requirement for the rationale.
-    try:
-        response = llm.invoke(messages, config=config)
-    except Exception as exc:
-        raise wrap_llm_exception("test_case_writer", exc, retries_attempted=max_retries) from exc
+    with log_agent_invocation("test_case_writer", prompt_hash=_PROMPT_HASH) as rec:
+        try:
+            response = llm.invoke(messages, config=config)
+        except Exception as exc:
+            raise wrap_llm_exception(
+                "test_case_writer", exc, retries_attempted=max_retries
+            ) from exc
+        rec.record_response(response)
     raw = coerce_response_text(response.content)
     return TestCaseWriterOutput.model_validate(json.loads(strip_json_fence(raw)))
