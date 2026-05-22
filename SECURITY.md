@@ -58,4 +58,4 @@ The following are **out of scope** for this repository:
 
 - [`docs/adr-0008-pii-langsmith.md`](docs/adr-0008-pii-langsmith.md) — ADR refusing LangSmith tracing in production to prevent PII leakage
 - [`docs/adr-0009-llm-fallback.md`](docs/adr-0009-llm-fallback.md) — ADR requiring structured failure instead of silent degradation
-- `GUARDRAILS.md` — Behavioural policies enforced by agents (to be added in Phase 12.7)
+- [`GUARDRAILS.md`](GUARDRAILS.md) — Behavioural policies enforced by agents, each mapped to its agent / prompt / test
