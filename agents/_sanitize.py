@@ -85,7 +85,6 @@ DEFAULT_ALLOWED_LANGS = frozenset(
         "markdown",
         "md",
         "http",
-        "diff",
     ]
 )
 

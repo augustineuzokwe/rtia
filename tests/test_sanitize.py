@@ -303,18 +303,35 @@ def test_as_markdown_strips_control_and_bidi_from_fields() -> None:
     assert "Gain visibility into operations." in md
 
 
-def test_as_markdown_clean_story_is_unchanged_modulo_sanitization() -> None:
-    """A story with no hostile bytes must render byte-identical to the pre-12.2 output shape."""
+def test_as_markdown_clean_story_byte_equal_snapshot() -> None:
+    """Byte-equal regression snapshot — Phase 12.2 must NOT silently drift the rendered output.
+
+    Pinned because as_markdown() now passes its output through
+    sanitize_artifact. A clean FinalUserStory must produce the EXACT
+    same bytes it did before 12.2 landed. If a future renderer change
+    legitimately alters formatting (e.g. adds a horizontal rule between
+    sections), update this expected string in the SAME commit that
+    changes the renderer — never silently.
+    """
     story = FinalUserStory(
         description="As a user, I want to filter results, so I can find things.",
         objective="Find relevant content quickly.",
     )
-    md = story.as_markdown()
-    assert "## Description" in md
-    assert "## Objective" in md
-    assert "## Acceptance Criteria" in md
-    # Placeholder for the unbuilt section.
-    assert "No acceptance criteria" in md or "_To be populated" in md
+    expected = (
+        "## Description\n"
+        "As a user, I want to filter results, so I can find things.\n"
+        "\n"
+        "## Objective\n"
+        "Find relevant content quickly.\n"
+        "\n"
+        "## Acceptance Criteria\n"
+        "_No acceptance criteria were produced for this story — check the run "
+        "trace; the AC Generator agent should populate this section._\n"
+        "\n"
+        "## Test Cases\n"
+        "_To be populated by the Test Case agent (Phase 9)._"
+    )
+    assert story.as_markdown() == expected
 
 
 def test_as_markdown_length_cap_applies_to_rendered_output() -> None:
