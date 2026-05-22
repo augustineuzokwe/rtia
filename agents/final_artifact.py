@@ -25,6 +25,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from agents._sanitize import DEFAULT_ALLOWED_LANGS, DEFAULT_MAX_CHARS, sanitize_artifact
+
 TestCaseType = Literal["happy_path", "edge_case", "negative"]
 
 _AC_PLACEHOLDER = (
@@ -107,12 +109,26 @@ class FinalUserStory(BaseModel):
         description="Free-form key/value pairs — model/prompt versions, review notes, etc.",
     )
 
-    def as_markdown(self) -> str:
+    def as_markdown(
+        self,
+        *,
+        max_chars: int = DEFAULT_MAX_CHARS,
+        allowed_langs: frozenset[str] = DEFAULT_ALLOWED_LANGS,
+    ) -> str:
         """Render as paste-ready Jira/GitHub Issue markdown.
 
         Sections with no content from their authoring agent show an
         explicit placeholder so the artifact's full shape is always
         visible — readers see what's coming, not just what's done.
+
+        The rendered output is passed through ``sanitize_artifact``
+        (Phase 12.2): strips ASCII control bytes and invisible / bidi-
+        override Unicode, normalises fenced-code language tags against
+        an allowlist, and caps the total length. Callers that need the
+        SanitizeReport (LangGraph checkpoint observability, eval suite)
+        should call ``sanitize_artifact`` directly instead — this method
+        preserves its ``str`` return type so existing consumers don't
+        break.
         """
         parts = [
             "## Description",
@@ -146,7 +162,11 @@ class FinalUserStory(BaseModel):
             parts.append("## Metadata")
             parts.extend(f"- **{k}**: {v}" for k, v in self.metadata.items())
 
-        return "\n".join(parts)
+        rendered = "\n".join(parts)
+        cleaned, _report = sanitize_artifact(
+            rendered, max_chars=max_chars, allowed_langs=allowed_langs
+        )
+        return cleaned
 
     def as_json(self, *, indent: int | None = 2) -> str:
         """Render as lossless JSON. Round-trips via `model_validate_json`."""
