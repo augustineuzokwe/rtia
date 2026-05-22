@@ -66,6 +66,17 @@ jobs:
       # third-party action. We treat a `push` to main as always relevant
       # (the eval should run on every merge so baselines.md stays
       # honest). For PRs, we diff against the PR's base SHA.
+      #
+      # Dependabot carve-out (Phase 13.5): GitHub blocks Dependabot PRs
+      # from accessing repository secrets, so the Gemini API key is
+      # empty and the eval cannot run. Rather than hard-fail those PRs,
+      # we skip the eval at the PR stage and rely on the
+      # always-runs-on-push-to-main branch above as the safety net.
+      # Documented carve-out — see GUARDRAILS.md "eval gate coverage".
+      # Risks accepted: a regression introduced by a major GH Action
+      # bump is caught one step late (post-merge on main, requires a
+      # revert) rather than pre-merge. Action-bump cadence is low and
+      # main's eval acts as the backstop.
       - name: Detect agent / prompt / eval changes
         id: should_run
         run: |
@@ -73,6 +84,11 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ]; then
             echo "::notice::push to main — regression always runs."
             echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
+            echo "::notice::Dependabot PR — secrets are not exposed to this run; the eval cannot execute. Skipping at PR stage. Push-to-main will run the eval and catch any regression introduced by this dependency."
+            echo "run=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           BASE="${{ github.event.pull_request.base.sha }}"
