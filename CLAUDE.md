@@ -61,6 +61,8 @@ uv run python scripts/run_pipeline_demo.py sample-03-multi-feature.md
 
 The demo requires `ANTHROPIC_API_KEY` in `.env` (see `.env.example`). LangSmith tracing is optional — set `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY=lsv2_pt_…` + `LANGSMITH_PROJECT=rtia` to enable.
 
+**Environment mode (`RTIA_ENV`, Phase 12.4):** controls the production-tracing guard. Allowed values: `development` (default when unset), `ci`, `production`. When `RTIA_ENV=production` AND `LANGSMITH_TRACING=true`, the demo and any entry point calling `assert_safe_for_env()` refuse to start to prevent requirement text (potentially containing customer PII) from being persisted to LangSmith. See [docs/adr-0008-pii-langsmith.md](docs/adr-0008-pii-langsmith.md).
+
 ---
 
 ## 4. Hard rules (non-negotiable)

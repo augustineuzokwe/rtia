@@ -29,7 +29,11 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from agents._secret_scan import SecretInInputError, raise_if_secrets_found  # noqa: E402
 from agents.graph import build_pipeline  # noqa: E402
-from agents.observability import tracing_status  # noqa: E402
+from agents.observability import (  # noqa: E402
+    ProductionTracingError,
+    assert_safe_for_env,
+    tracing_status,
+)
 
 LANGSMITH_DASHBOARD_URL = "https://smith.langchain.com"
 
@@ -117,6 +121,17 @@ _COST_DISCLOSURE = (
 
 def main() -> None:
     load_dotenv()
+
+    # Phase 12.4 — refuse to start with RTIA_ENV=production AND
+    # LANGSMITH_TRACING truthy. See docs/adr-0008-pii-langsmith.md.
+    # Asserted BEFORE the cost banner so a misconfigured prod
+    # deployment fails fast without printing anything that implies the
+    # pipeline is about to run.
+    try:
+        assert_safe_for_env()
+    except ProductionTracingError as exc:
+        print(f"\nABORTED: {exc}", file=sys.stderr)
+        sys.exit(2)
 
     print(_COST_DISCLOSURE)
     print()
