@@ -20,6 +20,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
+from agents._llm_errors import wrap_llm_exception
 from agents._llm_utils import coerce_response_text, strip_json_fence
 from agents.config import (
     DEFAULT_MAX_RETRIES,
@@ -100,6 +101,10 @@ def write_test_cases(
         HumanMessage(content=user_prompt),
     ]
     config = {"metadata": {"agent": "test_case_writer", "prompt_hash": _PROMPT_HASH}}
-    response = llm.invoke(messages, config=config)
+    # Phase 12.5 — see analyze_requirement for the rationale.
+    try:
+        response = llm.invoke(messages, config=config)
+    except Exception as exc:
+        raise wrap_llm_exception("test_case_writer", exc, retries_attempted=max_retries) from exc
     raw = coerce_response_text(response.content)
     return TestCaseWriterOutput.model_validate(json.loads(strip_json_fence(raw)))
