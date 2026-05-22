@@ -139,7 +139,7 @@ jobs:
       # floor is a real signal worth investigating, not transient noise.
       - name: Run eval suite (with retry for transient 503s)
         if: steps.should_run.outputs.run == 'true'
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         env:
           # Keep this in sync with the Verify Gemini API key step above.
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
