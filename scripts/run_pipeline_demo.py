@@ -27,6 +27,7 @@ from langgraph.types import Command
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
+from agents._secret_scan import SecretInInputError, raise_if_secrets_found  # noqa: E402
 from agents.graph import build_pipeline  # noqa: E402
 from agents.observability import tracing_status  # noqa: E402
 
@@ -142,6 +143,31 @@ def main() -> None:
 
     raw_markdown = sample_path.read_text(encoding="utf-8")
     requirement_text = extract_section(raw_markdown, "Raw Requirement")
+
+    # Phase 12.3 — refuse to invoke the pipeline if the input contains a
+    # high-confidence secret pattern. The scanner runs BEFORE any LLM
+    # call or LangSmith trace, so a detected credential never leaves the
+    # local process. See agents/_secret_scan.py and issue #124 for the
+    # block-not-warn policy decision.
+    try:
+        raise_if_secrets_found(requirement_text)
+    except SecretInInputError as exc:
+        print(
+            "\nABORTED: secret pattern detected in input.",
+            file=sys.stderr,
+        )
+        for finding in exc.findings:
+            print(
+                f"  - {finding.pattern_name}: {finding.redacted_match} "
+                f"(offset {finding.start}-{finding.end})",
+                file=sys.stderr,
+            )
+        print(
+            "\nNo external call was made (no Gemini, no LangSmith). "
+            "Redact or rotate the credential(s) and re-submit.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
 
     banner(f"INPUT REQUIREMENT — {sample_path.name}")
     print(requirement_text)
