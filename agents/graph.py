@@ -245,6 +245,8 @@ def reviewer_node(state: PipelineState) -> dict:
         summary_parts.append(f"gaps: {'; '.join(report.coverage_gaps)}")
     if report.weak_acs:
         summary_parts.append(f"weak ACs: {'; '.join(report.weak_acs)}")
+    if report.untestable_criteria:
+        summary_parts.append(f"untestable: {'; '.join(report.untestable_criteria)}")
     if report.recommendations:
         summary_parts.append(f"recommendations: {'; '.join(report.recommendations)}")
     tag = f"[{report.overall_quality}]"

@@ -177,6 +177,36 @@ def test_pipeline_flows_through_when_no_critical_ambiguities():
     assert "[strong]" in result["final_artifact"].metadata["review_summary"]
 
 
+def test_reviewer_summary_includes_all_report_categories():
+    """All four ReviewReport list categories must surface in metadata['review_summary'].
+
+    Regression guard — an earlier draft skipped untestable_criteria from the
+    summary string, which would silently hide a real review finding from
+    anyone reading only the rendered markdown.
+    """
+    analyst = _fake_analyst_response([])
+    review_payload = {
+        "coverage_gaps": ["No AC covers feature Z."],
+        "weak_acs": ["AC1 — vague then-clause"],
+        "untestable_criteria": ["AC2 — subjective outcome"],
+        "recommendations": ["Add concrete AC for Z."],
+        "overall_quality": "needs_work",
+    }
+
+    with _mock_pipeline_llms(analyst, review_payload=review_payload):
+        pipeline = build_pipeline(checkpointer=_test_checkpointer())
+        config = {"configurable": {"thread_id": "test-review-summary"}}
+        pipeline.invoke({"requirement_text": "some requirement"}, config=config)
+        result = pipeline.invoke(Command(resume={"accepted": True}), config=config)
+
+    summary = result["final_artifact"].metadata["review_summary"]
+    assert "[needs_work]" in summary
+    assert "gaps:" in summary
+    assert "weak ACs:" in summary
+    assert "untestable:" in summary
+    assert "recommendations:" in summary
+
+
 def test_pipeline_pauses_when_critical_ambiguity_present():
     """A critical ambiguity should pause the graph before the Story Writer."""
     analyst = _fake_analyst_response(
