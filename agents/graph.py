@@ -21,10 +21,11 @@ from typing import TypedDict
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.errors import GraphBubbleUp
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
-from agents._llm_errors import LLMPipelineError
+from agents._llm_errors import LLMPipelineError, PipelineStepError, wrap_step_exception
 from agents._secret_scan import raise_if_secrets_found
 from agents.ac_generator import AcGeneratorOutput, generate_acceptance_criteria
 from agents.final_artifact import AcceptanceCriterion, FinalUserStory, TestCase
@@ -87,6 +88,35 @@ class PipelineState(TypedDict, total=False):
     test_cases: list[TestCase]
     final_artifact: FinalUserStory
     review_report: ReviewReport
+
+
+def _wrap_node_exceptions(agent_name: str, fn):
+    """Convert unexpected node failures into structured ``PipelineStepError``.
+
+    Phase 13.4. ``LLMPipelineError`` already carries its own structured
+    detail and re-raises unchanged. Anything else (Pydantic validation,
+    JSON parse, programmer errors) is wrapped with the node's
+    ``agent_name`` pinned so the demo can route it through the same
+    stub-artifact builder as LLM failures. ``KeyboardInterrupt`` and
+    ``SystemExit`` propagate untouched — we are NOT a catch-everything
+    shield, only a "surface step failures legibly" boundary.
+    """
+    from functools import wraps
+
+    @wraps(fn)
+    def wrapper(state: PipelineState) -> dict:
+        try:
+            return fn(state)
+        except (LLMPipelineError, GraphBubbleUp, KeyboardInterrupt, SystemExit):
+            # GraphBubbleUp covers LangGraph's internal control-flow
+            # exceptions (GraphInterrupt from `interrupt()`, GraphDrained,
+            # etc.) — those are NOT failures and must propagate to the
+            # runtime untouched.
+            raise
+        except Exception as exc:
+            raise wrap_step_exception(agent_name, exc) from exc
+
+    return wrapper
 
 
 def analyst_node(state: PipelineState) -> dict:
@@ -320,14 +350,25 @@ def build_pipeline(checkpointer: BaseCheckpointSaver | None = None):
         checkpointer = _default_sqlite_checkpointer()
 
     builder = StateGraph(PipelineState)
-    builder.add_node("analyst", analyst_node)
-    builder.add_node("po_checkpoint", po_checkpoint_node)
-    builder.add_node("story_writer", story_writer_node)
-    builder.add_node("story_review_checkpoint", story_review_checkpoint_node)
-    builder.add_node("ac_generator", ac_generator_node)
-    builder.add_node("test_case_writer", test_case_writer_node)
-    builder.add_node("composer", composer_node)
-    builder.add_node("reviewer", reviewer_node)
+    # Each node is wrapped so unexpected exceptions (Pydantic validation,
+    # JSON parse, programmer errors) surface as PipelineStepError with
+    # agent attribution — see Phase 13.4. The checkpoint nodes are also
+    # wrapped because user-supplied resume payloads can violate shape
+    # assumptions; attributing those failures to the checkpoint, not the
+    # next agent, keeps debugging honest.
+    builder.add_node("analyst", _wrap_node_exceptions("requirements_analyst", analyst_node))
+    builder.add_node("po_checkpoint", _wrap_node_exceptions("po_checkpoint", po_checkpoint_node))
+    builder.add_node("story_writer", _wrap_node_exceptions("user_story_writer", story_writer_node))
+    builder.add_node(
+        "story_review_checkpoint",
+        _wrap_node_exceptions("story_review_checkpoint", story_review_checkpoint_node),
+    )
+    builder.add_node("ac_generator", _wrap_node_exceptions("ac_generator", ac_generator_node))
+    builder.add_node(
+        "test_case_writer", _wrap_node_exceptions("test_case_writer", test_case_writer_node)
+    )
+    builder.add_node("composer", _wrap_node_exceptions("composer", composer_node))
+    builder.add_node("reviewer", _wrap_node_exceptions("reviewer", reviewer_node))
     builder.add_edge(START, "analyst")
     builder.add_edge("analyst", "po_checkpoint")
     builder.add_edge("po_checkpoint", "story_writer")
@@ -340,15 +381,16 @@ def build_pipeline(checkpointer: BaseCheckpointSaver | None = None):
     return builder.compile(checkpointer=checkpointer)
 
 
-def build_stub_artifact_from_error(error: LLMPipelineError) -> FinalUserStory:
-    """Produce a ``FinalUserStory`` describing an LLM failure (Phase 12.5).
+def build_stub_artifact_from_error(error: PipelineStepError) -> FinalUserStory:
+    """Produce a ``FinalUserStory`` describing a pipeline-step failure.
 
-    Called by the demo (and any future API entry point) when
-    ``pipeline.invoke()`` raises ``LLMPipelineError`` — i.e. an LLM
-    call exhausted its retry budget. The returned artifact has empty
-    sections (the agent that would have filled them never ran) and
-    carries the structured failure detail as JSON in
-    ``metadata['error']`` plus a human-readable summary in
+    Accepts any ``PipelineStepError`` — including its narrower
+    ``LLMPipelineError`` subclass (Phase 12.5: Gemini retry budget
+    exhausted) and the broader Phase 13.4 wrapping of unexpected node
+    failures (Pydantic validation, JSON parse, programmer errors). The
+    artifact has empty sections (the agent that would have filled them
+    never finished) and carries the structured failure detail as JSON
+    in ``metadata['error']`` plus a human-readable summary in
     ``metadata['review_summary']`` so the rendered markdown surfaces
     the failure inline.
 
@@ -360,13 +402,23 @@ def build_stub_artifact_from_error(error: LLMPipelineError) -> FinalUserStory:
     learn whether the pipeline ran successfully. See
     ``docs/adr-0009-llm-fallback.md`` for the full policy.
     """
-    summary = (
-        f"[ERROR] LLM failure in '{error.detail.agent}' "
-        f"(class={error.detail.error_class}, "
-        f"status={error.detail.http_status}, "
-        f"retries={error.detail.retries_attempted}). "
-        "Pipeline aborted — see metadata.error for the structured detail."
-    )
+    detail = error.detail
+    if detail.http_status is None and detail.retries_attempted == 0:
+        # Non-LLM step failure (Phase 13.4). Skip the LLM-specific
+        # status/retries suffix that would just say "None" / "0".
+        summary = (
+            f"[ERROR] Step failure in '{detail.agent}' "
+            f"(class={detail.error_class}). "
+            "Pipeline aborted — see metadata.error for the structured detail."
+        )
+    else:
+        summary = (
+            f"[ERROR] LLM failure in '{detail.agent}' "
+            f"(class={detail.error_class}, "
+            f"status={detail.http_status}, "
+            f"retries={detail.retries_attempted}). "
+            "Pipeline aborted — see metadata.error for the structured detail."
+        )
     return FinalUserStory(
         description="_Pipeline aborted before this section was written. See metadata.error._",
         objective="_Pipeline aborted before this section was written. See metadata.error._",
@@ -392,6 +444,7 @@ __all__ = [
     "LLMPipelineError",
     "PIPELINE_STATE_VERSION",
     "PipelineState",
+    "PipelineStepError",
     "ReviewReport",
     "TestCase",
     "TestCaseWriterOutput",

@@ -21,8 +21,10 @@ from google.genai import errors as gemini_errors
 from agents._llm_errors import (
     LLMFailureDetail,
     LLMPipelineError,
+    PipelineStepError,
     is_retryable_llm_failure,
     wrap_llm_exception,
+    wrap_step_exception,
 )
 from agents.graph import build_stub_artifact_from_error
 
@@ -326,3 +328,122 @@ def test_review_artifact_wraps_llm_exception(monkeypatch):
     with pytest.raises(LLMPipelineError) as excinfo:
         rv.review_artifact("any requirement", artifact)
     assert excinfo.value.detail.agent == "reviewer"
+
+
+# ---------------------------------------------------------------------------
+# Phase 13.4 — non-LLM step failures wrapped at node boundary
+# ---------------------------------------------------------------------------
+
+
+def test_wrap_step_exception_produces_pipeline_step_error_with_no_http_status():
+    """Non-LLM exceptions carry http_status=None and retries_attempted=0."""
+    exc = ValueError("malformed JSON from upstream")
+    wrapped = wrap_step_exception("ac_generator", exc)
+    assert isinstance(wrapped, PipelineStepError)
+    # NOT an LLMPipelineError — the narrower subclass is for actual API calls.
+    assert not isinstance(wrapped, LLMPipelineError)
+    assert wrapped.detail.agent == "ac_generator"
+    assert wrapped.detail.error_class == "ValueError"
+    assert wrapped.detail.http_status is None
+    assert wrapped.detail.retries_attempted == 0
+    assert "malformed JSON" in wrapped.detail.message
+
+
+def test_pipeline_step_error_message_omits_llm_specific_suffix_when_non_llm():
+    """Non-LLM detail prints a cleaner message — no '(status=None, retries=0)' noise."""
+    wrapped = wrap_step_exception("composer", RuntimeError("boom"))
+    msg = str(wrapped)
+    assert "Pipeline step failed" in msg
+    assert "composer" in msg
+    assert "RuntimeError" in msg
+    # The LLM-specific fields would be lies for a non-LLM failure; check
+    # they're not formatted in.
+    assert "status=" not in msg
+    assert "retries=" not in msg
+
+
+def test_llm_pipeline_error_is_subclass_of_pipeline_step_error():
+    """One catch surface — callers can `except PipelineStepError` for both."""
+    detail = _make_detail()
+    err = LLMPipelineError(detail)
+    assert isinstance(err, PipelineStepError)
+
+
+def test_build_stub_artifact_from_step_error_uses_step_summary_form():
+    """Stub artifact metadata distinguishes step failures from LLM failures."""
+    exc = ValueError("schema validation failed")
+    wrapped = wrap_step_exception("test_case_writer", exc)
+    artifact = build_stub_artifact_from_error(wrapped)
+    summary = artifact.metadata["review_summary"]
+    assert "Step failure" in summary
+    assert "test_case_writer" in summary
+    assert "ValueError" in summary
+    # Error JSON still parseable — same downstream contract as LLM path.
+    detail_json = json.loads(artifact.metadata["error"])
+    assert detail_json["agent"] == "test_case_writer"
+    assert detail_json["http_status"] is None
+    assert detail_json["retries_attempted"] == 0
+
+
+def test_node_wrapper_converts_unexpected_exception_to_pipeline_step_error():
+    """A node that raises ValueError is caught and surfaced as PipelineStepError."""
+    from agents.graph import _wrap_node_exceptions
+
+    def broken_node(state):
+        raise ValueError("upstream produced garbage")
+
+    wrapped = _wrap_node_exceptions("ac_generator", broken_node)
+    with pytest.raises(PipelineStepError) as excinfo:
+        wrapped({})
+    assert excinfo.value.detail.agent == "ac_generator"
+    assert excinfo.value.detail.error_class == "ValueError"
+    assert "garbage" in excinfo.value.detail.message
+    # And it's NOT an LLMPipelineError — we did not lie about the source.
+    assert not isinstance(excinfo.value, LLMPipelineError)
+
+
+def test_node_wrapper_passes_llm_pipeline_error_through_unchanged():
+    """LLMPipelineError carries its own structured detail; don't double-wrap."""
+    from agents.graph import _wrap_node_exceptions
+
+    original = LLMPipelineError(_make_detail(agent="reviewer"))
+
+    def llm_failing_node(state):
+        raise original
+
+    wrapped = _wrap_node_exceptions("ac_generator", llm_failing_node)
+    with pytest.raises(LLMPipelineError) as excinfo:
+        wrapped({})
+    # Identity-preserved: same exception object, same agent attribution
+    # (reviewer, not the wrapping node's ac_generator).
+    assert excinfo.value is original
+    assert excinfo.value.detail.agent == "reviewer"
+
+
+def test_node_wrapper_lets_graph_bubble_up_propagate():
+    """LangGraph's GraphInterrupt etc. are control-flow, not failures."""
+    from langgraph.errors import GraphInterrupt
+    from langgraph.types import Interrupt
+
+    from agents.graph import _wrap_node_exceptions
+
+    payload = Interrupt(value={"ask": "test"}, id="x")
+
+    def interrupting_node(state):
+        raise GraphInterrupt((payload,))
+
+    wrapped = _wrap_node_exceptions("po_checkpoint", interrupting_node)
+    with pytest.raises(GraphInterrupt):
+        wrapped({})
+
+
+def test_node_wrapper_lets_keyboard_interrupt_propagate():
+    """User Ctrl-C must not be swallowed into a stub artifact."""
+    from agents.graph import _wrap_node_exceptions
+
+    def interruptible(state):
+        raise KeyboardInterrupt
+
+    wrapped = _wrap_node_exceptions("analyst", interruptible)
+    with pytest.raises(KeyboardInterrupt):
+        wrapped({})

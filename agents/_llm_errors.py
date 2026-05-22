@@ -70,7 +70,51 @@ class LLMFailureDetail:
 _MAX_MESSAGE_CHARS = 500
 
 
-class LLMPipelineError(RuntimeError):
+class PipelineStepError(RuntimeError):
+    """Raised by a pipeline node when one of its steps fails.
+
+    Phase 13.4 broadens the original Phase 12.5 contract: any unexpected
+    failure inside a pipeline node (Pydantic validation, JSON parse,
+    programmer error, transport blip outside the Gemini SDK's catch) is
+    converted to ``PipelineStepError`` at the node boundary so the demo
+    and any future API caller see *exactly one* exception type. The
+    caller builds a stub ``FinalUserStory`` and surfaces the failure in
+    ``metadata['error']`` rather than crashing.
+
+    ``LLMPipelineError`` is the narrower subclass for the specific
+    "Gemini retry budget exhausted" case carrying HTTP status. Callers
+    that want to distinguish can ``isinstance`` it. Callers that only
+    care "something failed" catch ``PipelineStepError`` and get both.
+
+    Detail shape: a ``LLMFailureDetail`` with ``http_status=None`` and
+    ``retries_attempted=0`` for the non-LLM case. Keeping one detail
+    type — rather than introducing a sibling — means the artifact
+    metadata schema stays stable for downstream consumers.
+    """
+
+    def __init__(self, detail: LLMFailureDetail) -> None:
+        self.detail = detail
+        super().__init__(self._format_message(detail))
+
+    @staticmethod
+    def _format_message(detail: LLMFailureDetail) -> str:
+        # For non-LLM failures (http_status=None, retries=0) the
+        # "(class=…, status=…, retries=…)" suffix would be noise; emit a
+        # cleaner single-line form. LLM failures keep the original
+        # diagnostic suffix so 12.5's log shape is preserved.
+        if detail.http_status is None and detail.retries_attempted == 0:
+            return (
+                f"Pipeline step failed in agent '{detail.agent}' "
+                f"(class={detail.error_class}): {detail.message}"
+            )
+        return (
+            f"LLM call failed in agent '{detail.agent}' "
+            f"(class={detail.error_class}, status={detail.http_status}, "
+            f"retries={detail.retries_attempted}): {detail.message}"
+        )
+
+
+class LLMPipelineError(PipelineStepError):
     """Raised by an agent's library function when its LLM call ultimately fails.
 
     "Ultimately fails" means: after the SDK's retry budget is exhausted,
@@ -84,14 +128,6 @@ class LLMPipelineError(RuntimeError):
     to the operator — a transparent retry to a different model would
     defeat the policy. See ADR-0009.
     """
-
-    def __init__(self, detail: LLMFailureDetail) -> None:
-        self.detail = detail
-        super().__init__(
-            f"LLM call failed in agent '{detail.agent}' "
-            f"(class={detail.error_class}, status={detail.http_status}, "
-            f"retries={detail.retries_attempted}): {detail.message}"
-        )
 
 
 def _truncate(text: str, limit: int = _MAX_MESSAGE_CHARS) -> str:
@@ -147,6 +183,33 @@ def wrap_llm_exception(
         occurred_at=datetime.now(UTC).isoformat(),
     )
     return LLMPipelineError(detail)
+
+
+def wrap_step_exception(agent_name: str, exc: BaseException) -> PipelineStepError:
+    """Convert any non-LLM exception inside a pipeline node into a structured failure.
+
+    Phase 13.4. Sibling of :func:`wrap_llm_exception` for failures that
+    are NOT "Gemini retry budget exhausted" — Pydantic validation,
+    JSON parse, programmer errors, anything else a node can raise. The
+    resulting ``PipelineStepError`` carries the same
+    ``LLMFailureDetail`` shape so the demo and the artifact metadata
+    schema don't have to branch on the failure source.
+
+    ``http_status`` is ``None`` because there is no API call involved;
+    ``retries_attempted`` is ``0`` because non-LLM failures aren't
+    retried. Both are honest values, NOT placeholders — downstream
+    consumers can rely on "status is None" meaning "this was not an
+    API failure".
+    """
+    detail = LLMFailureDetail(
+        agent=agent_name,
+        error_class=exc.__class__.__name__,
+        http_status=None,
+        message=_truncate(str(exc) or exc.__class__.__name__),
+        retries_attempted=0,
+        occurred_at=datetime.now(UTC).isoformat(),
+    )
+    return PipelineStepError(detail)
 
 
 def is_retryable_llm_failure(exc: BaseException) -> bool:
