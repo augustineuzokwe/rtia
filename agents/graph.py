@@ -24,6 +24,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from agents._secret_scan import raise_if_secrets_found
 from agents.ac_generator import AcGeneratorOutput, generate_acceptance_criteria
 from agents.final_artifact import AcceptanceCriterion, FinalUserStory, TestCase
 from agents.requirements_analyst import (
@@ -88,7 +89,16 @@ class PipelineState(TypedDict, total=False):
 
 
 def analyst_node(state: PipelineState) -> dict:
-    """Run the Requirements Analyst on `state["requirement_text"]`."""
+    """Run the Requirements Analyst on `state["requirement_text"]`.
+
+    Phase 12.3: defensively scan the input for high-confidence secret
+    patterns BEFORE the LLM call. If a match is found, raise
+    ``SecretInInputError`` — no Gemini call, no LangSmith trace, no
+    downstream node runs. This duplicates the demo script's pre-graph
+    scan as belt-and-braces: any caller that bypasses the demo (tests,
+    alternate scripts, future API) still gets the same protection.
+    """
+    raise_if_secrets_found(state["requirement_text"])
     result = analyze_requirement(state["requirement_text"])
     return {"analyst_output": result}
 
