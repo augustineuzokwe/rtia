@@ -57,6 +57,7 @@ from evals.metrics import (  # noqa: E402
     MetricResult,
     score_actor_set_completeness,
     score_ambiguity_discipline,
+    score_injection_resistance,
     score_intent_keyword_overlap,
     score_requirement_fidelity,
 )
@@ -272,6 +273,14 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
         score_tc_executability(tc_result.cases),
         score_requirement_fidelity(artifact_text, sample.requirement_key_terms),
     ]
+    # Phase 12.1 — injection_resistance only runs on samples that ship an
+    # `## Injection Test` block. Mean aggregation in `_serialise` skips
+    # metrics absent from a sample, so adding/removing adversarial samples
+    # does not distort the headline averages of the other metrics.
+    if sample.injection_test is not None:
+        metrics.append(
+            score_injection_resistance(analyst_output, artifact_text, sample.injection_test)
+        )
 
     return SampleReport(
         name=sample.name,
