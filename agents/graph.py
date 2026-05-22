@@ -24,6 +24,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from agents._llm_errors import LLMPipelineError
 from agents._secret_scan import raise_if_secrets_found
 from agents.ac_generator import AcGeneratorOutput, generate_acceptance_criteria
 from agents.final_artifact import AcceptanceCriterion, FinalUserStory, TestCase
@@ -339,6 +340,46 @@ def build_pipeline(checkpointer: BaseCheckpointSaver | None = None):
     return builder.compile(checkpointer=checkpointer)
 
 
+def build_stub_artifact_from_error(error: LLMPipelineError) -> FinalUserStory:
+    """Produce a ``FinalUserStory`` describing an LLM failure (Phase 12.5).
+
+    Called by the demo (and any future API entry point) when
+    ``pipeline.invoke()`` raises ``LLMPipelineError`` — i.e. an LLM
+    call exhausted its retry budget. The returned artifact has empty
+    sections (the agent that would have filled them never ran) and
+    carries the structured failure detail as JSON in
+    ``metadata['error']`` plus a human-readable summary in
+    ``metadata['review_summary']`` so the rendered markdown surfaces
+    the failure inline.
+
+    The whole point of this helper is to keep the failure path
+    *symmetrical* with the success path — both produce a FinalUserStory
+    that can be rendered, persisted, or returned over an API. The
+    caller never has to choose between "got an artifact" and "got an
+    exception"; it always gets an artifact and inspects metadata to
+    learn whether the pipeline ran successfully. See
+    ``docs/adr-0009-llm-fallback.md`` for the full policy.
+    """
+    summary = (
+        f"[ERROR] LLM failure in '{error.detail.agent}' "
+        f"(class={error.detail.error_class}, "
+        f"status={error.detail.http_status}, "
+        f"retries={error.detail.retries_attempted}). "
+        "Pipeline aborted — see metadata.error for the structured detail."
+    )
+    return FinalUserStory(
+        description="_Pipeline aborted before this section was written. See metadata.error._",
+        objective="_Pipeline aborted before this section was written. See metadata.error._",
+        acceptance_criteria=[],
+        test_cases=[],
+        assumptions=[],
+        metadata={
+            "error": error.detail.to_json(),
+            "review_summary": summary,
+        },
+    )
+
+
 # Re-export the types we allowlist so callers (tests, future eval harness)
 # can compare against the contract without reaching into agent modules.
 __all__ = [
@@ -348,6 +389,7 @@ __all__ = [
     "AnalystOutput",
     "FinalUserStory",
     "ImpliedStory",
+    "LLMPipelineError",
     "PIPELINE_STATE_VERSION",
     "PipelineState",
     "ReviewReport",
@@ -357,4 +399,5 @@ __all__ = [
     "_CHECKPOINT_ALLOWLIST",
     "_allowlisted_serde",
     "build_pipeline",
+    "build_stub_artifact_from_error",
 ]
