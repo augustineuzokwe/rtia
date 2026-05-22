@@ -117,6 +117,33 @@ PO checkpoints documented in [README.md:44](README.md) describe how ambiguities 
 
 ---
 
+## Coverage carve-outs
+
+These are explicit, documented gaps in guardrail enforcement. Each one trades a small coverage hole for a larger operational benefit; each links to the workflow / code that implements it.
+
+### Eval gate skipped on Dependabot PRs
+
+**What's skipped.** The Phase 11 CI eval gate (`Regression` job in [`.github/workflows/ci.yml`](.github/workflows/ci.yml)) does not run on pull requests opened by `dependabot[bot]`.
+
+**Why.** GitHub blocks repository secrets from Dependabot-triggered workflow runs as an anti-exfiltration measure. The eval needs `GOOGLE_API_KEY_CI` to call Gemini Flash; without it the step hard-fails on every Dependabot PR. Three choices: (a) expose the secret to Dependabot (real exfiltration risk via a malicious dep update), (b) hard-fail every Dependabot PR (operator must close-and-reopen each one from their account), (c) skip the eval at the PR stage and rely on the `push`-to-`main` branch of the workflow as the safety net. Option (c) was chosen.
+
+**Risks accepted.** A regression introduced by a major GH Action bump (e.g. `setup-uv@v5→v7` changing how `uv` is invoked) is caught one step late — by the post-merge eval on `main`, requiring a revert PR rather than a pre-merge block. The cadence of action bumps is low (monthly per Dependabot config), and the path filter already exempts Python-only dep bumps from the eval entirely.
+
+**Mitigations in place.**
+- `push` to `main` always runs the eval (workflow line: `push to main — regression always runs`). No Dependabot merge can land on main without the eval running on the merged result.
+- The skip emits a `::notice::` in the workflow log explaining the carve-out, so reviewers reading the PR's check output see the reason rather than wondering where the eval went.
+- Do **not** enable Dependabot auto-merge for the `github-actions` ecosystem. Auto-merge for grouped patch updates is acceptable only for the `uv` ecosystem (which already path-filter-skips the eval).
+
+**Enforced by:**
+
+| Layer | Location |
+|-------|----------|
+| Skip condition on `github.actor == 'dependabot[bot]'` | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (`Detect agent / prompt / eval changes` step) |
+| Post-merge safety net (`push` always runs the eval) | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (same step, `push` branch) |
+| Dependabot grouping config that limits action-bump PR volume | [`.github/dependabot.yml`](.github/dependabot.yml) |
+
+---
+
 ## Changing a guardrail
 
 If you genuinely need to relax or remove a guardrail:
