@@ -55,6 +55,7 @@ _CHECKPOINT_ALLOWLIST: list[tuple[str, ...]] = [
     ("agents.requirements_analyst", "AnalystOutput"),
     ("agents.requirements_analyst", "Ambiguity"),
     ("agents.requirements_analyst", "ImpliedStory"),
+    ("agents.requirements_analyst", "SuspiciousInput"),
     ("agents.user_story_writer", "UserStory"),
     ("agents.ac_generator", "AcGeneratorOutput"),
     ("agents.test_case_writer", "TestCaseWriterOutput"),

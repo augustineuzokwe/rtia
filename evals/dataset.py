@@ -27,6 +27,13 @@ _AC_CATEGORIES_HEADER = "### Required AC Categories"
 _AC_COUNT_HEADER = "### Expected AC Count"
 _AC_OUT_OF_SCOPE_HEADER = "### Out-of-Scope Behaviours"
 _AC_COUNT_RE = re.compile(r"\b(\d+)\s*\(\s*±\s*(\d+)\s*\)")
+_INJECTION_HEADER = "## Injection Test"
+_INJECTION_TYPE_HEADER = "### Injection Type"
+_INJECTION_VECTOR_HEADER = "### Injection Vector"
+_INJECTION_FORBIDDEN_HEADER = "### Forbidden Patterns"
+_INJECTION_BEHAVIOR_HEADER = "### Expected Pipeline Behavior"
+_DETECTED_TRUE_RE = re.compile(r"`?suspicious_input\.detected`?\s*==\s*true", re.IGNORECASE)
+_DETECTED_FALSE_RE = re.compile(r"`?suspicious_input\.detected`?\s*==\s*false", re.IGNORECASE)
 
 _BULLET_RE = re.compile(r"^\s*[-*]\s+(?P<body>.+?)\s*$", re.MULTILINE)
 _NONE_EXPECTED_RE = re.compile(r"\(none expected\)", re.IGNORECASE)
@@ -79,6 +86,31 @@ class ExpectedAcceptanceCriteria:
 
 
 @dataclass(frozen=True)
+class InjectionTest:
+    """Per-sample ground truth for the prompt-injection resistance metric.
+
+    Populated from the optional ``## Injection Test`` block in the sample
+    file (see ``EVAL_DATA_SPEC.md`` §Rules for Injection Test). Phase 12.1.
+
+    - ``injection_type`` and ``injection_vector`` are short free-form
+      labels carried into the eval report for failure-mode tagging; they
+      are not used by the metric for scoring.
+    - ``forbidden_patterns`` are case-insensitive substrings that MUST NOT
+      appear anywhere in the composite final artifact. Any one match
+      collapses ``score_injection_resistance`` to 0.0.
+    - ``expected_detected`` carries the parsed expectation for
+      ``AnalystOutput.suspicious_input.detected`` — True for adversarial
+      samples (04, 05, 06), False for the negative anchor (sample-07).
+      The metric asserts the Analyst's actual flag matches this value.
+    """
+
+    injection_type: str
+    injection_vector: str
+    forbidden_patterns: list[str]
+    expected_detected: bool
+
+
+@dataclass(frozen=True)
 class SampleRecord:
     """A loaded sample-requirements file."""
 
@@ -95,6 +127,11 @@ class SampleRecord:
     SampleRecord level rather than ``ExpectedAnalystOutput`` because it's
     artifact-wide ground truth, not per-agent. Empty list = no terms
     pinned yet (metric returns 0.0 with a diagnostic message)."""
+    injection_test: InjectionTest | None = None
+    """Set when the sample file contains a ``## Injection Test`` section,
+    None otherwise. Non-None samples are scored by
+    ``score_injection_resistance``; None samples skip that metric. Phase
+    12.1."""
     extra: dict[str, str] = field(default_factory=dict)
     """Reserved for future per-agent ground-truth blocks (Test Case agent,
     Reviewer agent, …) once those agents land."""
@@ -198,6 +235,71 @@ def _parse_expected_acs(content: str) -> ExpectedAcceptanceCriteria:
     )
 
 
+def _parse_injection_test(content: str) -> InjectionTest | None:
+    """Parse the optional ``## Injection Test`` block.
+
+    Returns None when the section is absent — the metric skips samples
+    without this block. When present, all four sub-sections must parse
+    cleanly; a malformed block raises rather than silently disabling the
+    security check.
+    """
+    # Anchor to start-of-line via a leading "\n" — the literal string
+    # `## Injection Test` also appears in backtick prose inside the
+    # Expected Analyst Output blockquote of every adversarial sample, and
+    # an unanchored `.find` would match that first and return the wrong
+    # block.
+    anchored = "\n" + _INJECTION_HEADER
+    if anchored not in content:
+        return None
+    block = _extract_section(content, _INJECTION_HEADER, ["## "])
+    # If the first match was an in-prose mention (no real header follows),
+    # _extract_section may have returned a block without our sub-headers.
+    # Re-anchor: slice from the anchored newline match forward.
+    if _INJECTION_TYPE_HEADER not in block:
+        anchored_idx = content.find(anchored)
+        # +1 to skip the leading newline, header parsing then proceeds
+        # exactly as before but starting from the real header.
+        block_start = anchored_idx + 1
+        # Reuse _extract_section by slicing first.
+        sub_content = content[block_start:]
+        block = _extract_section(sub_content, _INJECTION_HEADER, ["## "])
+    type_body = _strip_blockquote(
+        _extract_section(block, _INJECTION_TYPE_HEADER, ["###", "## "])
+    ).strip()
+    vector_body = _strip_blockquote(
+        _extract_section(block, _INJECTION_VECTOR_HEADER, ["###", "## "])
+    ).strip()
+    forbidden_body = _extract_section(block, _INJECTION_FORBIDDEN_HEADER, ["###", "## "])
+    behavior_body = _extract_section(block, _INJECTION_BEHAVIOR_HEADER, ["###", "## "])
+
+    # Forbidden Patterns: bullets, OR a parenthetical "(none — ...)" marker
+    # on the negative sample. The bullet parser treats the marker as zero
+    # bullets, which is exactly what we want.
+    forbidden_patterns = [b.strip() for b in _bullets(forbidden_body)]
+
+    # Expected detected value: parsed from the behaviour bullets via regex
+    # match on `suspicious_input.detected == true|false`. Adversarial
+    # samples list this assertion explicitly; the negative sample lists
+    # `== false`. A missing assertion is treated as a sample-file bug.
+    if _DETECTED_TRUE_RE.search(behavior_body):
+        expected_detected = True
+    elif _DETECTED_FALSE_RE.search(behavior_body):
+        expected_detected = False
+    else:
+        raise ValueError(
+            "Injection Test → Expected Pipeline Behavior must include an "
+            "assertion of the form 'suspicious_input.detected == true' or "
+            "'... == false'."
+        )
+
+    return InjectionTest(
+        injection_type=type_body,
+        injection_vector=vector_body,
+        forbidden_patterns=forbidden_patterns,
+        expected_detected=expected_detected,
+    )
+
+
 def load_sample(path: Path) -> SampleRecord:
     """Parse a single sample-requirements file into a SampleRecord."""
     content = path.read_text(encoding="utf-8")
@@ -216,6 +318,7 @@ def load_sample(path: Path) -> SampleRecord:
         expected_analyst=_parse_expected_analyst(content),
         expected_acs=_parse_expected_acs(content),
         requirement_key_terms=requirement_key_terms,
+        injection_test=_parse_injection_test(content),
     )
 
 

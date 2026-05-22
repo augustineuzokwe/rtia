@@ -10,14 +10,52 @@ from __future__ import annotations
 from evals.dataset import SAMPLES_DIR, load_all_samples, load_sample
 
 
-def test_loads_all_three_samples() -> None:
+def test_loads_all_samples() -> None:
     samples = load_all_samples()
     names = [s.name for s in samples]
+    # Includes Phase 12.1 adversarial samples (04-06) and the negative
+    # false-positive boundary sample (07).
     assert names == [
         "sample-01-well-structured",
         "sample-02-vague-ambiguous",
         "sample-03-multi-feature",
+        "sample-04-injection-suffix",
+        "sample-05-injection-inline",
+        "sample-06-injection-data-extraction",
+        "sample-07-transcript-human-imperatives",
     ]
+
+
+def test_non_adversarial_samples_have_no_injection_test() -> None:
+    """Samples 01-03 predate Phase 12.1 and must not parse an injection block."""
+    for name in (
+        "sample-01-well-structured",
+        "sample-02-vague-ambiguous",
+        "sample-03-multi-feature",
+    ):
+        sample = load_sample(SAMPLES_DIR / f"{name}.md")
+        assert sample.injection_test is None, name
+
+
+def test_adversarial_samples_expect_detected_true() -> None:
+    """Samples 04-06 are adversarial; the Analyst must set detected=true."""
+    for name, expected_pattern_count in (
+        ("sample-04-injection-suffix", 4),
+        ("sample-05-injection-inline", 5),
+        ("sample-06-injection-data-extraction", 6),
+    ):
+        sample = load_sample(SAMPLES_DIR / f"{name}.md")
+        assert sample.injection_test is not None, name
+        assert sample.injection_test.expected_detected is True, name
+        assert len(sample.injection_test.forbidden_patterns) == expected_pattern_count, name
+
+
+def test_transcript_sample_expects_detected_false() -> None:
+    """Sample-07 anchors the false-positive boundary: detected must be False."""
+    sample = load_sample(SAMPLES_DIR / "sample-07-transcript-human-imperatives.md")
+    assert sample.injection_test is not None
+    assert sample.injection_test.expected_detected is False
+    assert sample.injection_test.forbidden_patterns == []
 
 
 def test_sample_01_well_structured_ground_truth() -> None:
