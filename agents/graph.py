@@ -281,30 +281,58 @@ def deferred_implied_stories(state: PipelineState) -> list[ImpliedStory]:
     PO has indicated will become separate issues, and the Reviewer must
     NOT flag them as coverage gaps (LEARNINGS #31).
 
-    Match is case-insensitive substring on the story title against the
-    concatenated PO answers. This is intentionally loose — POs may
-    answer "Slack notifications" when the story title is "Slack
-    notifications for auto-quarantine changes", and we want that to
-    count as picked, not deferred.
+    Match is case-insensitive and **bidirectional substring**: a story is
+    considered picked if any PO answer contains the title OR the title
+    contains the answer. The bidirectionality covers the two realistic
+    PO behaviours:
 
-    Returns the full ``implied_stories`` list when the PO checkpoint
-    never fired (no critical ambiguities) — that's the "all 4 stories
+    - PO types a longer answer that includes the title verbatim
+      ("Pick the dashboard story for now") — title ⊂ answer matches.
+    - PO types a shorter variant of the title ("Slack notifications"
+      when the full title is "Slack notifications for auto-quarantine
+      changes") — answer ⊂ title matches.
+
+    A naive single-direction substring match (which an earlier draft of
+    this helper used) silently misclassifies one of those cases as
+    deferred, undoing both 15.1 (Reviewer suppresses gap flags for the
+    wrong story) and 15.3 (bulk export creates a follow-up for the
+    picked story). The bidirectional form is the cheapest robust fix
+    short of a real LLM-judge — fuzzy enough to be forgiving, strict
+    enough that "dashboard" doesn't accidentally match "audit log".
+
+    Returns the empty list when the PO checkpoint never fired (no
+    critical ambiguities or empty answers) — that's the "all stories
     are still in play, none picked" case. Caller (the Reviewer) treats
-    it as story-level scoping context; an empty-list result means
-    no story-level scoping happened at all (single-feature requirement).
+    an empty list as story-level scoping context; an empty-list result
+    means no story-level scoping happened at all (single-feature
+    requirement).
     """
     analyst = state.get("analyst_output")
     if analyst is None or not analyst.implied_stories:
         return []
     po_answers = state.get("po_answers") or {}
-    answers_blob = " | ".join(a.lower() for a in po_answers.values() if a)
-    if not answers_blob:
+    answer_strings = [a.lower().strip() for a in po_answers.values() if a and a.strip()]
+    if not answer_strings:
         # PO checkpoint never fired (or fired with empty answers).
         # Conservative: every implied story is in play; nothing is
         # deferred. Returning [] keeps the Reviewer's old behaviour
         # for non-multi-story runs untouched.
         return []
-    return [s for s in analyst.implied_stories if s.title.lower() not in answers_blob]
+    return [s for s in analyst.implied_stories if not _is_picked(s.title, answer_strings)]
+
+
+def _is_picked(story_title: str, answers_lower: list[str]) -> bool:
+    """Return True if any PO answer matches the story title in either direction.
+
+    Both directions matter — see ``deferred_implied_stories`` for the
+    rationale. ``answers_lower`` is the list of lower-cased / stripped
+    PO answers; this helper does no normalisation of its own beyond
+    lowercasing the title.
+    """
+    title = story_title.lower().strip()
+    if not title:
+        return False
+    return any(title in ans or ans in title for ans in answers_lower)
 
 
 def reviewer_node(state: PipelineState) -> dict:

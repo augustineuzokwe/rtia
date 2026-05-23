@@ -479,3 +479,75 @@ def test_reviewer_node_passes_deferred_implied_stories():
     assert "Story B" in captured_deferred_titles
     assert "Story C" in captured_deferred_titles
     assert "Story A" not in captured_deferred_titles
+
+
+def test_deferred_implied_stories_matches_bidirectionally():
+    """Phase 15 hotfix: PO answer ⊂ title OR title ⊂ answer both count as picked.
+
+    Earlier single-direction match silently misclassified the picked
+    story when POs typed a shorter variant of the title (e.g. 'Slack
+    notifications' when the title was 'Slack notifications for
+    auto-quarantine changes'). Pin all four realistic answer shapes
+    against the same stories so a regression to single-direction
+    matching surfaces immediately.
+    """
+    from agents.graph import deferred_implied_stories
+    from agents.requirements_analyst import AnalystOutput, ImpliedStory
+
+    stories = [
+        ImpliedStory(title="Slack notifications for auto-quarantine changes", summary="s"),
+        ImpliedStory(title="Quarantined tests dashboard", summary="d"),
+        ImpliedStory(title="Audit log for quarantine actions", summary="a"),
+    ]
+    base = {
+        "analyst_output": AnalystOutput(
+            intent="x", actors=["u"], ambiguities=[], implied_stories=stories
+        ),
+    }
+
+    cases = {
+        # answer verbatim → picks Slack story
+        "Slack notifications for auto-quarantine changes": [
+            "Quarantined tests dashboard",
+            "Audit log for quarantine actions",
+        ],
+        # answer SHORTER than title → still picks Slack (answer ⊂ title)
+        "Slack notifications": [
+            "Quarantined tests dashboard",
+            "Audit log for quarantine actions",
+        ],
+        # answer LONGER than title with extra context → picks Dashboard (title ⊂ answer)
+        "Pick Quarantined tests dashboard for now": [
+            "Slack notifications for auto-quarantine changes",
+            "Audit log for quarantine actions",
+        ],
+        # answer matches nothing → ALL stories stay deferred
+        "completely unrelated text": [
+            "Slack notifications for auto-quarantine changes",
+            "Quarantined tests dashboard",
+            "Audit log for quarantine actions",
+        ],
+    }
+    for answer, expected_deferred_titles in cases.items():
+        state = {**base, "po_answers": {"Q": answer}}
+        actual = [s.title for s in deferred_implied_stories(state)]
+        assert actual == expected_deferred_titles, (
+            f"answer={answer!r}: expected {expected_deferred_titles}, got {actual}"
+        )
+
+
+def test_deferred_implied_stories_ignores_empty_or_whitespace_answers():
+    """Empty/whitespace-only PO answers shouldn't behave like a 'no answer' (which
+    would defer nothing) — they should be skipped like the answers dict was empty."""
+    from agents.graph import deferred_implied_stories
+    from agents.requirements_analyst import AnalystOutput, ImpliedStory
+
+    stories = [ImpliedStory(title="Story A", summary="a")]
+    state = {
+        "analyst_output": AnalystOutput(
+            intent="x", actors=["u"], ambiguities=[], implied_stories=stories
+        ),
+        "po_answers": {"Q1": "   ", "Q2": ""},
+    }
+    # No usable answers → treat as no story-level scoping → empty deferred.
+    assert deferred_implied_stories(state) == []
