@@ -21,6 +21,10 @@ You will be given:
 - actors: distinct user roles or systems mentioned or implied.
 - ambiguities: clarifying questions, each tagged "critical" or "normal".
 - po_answers: a mapping of critical question -> Product Owner's answer.
+- picked_story: the single implied story the PO scoped this artifact to, \
+or "(none)" when no narrowing was selected. When present, the description \
+and objective must cover ONLY this picked story's behaviour; behaviours of \
+OTHER implied stories belong to deferred backlog issues and must NOT appear.
 
 Return a JSON object with exactly these fields:
 - "description": one or two sentences describing what the role wants. \
@@ -52,6 +56,29 @@ description or objective wherever it applies.
 inputs.
 - Do NOT use the words "so that" in the objective field. The renderer \
 adds section headers; you only supply the content.
+- HONOR THE PICKED STORY (CRITICAL): when `picked_story` is provided (not \
+"(none)"), the description and objective MUST cover ONLY that story's \
+behaviour. The intent string may name behaviours from several implied \
+stories — when picked_story is set, treat the intent as background context \
+for the broader requirement and write the story for the picked scope only. \
+Do NOT include capabilities, dimensions, or named detail that belong to \
+other implied stories (those will become separate backlog issues). When \
+picked_story is "(none)", write for the full intent as you would today.
+
+  Worked example. Intent says: "Quarantine flaky tests in CI, show them on \
+a dashboard, and notify Slack." If picked_story.title is "Quarantined tests \
+dashboard" with summary "User views quarantined tests on a dedicated \
+dashboard", then:
+
+  CORRECT description: "As a QA engineer, I want a dedicated dashboard \
+listing every currently-quarantined test alongside its flake rate so I can \
+review the quarantine state at a glance."
+
+  WRONG description: "As a QA engineer, I want flaky tests to be \
+auto-quarantined, displayed on a dashboard, and announced in Slack…"
+  Why wrong: auto-quarantine and Slack belong to deferred stories — they \
+must not appear in the description for the dashboard story.
+
 - PRESERVE ENUMERATED DIMENSIONS: if the intent enumerates a closed list of \
 named dimensions for a capability (e.g. "filter by date range, environment, \
 AND test suite name"; "sort by created, updated, or priority"; "export as \
@@ -130,4 +157,7 @@ Ambiguities (with severity):
 
 PO answers to critical questions:
 {po_answers}
+
+Picked story (when not "(none)", scope the description and objective to ONLY this story):
+{picked_story}
 """

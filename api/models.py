@@ -16,12 +16,19 @@ from pydantic import BaseModel, Field
 
 
 class ThreadStatus(StrEnum):
-    """Where the pipeline is for a given thread."""
+    """Where the pipeline is for a given thread.
+
+    ``DONE_FANOUT`` (Phase 15.4) is the terminal status for multi-story
+    requirements that branched into the fan-out path instead of the
+    deep flow. The payload carries ``fan_out_stories`` (a list of
+    lightweight stubs) instead of ``final_artifact``.
+    """
 
     RUNNING = "running"
     PAUSED_PO = "paused_po"
     PAUSED_REVIEW = "paused_review"
     DONE = "done"
+    DONE_FANOUT = "done_fanout"
     ERROR = "error"
 
 
@@ -34,14 +41,22 @@ class PipelineRequest(BaseModel):
 class ResumeRequest(BaseModel):
     """Body for ``POST /pipeline/{thread_id}/resume``.
 
-    Shape depends on which checkpoint the thread is paused at — the
-    caller's responsibility to send the right keys (the runner validates
-    by attempting to use them; LangGraph raises if the shape is wrong
-    and the runner surfaces that as a 400).
+    Shape depends on which checkpoint the thread is paused at:
+
+    - PO checkpoint, **deep mode**: ``answers`` is a ``dict[question, answer]``.
+    - PO checkpoint, **fan-out mode** (Phase 15.4): ``selected_story_titles``
+      is the list of implied-story titles the PO kept checked; ``answers``
+      carries any non-story critical question responses. Empty / missing
+      ``selected_story_titles`` means "fan out every identified story"
+      (Q2 default).
+    - Story review checkpoint: ``accepted`` ± ``description`` / ``objective``.
     """
 
-    # PO checkpoint: dict[str, str] of {question: answer}.
+    # PO checkpoint, deep mode (and non-story Qs in fan-out mode).
     answers: dict[str, str] | None = None
+
+    # PO checkpoint, fan-out mode.
+    selected_story_titles: list[str] | None = None
 
     # Story review checkpoint.
     accepted: bool | None = None

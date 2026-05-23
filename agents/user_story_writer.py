@@ -32,7 +32,7 @@ from agents.config import (
     DEFAULT_TIMEOUT_SECONDS,
     prompt_hash,
 )
-from agents.requirements_analyst import AnalystOutput
+from agents.requirements_analyst import AnalystOutput, ImpliedStory
 from prompts.user_story_writer_prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
 
 _PROMPT_HASH = prompt_hash(SYSTEM_PROMPT, USER_PROMPT_TEMPLATE)
@@ -77,10 +77,24 @@ def _format_po_answers(po_answers: dict[str, str]) -> str:
     return "\n".join(f"- Q: {q}\n  A: {a}" for q, a in po_answers.items())
 
 
+def _format_picked_story(picked: ImpliedStory | None) -> str:
+    """Render the "picked story" block for the user prompt.
+
+    ``(none)`` is the no-narrowing signal — the Writer falls back to its
+    default behaviour of covering the full intent. Rendering the same
+    placeholder for "no implied stories" and "PO didn't clearly pick"
+    keeps the prompt shape stable across all four PO-answer scenarios.
+    """
+    if picked is None:
+        return "(none)"
+    return f"- title: {picked.title}\n  summary: {picked.summary}"
+
+
 def write_user_story(
     analyst_output: AnalystOutput,
     po_answers: dict[str, str],
     *,
+    picked_story: ImpliedStory | None = None,
     model: str = DEFAULT_MODEL,
     temperature: float | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
@@ -94,6 +108,16 @@ def write_user_story(
     plus the PO's clarifications. This is intentional: it forces the Analyst
     to be the single source of truth about what was asked, and gives the
     Story Writer a clean, validated contract to work against.
+
+    ``picked_story`` is the Phase 15.4 narrowing hook. When the Analyst
+    flagged a multi-story requirement and the PO clearly picked one at
+    the PO checkpoint, the caller passes the picked ``ImpliedStory``
+    here so the Writer scopes the description + objective to ONLY that
+    story. ``None`` (the default) preserves the original broad behaviour
+    — used for single-feature requirements and for multi-story
+    requirements where the PO's answer didn't cleanly identify one
+    story. See :func:`agents.graph.picked_implied_story` for the
+    matching logic and the cases that return ``None``.
 
     Resilience knobs mirror `analyze_requirement`. See that function's
     docstring for per-parameter notes.
@@ -113,6 +137,7 @@ def write_user_story(
         actors="\n".join(f"- {actor}" for actor in analyst_output.actors) or "(none)",
         ambiguities=_format_ambiguities(analyst_output),
         po_answers=_format_po_answers(po_answers),
+        picked_story=_format_picked_story(picked_story),
     )
     messages = [
         SystemMessage(content=SYSTEM_PROMPT),

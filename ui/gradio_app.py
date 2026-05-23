@@ -89,6 +89,10 @@ def _state_to_panels(state) -> dict[str, Any]:
         "review_visible": gr.update(visible=False),
         "result_visible": gr.update(visible=False),
         "po_questions": gr.update(value=""),
+        "po_answers_visible": gr.update(visible=True),
+        "po_fanout_visible": gr.update(visible=False),
+        "po_fanout_checkboxes": gr.update(choices=[], value=[], visible=False),
+        "po_paused_payload": {},
         "review_preview": gr.update(value=""),
         "result_md": gr.update(value=""),
         "download_file": gr.update(value=None, visible=False),
@@ -99,15 +103,53 @@ def _state_to_panels(state) -> dict[str, Any]:
     }
 
     if state.status == ThreadStatus.PAUSED_PO:
-        questions = state.payload.get("critical_ambiguities", [])
-        formatted = "\n".join(f"{i + 1}. {q}" for i, q in enumerate(questions))
+        mode = state.payload.get("mode", "deep")
         base["po_visible"] = gr.update(visible=True)
-        base["po_questions"] = gr.update(
-            value=(
-                f"### {len(questions)} critical question(s) — "
-                "answer each on a separate line, in order:\n\n" + formatted
+        base["po_paused_payload"] = dict(state.payload)
+        questions = state.payload.get("critical_ambiguities", [])
+        if mode == "fan_out":
+            # Phase 15.4 — CheckboxGroup for implied stories + text input
+            # for any remaining non-story critical questions.
+            stories = state.payload.get("implied_stories", [])
+            preview_lines = [
+                "### Multi-story requirement detected",
+                "",
+                f"The Analyst identified **{len(stories)} implied stories**. ",
+                "RTIA will fan these out as lightweight backlog issues — ",
+                "no deep artifact this session. Uncheck any you don't want; ",
+                "submit to create them. Re-run RTIA on any title later for ",
+                "the full Description / Objective / ACs / Test Cases.",
+                "",
+            ]
+            for s in stories:
+                preview_lines.append(f"- **{s['title']}** — {s['summary']}")
+            if questions:
+                preview_lines.extend(
+                    [
+                        "",
+                        "**Other critical questions** (one answer per line, in order):",
+                        "",
+                    ]
+                )
+                preview_lines.extend(f"{i + 1}. {q}" for i, q in enumerate(questions))
+            base["po_questions"] = gr.update(value="\n".join(preview_lines))
+            base["po_fanout_visible"] = gr.update(visible=True)
+            base["po_fanout_checkboxes"] = gr.update(
+                choices=[s["title"] for s in stories],
+                value=[s["title"] for s in stories],
+                visible=True,
             )
-        )
+            # Hide the free-text answers box when there are no non-story Qs.
+            base["po_answers_visible"] = gr.update(visible=bool(questions))
+        else:
+            formatted = "\n".join(f"{i + 1}. {q}" for i, q in enumerate(questions))
+            base["po_questions"] = gr.update(
+                value=(
+                    f"### {len(questions)} critical question(s) — "
+                    "answer each on a separate line, in order:\n\n" + formatted
+                )
+            )
+            base["po_fanout_visible"] = gr.update(visible=False)
     elif state.status == ThreadStatus.PAUSED_REVIEW:
         base["review_visible"] = gr.update(visible=True)
         base["review_preview"] = gr.update(value=state.payload.get("rendered_artifact", ""))
@@ -141,6 +183,32 @@ def _state_to_panels(state) -> dict[str, Any]:
         else:
             base["deferred_md"] = gr.update(value="")
             base["deferred_checkboxes"] = gr.update(choices=[], value=[], visible=False)
+    elif state.status == ThreadStatus.DONE_FANOUT:
+        # Phase 15.4 — fan-out terminal state. No deep artifact; render
+        # the lightweight stub list and reuse the deferred-stories
+        # CheckboxGroup + Push-to-backlog flow.
+        stubs = state.payload.get("fan_out_stories") or []
+        base["result_visible"] = gr.update(visible=True)
+        md_lines = [
+            "### Fan-out result",
+            "",
+            f"RTIA produced **{len(stubs)} lightweight backlog stubs**.",
+            "Click *Push to backlog* below to create them in Jira / GitHub.",
+            "",
+            "_Re-run RTIA on any individual title to deep-dive that story._",
+            "",
+        ]
+        for s in stubs:
+            md_lines.append(f"- **{s['title']}** — {s['summary']}")
+        base["result_md"] = gr.update(value="\n".join(md_lines))
+        base["deferred_visible"] = gr.update(visible=bool(stubs))
+        if stubs:
+            base["deferred_md"] = gr.update(value="### Push these to the backlog:")
+            base["deferred_checkboxes"] = gr.update(
+                choices=[s["title"] for s in stubs],
+                value=[s["title"] for s in stubs],
+                visible=True,
+            )
     elif state.status == ThreadStatus.ERROR:
         rendered = state.payload.get("rendered_artifact", "")
         base["result_visible"] = gr.update(visible=True)
@@ -174,12 +242,23 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
         # PO checkpoint panel.
         with gr.Group(visible=False) as po_panel:
             po_questions = gr.Markdown("")
+            # Phase 15.4 — CheckboxGroup for the fan-out case. Hidden in
+            # deep mode; populated from the paused payload's implied_stories.
+            po_fanout_checkboxes = gr.CheckboxGroup(
+                choices=[],
+                value=[],
+                label="Stories to push as backlog stubs (uncheck to drop)",
+                visible=False,
+            )
             po_answers = gr.Textbox(
                 label="Answers (one per line, in order)",
                 lines=4,
                 placeholder="Answer 1\nAnswer 2\n…",
             )
-            po_submit = gr.Button("Submit answers", variant="primary")
+            # Holds the paused payload between renders so on_po_submit
+            # knows which mode to build the resume body for.
+            po_paused_payload_state = gr.State(value={})
+            po_submit = gr.Button("Submit", variant="primary")
 
         # Story review panel.
         with gr.Group(visible=False) as review_panel:
@@ -243,6 +322,9 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
                 mapping["thread_id_state"],
                 mapping["po_visible"],
                 mapping["po_questions"],
+                mapping["po_fanout_checkboxes"],
+                mapping["po_answers_visible"],
+                mapping["po_paused_payload"],
                 mapping["review_visible"],
                 mapping["review_preview"],
                 mapping["result_visible"],
@@ -258,6 +340,9 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             thread_id_state,
             po_panel,
             po_questions,
+            po_fanout_checkboxes,
+            po_answers,
+            po_paused_payload_state,
             review_panel,
             review_preview,
             result_panel,
@@ -301,19 +386,44 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
 
         run_btn.click(on_run, [req_text], outputs)
 
-        def on_po_submit(thread_id, answers_blob, text):
+        def on_po_submit(thread_id, answers_blob, fanout_selection, paused_payload, _text):
+            """Phase 15.4 — submit handler dispatches on paused payload's mode.
+
+            Fan-out: bundle ``selected_story_titles`` + free-text answers
+            (for any non-story critical questions) into the structured
+            resume value the graph expects.
+
+            Deep: today's flat ``dict[question, answer]`` shape.
+            """
             runner = _runner(app)
-            current = runner.get_state(thread_id)
-            questions = current.payload.get("critical_ambiguities", [])
+            mode = (paused_payload or {}).get("mode", "deep")
+            questions = (paused_payload or {}).get("critical_ambiguities") or []
             lines = [ln.strip() for ln in (answers_blob or "").splitlines() if ln.strip()]
             answers = {
                 q: (lines[i] if i < len(lines) else "no answer given")
                 for i, q in enumerate(questions)
             }
-            state = runner.resume(thread_id, answers)
+            if mode == "fan_out":
+                resume_value = {
+                    "selected_story_titles": list(fanout_selection or []),
+                    "answers": answers,
+                }
+            else:
+                resume_value = answers
+            state = runner.resume(thread_id, resume_value)
             return _spread(state)
 
-        po_submit.click(on_po_submit, [thread_id_state, po_answers, req_text], outputs)
+        po_submit.click(
+            on_po_submit,
+            [
+                thread_id_state,
+                po_answers,
+                po_fanout_checkboxes,
+                po_paused_payload_state,
+                req_text,
+            ],
+            outputs,
+        )
 
         def on_review_accept(thread_id):
             state = _runner(app).resume(thread_id, {"accepted": True})

@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from agents.requirements_analyst import ImpliedStory
 from api.main import create_app
+from api.models import ThreadState, ThreadStatus
 
 TOKEN = "tok"
 
@@ -161,3 +162,53 @@ def test_export_deferred_jira_dry_run_uses_adf_codeblock(client, runner_mock):
     assert result["payload"]["fields"]["summary"] == "Story A"
     desc = result["payload"]["fields"]["description"]
     assert desc["content"][0]["type"] == "codeBlock"
+
+
+def test_export_deferred_dispatches_to_fanout_source_on_done_fanout(client, runner_mock):
+    """Phase 15.4 — when status is DONE_FANOUT, the endpoint sources stories
+    from get_fanout_stories_and_context, not get_deferred_stories_and_context."""
+    runner_mock.get_state.return_value = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.DONE_FANOUT,
+        payload={"fan_out_stories": [{"title": "Story A", "summary": "a"}]},
+    )
+    runner_mock.get_fanout_stories_and_context.return_value = (
+        [ImpliedStory(title="Story A", summary="a")],
+        "req",
+    )
+    r = client.post(
+        "/pipeline/tid/export-deferred",
+        headers=_auth(),
+        json={
+            "target": {"backend": "github", "github_repo": "owner/name"},
+            "dry_run": True,
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert [r["payload"]["title"] for r in body["results"]] == ["Story A"]
+    # Confirm dispatch went through the fan-out branch.
+    runner_mock.get_fanout_stories_and_context.assert_called_once_with("tid")
+    runner_mock.get_deferred_stories_and_context.assert_not_called()
+
+
+def test_export_deferred_uses_deferred_source_on_done_status(client, runner_mock):
+    """Phase 15.4 regression guard — deep DONE threads still use the old source."""
+    runner_mock.get_state.return_value = ThreadState(
+        thread_id="tid", status=ThreadStatus.DONE, payload={}
+    )
+    runner_mock.get_deferred_stories_and_context.return_value = (
+        [ImpliedStory(title="Story X", summary="x")],
+        "req",
+    )
+    r = client.post(
+        "/pipeline/tid/export-deferred",
+        headers=_auth(),
+        json={
+            "target": {"backend": "github", "github_repo": "owner/name"},
+            "dry_run": True,
+        },
+    )
+    assert r.status_code == 200
+    runner_mock.get_deferred_stories_and_context.assert_called_once_with("tid")
+    runner_mock.get_fanout_stories_and_context.assert_not_called()

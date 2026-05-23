@@ -420,13 +420,15 @@ def test_story_review_override_partial_keeps_non_overridden_fields():
     assert artifact.objective == "Outcome Y is achieved."
 
 
-def test_reviewer_node_passes_deferred_implied_stories():
-    """Phase 15.1 — graph wires PO answers + implied_stories to the Reviewer.
+def test_reviewer_node_passes_empty_deferred_for_single_implied_story():
+    """Phase 15.4 — under fan-out routing, the Reviewer only runs for
+    single-implied-story (or zero) requirements. In those cases the
+    deferred list is always empty — the 15.1 scope-aware Reviewer
+    plumbing stays wired but degenerates to a no-op. Pin that contract.
 
-    When the Analyst returns multiple implied stories and the PO picks
-    one at the PO checkpoint, the others must reach the Reviewer as
-    'deferred' context so the Reviewer doesn't flag their behaviours as
-    coverage gaps (LEARNINGS #31).
+    Multi-implied-story (≥ 2) requirements branch to fan_out_node, so
+    the Reviewer never runs at all on them — that property is covered
+    by ``test_multi_story_branches_to_fanout_skipping_deep_nodes``.
     """
     from unittest.mock import patch
 
@@ -435,8 +437,7 @@ def test_reviewer_node_passes_deferred_implied_stories():
     def _fake_review_artifact(_req, _artifact, *, deferred_stories=None, **_kw):
         from agents.reviewer import ReviewReport
 
-        if deferred_stories:
-            captured_deferred_titles.extend(s.title for s in deferred_stories)
+        captured_deferred_titles.extend(s.title for s in (deferred_stories or []))
         return ReviewReport(
             coverage_gaps=[],
             weak_acs=[],
@@ -446,21 +447,11 @@ def test_reviewer_node_passes_deferred_implied_stories():
         )
 
     analyst_payload = {
-        "intent": "Goal",
+        "intent": "single-story req",
         "actors": ["User"],
-        "ambiguities": [
-            {
-                "question": (
-                    "This requirement implies 3 stories: [Story A, Story B, Story C]. "
-                    "Which single story should this issue cover?"
-                ),
-                "severity": "critical",
-            }
-        ],
+        "ambiguities": [],
         "implied_stories": [
-            {"title": "Story A", "summary": "First implied story."},
-            {"title": "Story B", "summary": "Second implied story."},
-            {"title": "Story C", "summary": "Third implied story."},
+            {"title": "The only story", "summary": "the only story summary"},
         ],
     }
 
@@ -469,16 +460,11 @@ def test_reviewer_node_passes_deferred_implied_stories():
         patch("agents.graph.review_artifact", side_effect=_fake_review_artifact),
     ):
         pipeline = build_pipeline(checkpointer=_test_checkpointer())
-        config = {"configurable": {"thread_id": "test-deferred"}}
-        pipeline.invoke({"requirement_text": "multi-story req"}, config=config)
-        # PO picks "Story A" — the other two should be deferred.
-        po_question = analyst_payload["ambiguities"][0]["question"]
-        pipeline.invoke(Command(resume={po_question: "Story A"}), config=config)
+        config = {"configurable": {"thread_id": "test-1-story-reviewer"}}
+        pipeline.invoke({"requirement_text": "req"}, config=config)
         pipeline.invoke(Command(resume={"accepted": True}), config=config)
 
-    assert "Story B" in captured_deferred_titles
-    assert "Story C" in captured_deferred_titles
-    assert "Story A" not in captured_deferred_titles
+    assert captured_deferred_titles == []
 
 
 def test_deferred_implied_stories_matches_bidirectionally():
@@ -551,3 +537,219 @@ def test_deferred_implied_stories_ignores_empty_or_whitespace_answers():
     }
     # No usable answers → treat as no story-level scoping → empty deferred.
     assert deferred_implied_stories(state) == []
+
+
+def test_picked_implied_story_returns_single_match_or_none():
+    """Phase 15.4 — picked_implied_story is single-pick by design.
+
+    Pin the four cases that determine downstream behaviour:
+    - clean single pick → that story
+    - multiple matches (ambiguous "pick 2") → None
+    - "all" / unrelated text → None
+    - empty po_answers / no implied_stories → None
+    """
+    from agents.graph import picked_implied_story
+    from agents.requirements_analyst import AnalystOutput, ImpliedStory
+
+    stories = [
+        ImpliedStory(title="Quarantined tests dashboard", summary="dash"),
+        ImpliedStory(title="Audit log for quarantine actions", summary="audit"),
+        ImpliedStory(title="Slack notifications for auto-quarantine changes", summary="slack"),
+    ]
+    base = {
+        "analyst_output": AnalystOutput(
+            intent="x", actors=["u"], ambiguities=[], implied_stories=stories
+        ),
+    }
+
+    # Clean pick — short variant matches exactly one title.
+    s = picked_implied_story({**base, "po_answers": {"Q": "dashboard"}})
+    assert s is not None and s.title == "Quarantined tests dashboard"
+
+    # Multiple matches → None.
+    s = picked_implied_story({**base, "po_answers": {"Q": "dashboard and audit log"}})
+    assert s is None
+
+    # "all" doesn't match any title → None.
+    s = picked_implied_story({**base, "po_answers": {"Q": "all"}})
+    assert s is None
+
+    # No po_answers → None.
+    s = picked_implied_story({**base, "po_answers": {}})
+    assert s is None
+
+    # No implied_stories → None.
+    s = picked_implied_story(
+        {
+            "analyst_output": AnalystOutput(
+                intent="x", actors=["u"], ambiguities=[], implied_stories=[]
+            ),
+            "po_answers": {"Q": "anything"},
+        }
+    )
+    assert s is None
+
+
+def test_story_writer_node_passes_picked_story_for_single_implied_story():
+    """Phase 15.4 — single-implied-story deep path still wires the picked story.
+
+    Multi-story (≥ 2) cases route to fan-out and never call the Story
+    Writer. The picked-story narrowing is now only meaningful for the
+    1-implied-story deep case (15.1 Reviewer scope-awareness similarly
+    becomes a no-op for 0-implied — empty deferred list).
+    """
+    from unittest.mock import patch
+
+    from agents.user_story_writer import UserStory
+
+    captured_picks: list[object] = []
+
+    def _fake_write(_analyst, _po, *, picked_story=None, **_kw):
+        captured_picks.append(picked_story)
+        return UserStory(description="d", objective="o", assumptions=[])
+
+    analyst_payload = {
+        "intent": "single-story req",
+        "actors": ["User"],
+        "ambiguities": [],
+        "implied_stories": [
+            {"title": "The only story", "summary": "the only story summary"},
+        ],
+    }
+
+    with (
+        _mock_pipeline_llms(analyst_payload),
+        patch("agents.graph.write_user_story", side_effect=_fake_write),
+    ):
+        pipeline = build_pipeline(checkpointer=_test_checkpointer())
+        config = {"configurable": {"thread_id": "test-picked-1-story"}}
+        # No critical ambiguity → PO checkpoint passes through →
+        # Story Writer runs immediately → Story Review pauses.
+        pipeline.invoke({"requirement_text": "req"}, config=config)
+        pipeline.invoke(Command(resume={"accepted": True}), config=config)
+
+    assert len(captured_picks) == 1
+    assert captured_picks[0] is not None
+    assert captured_picks[0].title == "The only story"
+
+
+def test_multi_story_branches_to_fanout_skipping_deep_nodes():
+    """Phase 15.4 — implied_stories ≥ 2 routes to fan_out_node, skipping
+    Story Writer / AC Generator / Test Case Writer / Reviewer entirely.
+
+    The fan_out_node populates ``fan_out_stories`` filtered by the PO's
+    ``selected_story_titles`` selection. None of the deep-path agent
+    library functions are called.
+    """
+    from unittest.mock import patch
+
+    from agents.user_story_writer import UserStory
+
+    deep_calls: dict[str, int] = {
+        "story": 0,
+        "ac": 0,
+        "test": 0,
+        "reviewer": 0,
+    }
+
+    def _spy_story(_a, _p, **_kw):
+        deep_calls["story"] += 1
+        return UserStory(description="d", objective="o", assumptions=[])
+
+    analyst_payload = {
+        "intent": "multi-story req",
+        "actors": ["User"],
+        "ambiguities": [
+            {
+                "question": "This requirement implies 3 stories. Which single story?",
+                "severity": "critical",
+            }
+        ],
+        "implied_stories": [
+            {"title": "Story A", "summary": "a"},
+            {"title": "Story B", "summary": "b"},
+            {"title": "Story C", "summary": "c"},
+        ],
+    }
+
+    with (
+        _mock_pipeline_llms(analyst_payload),
+        patch("agents.graph.write_user_story", side_effect=_spy_story),
+    ):
+        pipeline = build_pipeline(checkpointer=_test_checkpointer())
+        config = {"configurable": {"thread_id": "test-fanout-branch"}}
+
+        # First invoke → analyst runs, po_checkpoint pauses for fan-out.
+        first = pipeline.invoke({"requirement_text": "req"}, config=config)
+        payload = first["__interrupt__"][0].value
+        assert payload["mode"] == "fan_out"
+        assert len(payload["implied_stories"]) == 3
+        # The "which single story?" critical question is hidden from the
+        # text-input list because the CheckboxGroup replaces it.
+        assert payload["critical_ambiguities"] == []
+
+        # PO keeps 2 of 3 → fan_out_node filters.
+        result = pipeline.invoke(
+            Command(
+                resume={
+                    "selected_story_titles": ["Story A", "Story C"],
+                    "answers": {},
+                }
+            ),
+            config=config,
+        )
+
+    # Story Writer was never called — proves deep nodes are skipped.
+    assert deep_calls["story"] == 0
+    assert "user_story" not in result
+    assert "final_artifact" not in result
+    assert "review_report" not in result
+    fan_out = result["fan_out_stories"]
+    assert [s.title for s in fan_out] == ["Story A", "Story C"]
+
+
+def test_fanout_empty_selection_keeps_all_stories():
+    """Phase 15.4 / Q2 default — empty selected_story_titles ⇒ fan out
+    every implied story rather than producing nothing."""
+    from agents.graph import fan_out_node
+    from agents.requirements_analyst import AnalystOutput, ImpliedStory
+
+    stories = [
+        ImpliedStory(title="Story A", summary="a"),
+        ImpliedStory(title="Story B", summary="b"),
+    ]
+    state = {
+        "analyst_output": AnalystOutput(
+            intent="x", actors=["u"], ambiguities=[], implied_stories=stories
+        ),
+        "selected_story_titles": [],
+    }
+    out = fan_out_node(state)
+    assert [s.title for s in out["fan_out_stories"]] == ["Story A", "Story B"]
+
+
+def test_is_fanout_mode_branch_criterion():
+    """Phase 15.4 — pin the branch criterion explicitly.
+
+    The condition is purely on the Analyst's output (count ≥ 2). Even
+    if the PO eventually unchecks all but one story, the routing was
+    decided when the checkpoint fired.
+    """
+    from agents.graph import is_fanout_mode
+    from agents.requirements_analyst import AnalystOutput, ImpliedStory
+
+    def _state(n: int) -> dict:
+        return {
+            "analyst_output": AnalystOutput(
+                intent="x",
+                actors=["u"],
+                ambiguities=[],
+                implied_stories=[ImpliedStory(title=f"S{i}", summary="s") for i in range(n)],
+            )
+        }
+
+    assert is_fanout_mode(_state(0)) is False
+    assert is_fanout_mode(_state(1)) is False
+    assert is_fanout_mode(_state(2)) is True
+    assert is_fanout_mode(_state(5)) is True
+    assert is_fanout_mode({}) is False  # no analyst output yet

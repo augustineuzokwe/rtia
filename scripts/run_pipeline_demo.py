@@ -91,6 +91,44 @@ def collect_po_answers(critical_questions: list[str]) -> dict[str, str]:
     return answers
 
 
+def collect_fanout_selection(payload: dict) -> dict:
+    """Phase 15.4 — CLI prompt for the fan-out PO checkpoint.
+
+    Mirrors the Gradio CheckboxGroup. Default behaviour (empty input)
+    keeps every implied story — matches Q2's "fan out everything"
+    default and the graph's empty-selection contract.
+    """
+    stories = payload.get("implied_stories", [])
+    print(f"\nThis requirement implies {len(stories)} independent stories:")
+    for i, s in enumerate(stories, 1):
+        print(f"  {i}. {s['title']} — {s['summary']}")
+    print(
+        "\nRTIA will fan these out as lightweight backlog stubs (no deep "
+        "artifact this session).\nEnter the numbers to KEEP, comma-separated, "
+        "or press Enter to keep all:"
+    )
+    raw = input("Keep: ").strip()
+    if not raw:
+        selected_titles = [s["title"] for s in stories]
+    else:
+        keep_indices: set[int] = set()
+        for tok in raw.split(","):
+            tok = tok.strip()
+            if tok.isdigit():
+                idx = int(tok) - 1
+                if 0 <= idx < len(stories):
+                    keep_indices.add(idx)
+        selected_titles = [s["title"] for i, s in enumerate(stories) if i in keep_indices]
+        if not selected_titles:
+            # Fall back to "keep all" rather than nothing — same as Q2 default.
+            selected_titles = [s["title"] for s in stories]
+
+    # Any non-story critical questions still need text input.
+    other_questions = payload.get("critical_ambiguities", [])
+    answers = collect_po_answers(other_questions) if other_questions else {}
+    return {"selected_story_titles": selected_titles, "answers": answers}
+
+
 def collect_story_review_response(payload: dict) -> dict:
     """Show the rendered story preview; collect accept-or-override.
 
@@ -225,11 +263,19 @@ def main() -> None:
     # fired, dispatching on the interrupt payload's shape.
     while "__interrupt__" in result:
         payload = result["__interrupt__"][0].value
-        if "critical_ambiguities" in payload:
+        if payload.get("mode") == "fan_out":
+            # Phase 15.4 — multi-story branch. CheckboxGroup-equivalent
+            # in the CLI is a comma-separated list of indices.
+            banner(
+                f"PO CHECKPOINT (fan-out) — {len(payload.get('implied_stories', []))} "
+                "IMPLIED STORIES"
+            )
+            resume_value: object = collect_fanout_selection(payload)
+        elif "critical_ambiguities" in payload:
             critical = payload["critical_ambiguities"]
             banner(f"PO CHECKPOINT — {len(critical)} CRITICAL AMBIGUITY/IES")
             print("The graph has paused. Please answer the critical questions below.")
-            resume_value: object = collect_po_answers(critical)
+            resume_value = collect_po_answers(critical)
         elif "rendered_artifact" in payload:
             banner("STORY REVIEW CHECKPOINT — review the rendered story below")
             resume_value = collect_story_review_response(payload)
@@ -271,6 +317,19 @@ def main() -> None:
         for question, answer in po_answers.items():
             print(f"Q: {question}")
             print(f"A: {answer}\n")
+
+    # Phase 15.4 — fan-out terminal state: no final_artifact, no Reviewer.
+    # Print the lightweight stub list and exit successfully.
+    if "fan_out_stories" in result:
+        stubs = result["fan_out_stories"]
+        banner(f"FAN-OUT RESULT — {len(stubs)} BACKLOG STUBS")
+        for s in stubs:
+            print(f"- {s.title}\n    {s.summary}\n")
+        print(
+            "Re-run RTIA on any individual title above to get the deep "
+            "artifact (Description / Objective / ACs / Test Cases)."
+        )
+        return
 
     artifact = result["final_artifact"]
     banner("FINAL ARTIFACT (paste-ready markdown)")

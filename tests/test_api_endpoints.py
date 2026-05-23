@@ -172,3 +172,65 @@ def test_upload_markdown_roundtrip(client):
     body = r.json()
     assert body["text"].startswith("# Req")
     assert body["char_count"] == len(body["text"])
+
+
+def test_resume_routes_fanout_resume_shape(client, runner_mock):
+    """Phase 15.4 — resume with selected_story_titles → structured payload."""
+    runner_mock.get_state.return_value = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.PAUSED_PO,
+        payload={
+            "mode": "fan_out",
+            "implied_stories": [
+                {"title": "Story A", "summary": "a"},
+                {"title": "Story B", "summary": "b"},
+            ],
+            "critical_ambiguities": [],
+        },
+    )
+    runner_mock.resume.return_value = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.DONE_FANOUT,
+        payload={"fan_out_stories": [{"title": "Story A", "summary": "a"}]},
+    )
+    r = client.post(
+        "/pipeline/tid/resume",
+        headers=_auth(),
+        json={"selected_story_titles": ["Story A"]},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "done_fanout"
+    runner_mock.resume.assert_called_once_with(
+        "tid", {"selected_story_titles": ["Story A"], "answers": {}}
+    )
+
+
+def test_resume_fanout_empty_selection_passes_empty_list(client, runner_mock):
+    """Phase 15.4 / Q2 — None or empty selected_story_titles passes [] through."""
+    runner_mock.get_state.return_value = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.PAUSED_PO,
+        payload={
+            "mode": "fan_out",
+            "implied_stories": [{"title": "A", "summary": "a"}],
+            "critical_ambiguities": [],
+        },
+    )
+    runner_mock.resume.return_value = ThreadState(
+        thread_id="tid", status=ThreadStatus.DONE_FANOUT, payload={}
+    )
+    r = client.post("/pipeline/tid/resume", headers=_auth(), json={})
+    assert r.status_code == 200
+    runner_mock.resume.assert_called_once_with("tid", {"selected_story_titles": [], "answers": {}})
+
+
+def test_resume_deep_mode_still_requires_answers(client, runner_mock):
+    """Phase 15.4 — deep-mode PO checkpoint contract unchanged."""
+    runner_mock.get_state.return_value = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.PAUSED_PO,
+        payload={"mode": "deep", "critical_ambiguities": ["Q?"]},
+    )
+    r = client.post("/pipeline/tid/resume", headers=_auth(), json={"accepted": True})
+    assert r.status_code == 400

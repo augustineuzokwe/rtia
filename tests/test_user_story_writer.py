@@ -77,3 +77,50 @@ def test_rejects_response_with_legacy_role_want_benefit_schema():
     }
     with _mock_invoke(legacy), pytest.raises(ValidationError):
         write_user_story(ANALYST_OUTPUT, PO_ANSWERS)
+
+
+def test_write_user_story_renders_picked_story_in_prompt(monkeypatch):
+    """Phase 15.4 — when picked_story is set, the prompt must surface its title + summary."""
+    from unittest.mock import MagicMock, patch
+
+    from langchain_core.messages import AIMessage
+
+    from agents.requirements_analyst import AnalystOutput, ImpliedStory
+    from agents.user_story_writer import write_user_story
+
+    captured: list[str] = []
+
+    def _capture(**_kwargs):
+        m = MagicMock()
+
+        def _invoke(messages, **_):
+            captured.append(messages[1].content)
+            return AIMessage(content='{"description":"...","objective":"...","assumptions":[]}')
+
+        m.invoke.side_effect = _invoke
+        return m
+
+    analyst = AnalystOutput(
+        intent="multi-feature requirement",
+        actors=["QA engineer"],
+        ambiguities=[],
+        implied_stories=[
+            ImpliedStory(title="Quarantined tests dashboard", summary="dashboard story"),
+        ],
+    )
+    picked = ImpliedStory(title="Quarantined tests dashboard", summary="dashboard story")
+
+    with patch("agents.user_story_writer.ChatGoogleGenerativeAI", side_effect=_capture):
+        write_user_story(analyst, {"Which?": "dashboard"}, picked_story=picked)
+
+    assert len(captured) == 1
+    rendered = captured[0]
+    assert "Picked story" in rendered
+    assert "Quarantined tests dashboard" in rendered
+    assert "dashboard story" in rendered
+
+    # And the "(none)" placeholder when no pick is supplied.
+    captured.clear()
+    with patch("agents.user_story_writer.ChatGoogleGenerativeAI", side_effect=_capture):
+        write_user_story(analyst, {"Which?": "all"})
+    assert "(none)" in captured[0]
