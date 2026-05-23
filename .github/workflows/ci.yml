@@ -137,6 +137,14 @@ jobs:
       # CI run, and only on actually-flaky days. Median run still costs
       # $0.03. Threshold enforcement does NOT retry — a metric below
       # floor is a real signal worth investigating, not transient noise.
+      #
+      # timeout_minutes bumped to 10 (was 5) on PR #162: Gemini latency
+      # on GitHub-hosted runners exceeded the original 300s ceiling on
+      # consecutive runs, and the budget gate's 240s aggregate ceiling
+      # is the real quality signal. Workflow wall-clock now has ~360s
+      # slack over the budget, so a real budget regression still fails
+      # the next step (check_budgets.py) even though the workflow itself
+      # has more breathing room.
       - name: Run eval suite (with retry for transient 503s)
         if: steps.should_run.outputs.run == 'true'
         uses: nick-fields/retry@v4
@@ -144,7 +152,7 @@ jobs:
           # Keep this in sync with the Verify Gemini API key step above.
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 2
           retry_wait_seconds: 30
           command: uv run python evals/run_evals.py --report-path evals/reports/ci-run.json
