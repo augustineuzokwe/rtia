@@ -1,0 +1,174 @@
+"""Tests for FastAPI endpoints via TestClient with a mocked runner."""
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+import pytest
+from fastapi.testclient import TestClient
+
+from api.main import create_app
+from api.models import ThreadState, ThreadStatus
+
+TOKEN = "tok"
+
+
+@pytest.fixture
+def runner_mock():
+    return MagicMock()
+
+
+@pytest.fixture
+def client(runner_mock):
+    app = create_app(runner=runner_mock, token=TOKEN)
+    return TestClient(app)
+
+
+def _auth():
+    return {"Authorization": f"Bearer {TOKEN}"}
+
+
+def test_post_pipeline_returns_thread_state(client, runner_mock):
+    runner_mock.start.return_value = ThreadState(
+        thread_id="tid-1",
+        status=ThreadStatus.PAUSED_REVIEW,
+        payload={"rendered_artifact": "## Description\n..."},
+    )
+    r = client.post("/pipeline", headers=_auth(), json={"requirement_text": "some req"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["thread_id"] == "tid-1"
+    assert body["status"] == "paused_review"
+
+
+def test_post_pipeline_requires_non_empty_text(client):
+    r = client.post("/pipeline", headers=_auth(), json={"requirement_text": ""})
+    assert r.status_code == 422
+
+
+def test_get_pipeline_state(client, runner_mock):
+    runner_mock.get_state.return_value = ThreadState(
+        thread_id="tid", status=ThreadStatus.DONE, payload={"final_artifact": {}}
+    )
+    r = client.get("/pipeline/tid", headers=_auth())
+    assert r.status_code == 200
+    assert r.json()["status"] == "done"
+
+
+def test_resume_routes_po_answers(client, runner_mock):
+    runner_mock.get_state.return_value = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.PAUSED_PO,
+        payload={"critical_ambiguities": ["Q?"]},
+    )
+    runner_mock.resume.return_value = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.PAUSED_REVIEW,
+        payload={"rendered_artifact": "..."},
+    )
+    r = client.post(
+        "/pipeline/tid/resume",
+        headers=_auth(),
+        json={"answers": {"Q?": "A!"}},
+    )
+    assert r.status_code == 200
+    runner_mock.resume.assert_called_once_with("tid", {"Q?": "A!"})
+
+
+def test_resume_review_accept(client, runner_mock):
+    runner_mock.get_state.return_value = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.PAUSED_REVIEW,
+        payload={"rendered_artifact": "..."},
+    )
+    runner_mock.resume.return_value = ThreadState(
+        thread_id="tid", status=ThreadStatus.DONE, payload={}
+    )
+    r = client.post("/pipeline/tid/resume", headers=_auth(), json={"accepted": True})
+    assert r.status_code == 200
+    runner_mock.resume.assert_called_once_with("tid", {"accepted": True})
+
+
+def test_resume_review_override(client, runner_mock):
+    runner_mock.get_state.return_value = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.PAUSED_REVIEW,
+        payload={"rendered_artifact": "..."},
+    )
+    runner_mock.resume.return_value = ThreadState(
+        thread_id="tid", status=ThreadStatus.DONE, payload={}
+    )
+    r = client.post(
+        "/pipeline/tid/resume",
+        headers=_auth(),
+        json={"accepted": False, "description": "new d", "objective": "new o"},
+    )
+    assert r.status_code == 200
+    runner_mock.resume.assert_called_once_with(
+        "tid",
+        {"accepted": False, "description": "new d", "objective": "new o"},
+    )
+
+
+def test_resume_rejects_when_thread_not_paused(client, runner_mock):
+    runner_mock.get_state.return_value = ThreadState(
+        thread_id="tid", status=ThreadStatus.DONE, payload={}
+    )
+    r = client.post("/pipeline/tid/resume", headers=_auth(), json={"accepted": True})
+    assert r.status_code == 409
+
+
+def test_resume_po_requires_answers_field(client, runner_mock):
+    runner_mock.get_state.return_value = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.PAUSED_PO,
+        payload={"critical_ambiguities": ["Q?"]},
+    )
+    r = client.post("/pipeline/tid/resume", headers=_auth(), json={"accepted": True})
+    assert r.status_code == 400
+
+
+def test_export_markdown_returns_404_before_composer(client, runner_mock):
+    runner_mock.render_markdown.return_value = None
+    r = client.get("/pipeline/tid/export.md", headers=_auth())
+    assert r.status_code == 404
+
+
+def test_export_markdown_returns_markdown(client, runner_mock):
+    runner_mock.render_markdown.return_value = "## Description\nbody"
+    r = client.get("/pipeline/tid/export.md", headers=_auth())
+    assert r.status_code == 200
+    assert r.text == "## Description\nbody"
+    assert r.headers["content-type"].startswith("text/markdown")
+    assert "attachment" in r.headers["content-disposition"]
+
+
+def test_upload_pdf_rejects_scanned(client):
+    import io
+
+    from pypdf import PdfWriter
+
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    buf = io.BytesIO()
+    writer.write(buf)
+    r = client.post(
+        "/uploads/pdf",
+        headers=_auth(),
+        files={"file": ("blank.pdf", buf.getvalue(), "application/pdf")},
+    )
+    assert r.status_code == 422
+    body = r.json()
+    assert "scanned_pdf" in str(body["detail"]) or "scanned" in str(body["detail"]).lower()
+
+
+def test_upload_markdown_roundtrip(client):
+    r = client.post(
+        "/uploads/markdown",
+        headers=_auth(),
+        files={"file": ("req.md", b"# Req\n\nAs a user...", "text/markdown")},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["text"].startswith("# Req")
+    assert body["char_count"] == len(body["text"])

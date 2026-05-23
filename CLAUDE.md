@@ -57,9 +57,12 @@ uv run pre-commit run --all-files    # format + lint everything
 uv run python scripts/run_pipeline_demo.py            # default sample-01
 uv run python scripts/run_pipeline_demo.py sample-02-vague-ambiguous.md
 uv run python scripts/run_pipeline_demo.py sample-03-multi-feature.md
+uv run python scripts/run_api.py                       # FastAPI + Gradio UI at http://127.0.0.1:8000/?token=…
 ```
 
 The demo requires `ANTHROPIC_API_KEY` in `.env` (see `.env.example`). LangSmith tracing is optional — set `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY=lsv2_pt_…` + `LANGSMITH_PROJECT=rtia` to enable.
+
+**API token (`RTIA_API_TOKEN`, Phase 14):** the `run_api.py` entrypoint mints a fresh URL-safe bearer token per process unless `RTIA_API_TOKEN` is set in `.env`. The token gates all `/pipeline*` and `/uploads/*` endpoints (`Authorization: Bearer <token>`) and the Gradio mount accepts it via `?token=…` so the printed startup URL is one-click. Set `RTIA_API_HOST` / `RTIA_API_PORT` to override the default `127.0.0.1:8000`.
 
 **Environment mode (`RTIA_ENV`, Phase 12.4):** controls the production-tracing guard. Allowed values: `development` (default when unset), `ci`, `production`. When `RTIA_ENV=production` AND `LANGSMITH_TRACING=true`, the demo and any entry point calling `assert_safe_for_env()` refuse to start to prevent requirement text (potentially containing customer PII) from being persisted to LangSmith. See [docs/adr-0008-pii-langsmith.md](docs/adr-0008-pii-langsmith.md).
 
