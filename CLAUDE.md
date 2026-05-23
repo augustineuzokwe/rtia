@@ -48,7 +48,7 @@ rtia/
 ├── api/                   # FastAPI app + bearer-token auth + exporters bridge (Phase 14)
 ├── ui/                    # Gradio Blocks UI mounted at / (Phase 14)
 ├── exporters/             # Jira + GitHub backends behind one Exporter Protocol (Phase 15.2)
-└── docs/                  # ADRs + USAGE.md (Phase 16)
+└── docs/                  # ADRs + USAGE.md (Phase 16) + UI_CONTRACT.md (developer-facing UI rules, #186)
 ```
 
 `agents/` and `prompts/` mirror 1:1 — each agent owns one prompts module.
@@ -234,6 +234,7 @@ Don't start work on a phase without first reading the relevant section of the pl
 - **msgpack deserialization warning** — `AnalystOutput` etc. need to be registered for checkpointing. Phase 2.2 fixes; until then, the warning is benign noise.
 - **`gemini-3.5-flash` is an alias** — not pinned to a date. When Google publishes dated suffixes for the 3.5 line, bump `DEFAULT_MODEL` for reproducibility. Same caveat applied to `gemini-2.5-flash` before the ADR-0007 switch.
 - **Gemini 503s are backend-pool specific, not global.** A Gemini model alias that 503s on GitHub-hosted runners can simultaneously respond fine from a maintainer laptop — Google routes runner IP ranges to a specific backend pool. When a 503 storm hits, probe sibling models live (`client.models.list()` + a 1-token `invoke`) before assuming Google is globally down. See ADR-0007 §"What we proved with live probing".
+- **UI panel visibility is a contract, not free-form** — issues #170 / #176 / #178 / #186 were all reactive patches around `ui/gradio_app.py` state-to-panel mapping. Before any change to a `gr.update(visible=…)` or to `_state_to_panels` / `_SPREAD_KEYS` / `outputs`, read [docs/UI_CONTRACT.md](docs/UI_CONTRACT.md) — it's short and lists the invariants the audit landed on.
 
 ---
 
