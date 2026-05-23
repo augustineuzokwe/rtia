@@ -270,7 +270,7 @@ def composer_node(state: PipelineState) -> dict:
     return {"final_artifact": artifact}
 
 
-def _deferred_implied_stories(state: PipelineState) -> list[ImpliedStory]:
+def deferred_implied_stories(state: PipelineState) -> list[ImpliedStory]:
     """Pick out the implied stories the PO deferred at the PO checkpoint.
 
     When the Analyst flags a multi-story requirement, the PO checkpoint
@@ -321,7 +321,7 @@ def reviewer_node(state: PipelineState) -> dict:
     flagging deferred behaviours as coverage gaps (LEARNINGS #31).
     """
     artifact = state["final_artifact"]
-    deferred = _deferred_implied_stories(state)
+    deferred = deferred_implied_stories(state)
     report = review_artifact(state["requirement_text"], artifact, deferred_stories=deferred)
 
     summary_parts = []
@@ -477,6 +477,7 @@ def build_stub_artifact_from_error(error: PipelineStepError) -> FinalUserStory:
 # Re-export the types we allowlist so callers (tests, future eval harness)
 # can compare against the contract without reaching into agent modules.
 __all__ = [
+    "deferred_implied_stories",
     "AcGeneratorOutput",
     "AcceptanceCriterion",
     "Ambiguity",

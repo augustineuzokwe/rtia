@@ -154,6 +154,47 @@ def test_runner_render_markdown_returns_none_before_composer():
         assert runner.render_markdown(paused.thread_id) is None
 
 
+def test_runner_done_payload_includes_deferred_stories():
+    """Phase 15.3 — DONE state surfaces the implied stories the PO didn't pick.
+
+    The Analyst returns 3 implied stories, PO picks "Story A", runner
+    completes the pipeline. The DONE-state payload's
+    ``deferred_stories`` must contain B and C but not A.
+    """
+    analyst = {
+        "intent": "Goal",
+        "actors": ["User"],
+        "ambiguities": [
+            {
+                "question": (
+                    "This requirement implies 3 stories: [Story A, Story B, "
+                    "Story C]. Which single story should this issue cover?"
+                ),
+                "severity": "critical",
+            }
+        ],
+        "implied_stories": [
+            {"title": "Story A", "summary": "first"},
+            {"title": "Story B", "summary": "second"},
+            {"title": "Story C", "summary": "third"},
+        ],
+    }
+    pipeline, stack = _patched_pipeline(analyst)
+    with stack:
+        runner = PipelineRunner(pipeline)
+        paused = runner.start("requirement")
+        assert paused.status == ThreadStatus.PAUSED_PO
+        po_question = paused.payload["critical_ambiguities"][0]
+        review = runner.resume(paused.thread_id, {po_question: "Story A"})
+        assert review.status == ThreadStatus.PAUSED_REVIEW
+        done = runner.resume(paused.thread_id, {"accepted": True})
+
+    assert done.status == ThreadStatus.DONE
+    deferred = done.payload["deferred_stories"]
+    deferred_titles = {s["title"] for s in deferred}
+    assert deferred_titles == {"Story B", "Story C"}
+
+
 def test_runner_render_markdown_returns_string_when_done():
     analyst = {"intent": "Goal", "actors": ["User"], "ambiguities": []}
     pipeline, stack = _patched_pipeline(analyst)

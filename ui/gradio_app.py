@@ -42,6 +42,34 @@ from exporters.base import (
 )
 
 
+def _build_followup_markdown(title: str, summary: str, requirement_text: str) -> str:
+    """Compose the body of a deferred follow-up issue.
+
+    Mirrors ``api.main._build_deferred_followup_markdown`` so the UI
+    in-process path and the API endpoint produce identical issue bodies.
+    Kept in two places because both consumers live behind their own
+    surface; consolidating would require a circular-import dance.
+    """
+    excerpt = (requirement_text or "").strip()
+    if len(excerpt) > 800:
+        excerpt = excerpt[:800].rstrip() + "…"
+    parts = [
+        f"## {title}",
+        "",
+        summary,
+        "",
+        "## Provenance",
+        (
+            "_Deferred from an RTIA run on a multi-story requirement. "
+            "Re-run RTIA on this title once you're ready to flesh out the "
+            "full Description / Objective / ACs / Test Cases._"
+        ),
+    ]
+    if excerpt:
+        parts.extend(["", "## Originating requirement (excerpt)", "", excerpt])
+    return "\n".join(parts)
+
+
 def _runner(app: FastAPI) -> PipelineRunner:
     return app.state.runner
 
@@ -54,7 +82,7 @@ def _state_to_panels(state) -> dict[str, Any]:
     readable.
     """
     status_label = f"Status: **{state.status.value}**"
-    base = {
+    base: dict[str, Any] = {
         "status_md": status_label,
         "thread_id_state": state.thread_id,
         "po_visible": gr.update(visible=False),
@@ -64,6 +92,10 @@ def _state_to_panels(state) -> dict[str, Any]:
         "review_preview": gr.update(value=""),
         "result_md": gr.update(value=""),
         "download_file": gr.update(value=None, visible=False),
+        "deferred_visible": gr.update(visible=False),
+        "deferred_md": gr.update(value=""),
+        "deferred_checkboxes": gr.update(choices=[], value=[], visible=False),
+        "deferred_titles": [],
     }
 
     if state.status == ThreadStatus.PAUSED_PO:
@@ -91,6 +123,24 @@ def _state_to_panels(state) -> dict[str, Any]:
         ) as fh:
             fh.write(rendered)
             base["download_file"] = gr.update(value=fh.name, visible=True)
+        # Phase 15.3 — surface deferred implied stories so the PO can
+        # batch-create follow-up issues from the same panel.
+        deferred = state.payload.get("deferred_stories") or []
+        base["deferred_titles"] = [s["title"] for s in deferred]
+        base["deferred_visible"] = gr.update(visible=bool(deferred))
+        if deferred:
+            md_lines = ["### Deferred stories", ""]
+            for s in deferred:
+                md_lines.append(f"- **{s['title']}** — {s['summary']}")
+            base["deferred_md"] = gr.update(value="\n".join(md_lines))
+            base["deferred_checkboxes"] = gr.update(
+                choices=[s["title"] for s in deferred],
+                value=[s["title"] for s in deferred],
+                visible=True,
+            )
+        else:
+            base["deferred_md"] = gr.update(value="")
+            base["deferred_checkboxes"] = gr.update(choices=[], value=[], visible=False)
     elif state.status == ThreadStatus.ERROR:
         rendered = state.payload.get("rendered_artifact", "")
         base["result_visible"] = gr.update(visible=True)
@@ -170,6 +220,20 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             export_btn = gr.Button("Push to backlog", variant="primary")
             export_result_md = gr.Markdown("")
 
+        # Deferred-stories panel (Phase 15.3) — only visible when the
+        # Analyst flagged multiple implied stories and the PO scoped
+        # the main artifact to one of them.
+        with gr.Group(visible=False) as deferred_panel:
+            deferred_md = gr.Markdown("")
+            deferred_checkboxes = gr.CheckboxGroup(
+                choices=[],
+                value=[],
+                label="Create follow-up issues for these deferred stories:",
+                visible=False,
+            )
+            export_deferred_btn = gr.Button("Create follow-up issues", variant="primary")
+            export_deferred_result_md = gr.Markdown("")
+
         # ----- event handlers --------------------------------------
 
         def _spread(state):
@@ -184,6 +248,9 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
                 mapping["result_visible"],
                 mapping["result_md"],
                 mapping["download_file"],
+                mapping["deferred_visible"],
+                mapping["deferred_md"],
+                mapping["deferred_checkboxes"],
             )
 
         outputs = [
@@ -196,6 +263,9 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             result_panel,
             result_md,
             download_file,
+            deferred_panel,
+            deferred_md,
+            deferred_checkboxes,
         ]
 
         def on_upload_pdf(f):
@@ -317,6 +387,79 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
                 export_dry_run,
             ],
             [export_result_md],
+        )
+
+        def on_export_deferred(thread_id, backend, target, extra, dry_run, selected_titles):
+            """Batch-create follow-up issues for the deferred implied stories.
+
+            Reuses the same backend dropdown + target fields from the
+            single-export form. ``selected_titles`` is the checkbox-group
+            value (a subset of the deferred titles). Empty selection ⇒
+            create issues for ALL deferred stories.
+            """
+            loaded = _runner(app).get_deferred_stories_and_context(thread_id)
+            if loaded is None:
+                return "❌ No thread state."
+            deferred, requirement_text = loaded
+            if not deferred:
+                return "_No deferred stories — nothing to create._"
+
+            include_titles = selected_titles or [s.title for s in deferred]
+
+            target = (target or "").strip()
+            extra = (extra or "").strip()
+            if backend == "jira":
+                tgt = ExportTarget(
+                    backend="jira",
+                    jira_project_key=target or None,
+                    jira_parent_key=extra or None,
+                )
+            else:
+                tgt = ExportTarget(
+                    backend="github",
+                    github_repo=target or None,
+                    github_project_number=int(extra) if extra.isdigit() else None,
+                )
+
+            try:
+                exporter = make_exporter(backend)
+            except ExportConfigError as exc:
+                return f"❌ Config error: {exc}"
+
+            include_lower = {t.lower() for t in include_titles}
+            lines: list[str] = []
+            for story in deferred:
+                if story.title.lower() not in include_lower:
+                    continue
+                body = _build_followup_markdown(story.title, story.summary, requirement_text)
+                try:
+                    result = exporter.export(body, tgt, title=story.title, dry_run=bool(dry_run))
+                except (ExportConfigError, ExporterTransportError) as exc:
+                    lines.append(f"- ❌ **{story.title}**: {exc}")
+                    continue
+                if result.dry_run:
+                    lines.append(f"- 📋 **{story.title}** (dry-run, would push)")
+                elif result.success:
+                    if result.url:
+                        lines.append(f"- ✅ **{story.title}** → [{result.key}]({result.url})")
+                    else:
+                        lines.append(f"- ✅ **{story.title}** (no URL returned)")
+                else:
+                    lines.append(f"- ❌ **{story.title}**: {result.error}")
+
+            return "\n".join(lines) if lines else "_Nothing exported._"
+
+        export_deferred_btn.click(
+            on_export_deferred,
+            [
+                thread_id_state,
+                export_backend,
+                export_target,
+                export_extra,
+                export_dry_run,
+                deferred_checkboxes,
+            ],
+            [export_deferred_result_md],
         )
         review_override.click(
             on_review_override,
