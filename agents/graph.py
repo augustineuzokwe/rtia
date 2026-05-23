@@ -270,6 +270,43 @@ def composer_node(state: PipelineState) -> dict:
     return {"final_artifact": artifact}
 
 
+def _deferred_implied_stories(state: PipelineState) -> list[ImpliedStory]:
+    """Pick out the implied stories the PO deferred at the PO checkpoint.
+
+    When the Analyst flags a multi-story requirement, the PO checkpoint
+    asks "which single story should this issue cover?" and stores the
+    PO's answer in ``state["po_answers"]``. Everything in
+    ``analyst_output.implied_stories`` whose title does NOT appear in
+    any PO answer is treated as deferred — those are the behaviours the
+    PO has indicated will become separate issues, and the Reviewer must
+    NOT flag them as coverage gaps (LEARNINGS #31).
+
+    Match is case-insensitive substring on the story title against the
+    concatenated PO answers. This is intentionally loose — POs may
+    answer "Slack notifications" when the story title is "Slack
+    notifications for auto-quarantine changes", and we want that to
+    count as picked, not deferred.
+
+    Returns the full ``implied_stories`` list when the PO checkpoint
+    never fired (no critical ambiguities) — that's the "all 4 stories
+    are still in play, none picked" case. Caller (the Reviewer) treats
+    it as story-level scoping context; an empty-list result means
+    no story-level scoping happened at all (single-feature requirement).
+    """
+    analyst = state.get("analyst_output")
+    if analyst is None or not analyst.implied_stories:
+        return []
+    po_answers = state.get("po_answers") or {}
+    answers_blob = " | ".join(a.lower() for a in po_answers.values() if a)
+    if not answers_blob:
+        # PO checkpoint never fired (or fired with empty answers).
+        # Conservative: every implied story is in play; nothing is
+        # deferred. Returning [] keeps the Reviewer's old behaviour
+        # for non-multi-story runs untouched.
+        return []
+    return [s for s in analyst.implied_stories if s.title.lower() not in answers_blob]
+
+
 def reviewer_node(state: PipelineState) -> dict:
     """Run the Reviewer on the assembled artifact.
 
@@ -278,9 +315,14 @@ def reviewer_node(state: PipelineState) -> dict:
     demo can inspect individual fields. Also appends a one-line quality
     summary to final_artifact.metadata so the rendered markdown always
     surfaces review notes alongside the artifact.
+
+    Phase 15.1 — scope-aware. Passes any implied stories the PO deferred
+    at the PO checkpoint into ``review_artifact`` so the Reviewer stops
+    flagging deferred behaviours as coverage gaps (LEARNINGS #31).
     """
     artifact = state["final_artifact"]
-    report = review_artifact(state["requirement_text"], artifact)
+    deferred = _deferred_implied_stories(state)
+    report = review_artifact(state["requirement_text"], artifact, deferred_stories=deferred)
 
     summary_parts = []
     if report.coverage_gaps:
