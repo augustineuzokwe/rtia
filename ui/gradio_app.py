@@ -108,6 +108,24 @@ def _state_to_panels(state) -> dict[str, Any]:
     Returned as a dict the caller spreads into the relevant outputs;
     keeping the mapping in one place keeps the event handlers below
     readable.
+
+    Panel-visibility flags (one per gated group):
+
+    - ``po_visible`` — PO checkpoint inputs
+    - ``review_visible`` — Story review checkpoint
+    - ``result_visible`` — Rendered artifact / fan-out stub list
+    - ``backlog_visible`` — Shared "Backlog target" config form
+      (backend / target / extras / dry-run). Visible on both terminal
+      success states; hidden on ERROR so the user can't pre-fill a form
+      that connects to nothing actionable. See issue #186 §6.1.
+    - ``deep_export_visible`` — "Push to backlog" button (deep flow only)
+    - ``deferred_visible`` — Deferred/fan-out follow-up panel
+    - ``error_visible`` — Dedicated error panel (sibling of
+      ``result_panel``); replaces the prior pattern of overloading
+      ``result_panel`` with the error message.
+    - ``run_btn_interactive`` — ``False`` while a thread is active so
+      the Run button can't silently orphan an in-flight run (issue #186
+      §6.4).
     """
     status_label = f"Status: **{state.status.value}**"
     base: dict[str, Any] = {
@@ -116,13 +134,15 @@ def _state_to_panels(state) -> dict[str, Any]:
         "po_visible": gr.update(visible=False),
         "review_visible": gr.update(visible=False),
         "result_visible": gr.update(visible=False),
-        # Phase 16 hotfix — deep-flow export form has its own visibility so
-        # it stays hidden on DONE_FANOUT (where no deep artifact exists).
-        # See ADR-0010 and issue #175 for context.
+        "backlog_visible": gr.update(visible=False),
+        # Deep-flow export button: visible only on DONE. See ADR-0010
+        # and issue #175 for context.
         "deep_export_visible": gr.update(visible=False),
+        "error_visible": gr.update(visible=False),
+        "error_md": gr.update(value=""),
+        "run_btn_interactive": gr.update(interactive=True),
         "po_questions": gr.update(value=""),
         "po_answers_visible": gr.update(visible=True),
-        "po_fanout_visible": gr.update(visible=False),
         "po_fanout_checkboxes": gr.update(choices=[], value=[], visible=False),
         "po_paused_payload": {},
         "review_preview": gr.update(value=""),
@@ -131,8 +151,17 @@ def _state_to_panels(state) -> dict[str, Any]:
         "deferred_visible": gr.update(visible=False),
         "deferred_md": gr.update(value=""),
         "deferred_checkboxes": gr.update(choices=[], value=[], visible=False),
-        "deferred_titles": [],
     }
+
+    # Lock the Run button whenever a thread is active so clicking it
+    # can't orphan in-flight work (#186 §6.4). Terminal and error states
+    # leave the button enabled — the user is free to start a fresh run.
+    if state.status in (
+        ThreadStatus.RUNNING,
+        ThreadStatus.PAUSED_PO,
+        ThreadStatus.PAUSED_REVIEW,
+    ):
+        base["run_btn_interactive"] = gr.update(interactive=False)
 
     if state.status == ThreadStatus.PAUSED_PO:
         mode = state.payload.get("mode", "deep")
@@ -165,7 +194,6 @@ def _state_to_panels(state) -> dict[str, Any]:
                 )
                 preview_lines.extend(f"{i + 1}. {q}" for i, q in enumerate(questions))
             base["po_questions"] = gr.update(value="\n".join(preview_lines))
-            base["po_fanout_visible"] = gr.update(visible=True)
             base["po_fanout_checkboxes"] = gr.update(
                 choices=[s["title"] for s in stories],
                 value=[s["title"] for s in stories],
@@ -181,15 +209,17 @@ def _state_to_panels(state) -> dict[str, Any]:
                     "answer each on a separate line, in order:\n\n" + formatted
                 )
             )
-            base["po_fanout_visible"] = gr.update(visible=False)
     elif state.status == ThreadStatus.PAUSED_REVIEW:
         base["review_visible"] = gr.update(visible=True)
         base["review_preview"] = gr.update(value=state.payload.get("rendered_artifact", ""))
     elif state.status == ThreadStatus.DONE:
         rendered = state.payload.get("rendered_artifact", "")
         base["result_visible"] = gr.update(visible=True)
+        # Shared backlog-target form is visible on both success terminals
+        # (used by deep export AND fan-out follow-up exports).
+        base["backlog_visible"] = gr.update(visible=True)
         # Deep flow produced an artifact — the single-artifact "Push to
-        # backlog" form is the right control here.
+        # backlog" button is the right control here.
         base["deep_export_visible"] = gr.update(visible=True)
         base["result_md"] = gr.update(value=rendered)
         # write a temp .md the user can click to download
@@ -203,7 +233,6 @@ def _state_to_panels(state) -> dict[str, Any]:
         # Phase 15.3 — surface deferred implied stories so the PO can
         # batch-create follow-up issues from the same panel.
         deferred = state.payload.get("deferred_stories") or []
-        base["deferred_titles"] = [s["title"] for s in deferred]
         base["deferred_visible"] = gr.update(visible=bool(deferred))
         if deferred:
             md_lines = ["### Deferred stories", ""]
@@ -224,8 +253,11 @@ def _state_to_panels(state) -> dict[str, Any]:
         # CheckboxGroup + Push-to-backlog flow.
         stubs = state.payload.get("fan_out_stories") or []
         base["result_visible"] = gr.update(visible=True)
+        # Shared backlog-target form is visible — the fan-out export
+        # below reads from the same fields.
+        base["backlog_visible"] = gr.update(visible=True)
         # No deep artifact in fan-out mode — keep the single-artifact
-        # "Push to backlog" form hidden so the PO uses the correct
+        # "Push to backlog" button hidden so the PO uses the correct
         # "Create follow-up issues" control below.
         base["deep_export_visible"] = gr.update(visible=False)
         md_lines = [
@@ -249,9 +281,42 @@ def _state_to_panels(state) -> dict[str, Any]:
                 visible=True,
             )
     elif state.status == ThreadStatus.ERROR:
+        # #186 §6.1 — ERROR no longer rides on ``result_panel``. Routing
+        # to a dedicated ``error_panel`` keeps the "Backlog target"
+        # form (a child of ``result_panel``) hidden, so the user can't
+        # pre-fill inputs that connect to nothing actionable.
         rendered = state.payload.get("rendered_artifact", "")
-        base["result_visible"] = gr.update(visible=True)
-        base["result_md"] = gr.update(value=f"**Pipeline error.**\n\n{rendered}")
+        base["error_visible"] = gr.update(visible=True)
+        body = (
+            f"### Pipeline error\n\n{rendered}\n\n"
+            "_Re-edit the requirement above and click **Run pipeline** "
+            "to try again._"
+            if rendered
+            else (
+                "### Pipeline error\n\n"
+                "The pipeline failed without a recoverable message. "
+                "Re-edit the requirement above and click **Run pipeline** "
+                "to try again."
+            )
+        )
+        base["error_md"] = gr.update(value=body)
+    elif state.status == ThreadStatus.RUNNING:
+        # Transient state — no panels open. Kept as an explicit branch
+        # so future affordances (spinner, partial preview) have a home
+        # and don't have to share a fallthrough with the idle path.
+        pass
+    else:
+        # #186 §R6 — unknown status. Failing loud here means a future
+        # graph change that adds a status surfaces visibly instead of
+        # silently rendering every panel hidden.
+        base["error_visible"] = gr.update(visible=True)
+        base["error_md"] = gr.update(
+            value=(
+                f"### Unknown pipeline status: `{state.status!r}`\n\n"
+                "This is a bug — please report it with the status value "
+                "above and the input that produced it."
+            )
+        )
     return base
 
 
@@ -312,52 +377,53 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
                 label="New objective (leave blank to keep)", lines=2, visible=True
             )
 
-        # Result panel.
+        # Result panel — artifact preview + download only.
         with gr.Group(visible=False) as result_panel:
             result_md = gr.Markdown("")
             download_file = gr.File(label="Download markdown", visible=False)
 
-            # Shared export configuration. The four fields below
-            # (backend, target, extra, dry_run) drive BOTH the deep-flow
-            # "Push to backlog" button AND the fan-out "Create follow-up
-            # issues" button. They must therefore be visible whenever
-            # ``result_panel`` is — i.e. on ``DONE`` and on
-            # ``DONE_FANOUT``. PR #176 originally nested them inside
-            # ``deep_export_panel`` (issue #175 fix), which silently
-            # stuck the fan-out flow in dry-run because the user
-            # couldn't see the checkbox. Issue #177 lifted them out to
-            # this shared group.
-            with gr.Group():
-                gr.Markdown("---\n### Backlog target")
-                export_backend = gr.Dropdown(
-                    choices=["jira", "github"],
-                    value="github",
-                    label="Backend",
-                )
-                export_target = gr.Textbox(
-                    label="Target (Jira: project key e.g. 'RTIA' | GitHub: repo 'owner/name')",
-                    value="augustineuzokwe/rtia",
-                )
-                export_extra = gr.Textbox(
-                    label=(
-                        "Optional: Jira parent epic key (e.g. 'RTIA-1') OR "
-                        "GitHub project number (e.g. '5')"
-                    ),
-                    value="",
-                )
-                export_dry_run = gr.Checkbox(
-                    label="Dry run (build payload, don't send)", value=True
-                )
+        # Error panel — sibling of ``result_panel``, NOT a child. This
+        # split is the #186 §6.1 fix: previously the ERROR branch
+        # toggled ``result_panel`` (which carries the "Backlog target"
+        # form as a child), so the user saw an actionable-looking form
+        # connected to nothing on every pipeline failure.
+        with gr.Group(visible=False) as error_panel:
+            error_md = gr.Markdown("")
 
-            # Deep-flow export trigger. Hidden on ``DONE_FANOUT`` because
-            # the single-artifact endpoint has nothing to push in
-            # fan-out mode (see ADR-0010). The shared config above
-            # stays visible regardless so the fan-out user can still
-            # configure the destination.
-            with gr.Group(visible=False) as deep_export_panel:
-                gr.Markdown("### Push the deep-flow artifact")
-                export_btn = gr.Button("Push to backlog", variant="primary")
-                export_result_md = gr.Markdown("")
+        # Shared export configuration. The four fields below drive BOTH
+        # the deep-flow "Push to backlog" button AND the fan-out
+        # "Create follow-up issues" button. Lifted to its own gated
+        # group (#186 §R3 / §6.1) with an independent ``backlog_visible``
+        # flag — visible on DONE and DONE_FANOUT, hidden on ERROR.
+        with gr.Group(visible=False) as backlog_target_panel:
+            gr.Markdown("---\n### Backlog target")
+            export_backend = gr.Dropdown(
+                choices=["jira", "github"],
+                value="github",
+                label="Backend",
+            )
+            export_target = gr.Textbox(
+                label="Target (Jira: project key e.g. 'RTIA' | GitHub: repo 'owner/name')",
+                value="augustineuzokwe/rtia",
+            )
+            export_extra = gr.Textbox(
+                label=(
+                    "Optional: Jira parent epic key (e.g. 'RTIA-1') OR "
+                    "GitHub project number (e.g. '5')"
+                ),
+                value="",
+            )
+            export_dry_run = gr.Checkbox(label="Dry run (build payload, don't send)", value=True)
+
+        # Deep-flow export trigger. Hidden on ``DONE_FANOUT`` because
+        # the single-artifact endpoint has nothing to push in fan-out
+        # mode (see ADR-0010). ``backlog_target_panel`` above stays
+        # visible regardless so the fan-out user can still configure
+        # the destination for the follow-up exports below.
+        with gr.Group(visible=False) as deep_export_panel:
+            gr.Markdown("### Push the deep-flow artifact")
+            export_btn = gr.Button("Push to backlog", variant="primary")
+            export_result_md = gr.Markdown("")
 
         # Deferred-stories panel (Phase 15.3) — only visible when the
         # Analyst flagged multiple implied stories and the PO scoped
@@ -375,26 +441,38 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
 
         # ----- event handlers --------------------------------------
 
+        # ``_SPREAD_KEYS`` and ``outputs`` are positionally-aligned by
+        # convention; the tuple Gradio receives must hand each update
+        # to the right component or the UI breaks silently (#186 §R1).
+        # Sourcing both from a single keys list catches misalignment at
+        # build time and is exercised by the alignment test in
+        # tests/test_ui_state_panels.py.
+        _SPREAD_KEYS = (
+            "status_md",
+            "thread_id_state",
+            "po_visible",
+            "po_questions",
+            "po_fanout_checkboxes",
+            "po_answers_visible",
+            "po_paused_payload",
+            "review_visible",
+            "review_preview",
+            "result_visible",
+            "result_md",
+            "download_file",
+            "backlog_visible",
+            "deep_export_visible",
+            "deferred_visible",
+            "deferred_md",
+            "deferred_checkboxes",
+            "error_visible",
+            "error_md",
+            "run_btn_interactive",
+        )
+
         def _spread(state):
             mapping = _state_to_panels(state)
-            return (
-                mapping["status_md"],
-                mapping["thread_id_state"],
-                mapping["po_visible"],
-                mapping["po_questions"],
-                mapping["po_fanout_checkboxes"],
-                mapping["po_answers_visible"],
-                mapping["po_paused_payload"],
-                mapping["review_visible"],
-                mapping["review_preview"],
-                mapping["result_visible"],
-                mapping["result_md"],
-                mapping["download_file"],
-                mapping["deep_export_visible"],
-                mapping["deferred_visible"],
-                mapping["deferred_md"],
-                mapping["deferred_checkboxes"],
-            )
+            return tuple(mapping[k] for k in _SPREAD_KEYS)
 
         outputs = [
             status_md,
@@ -409,11 +487,19 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             result_panel,
             result_md,
             download_file,
+            backlog_target_panel,
             deep_export_panel,
             deferred_panel,
             deferred_md,
             deferred_checkboxes,
+            error_panel,
+            error_md,
+            run_btn,
         ]
+        assert len(outputs) == len(_SPREAD_KEYS), (
+            "outputs/_SPREAD_KEYS length mismatch — every key must have "
+            "a positionally-matched Gradio component"
+        )
 
         def on_upload_pdf(f):
             if f is None:
@@ -442,7 +528,32 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
 
         def on_run(text):
             if not (text or "").strip():
-                return _spread(_RUNNER_IDLE_STATE)
+                # Empty input — no thread is started, every gated panel
+                # stays hidden, Run stays enabled. We return raw
+                # gr.update objects positionally so we don't have to
+                # invent an "idle" ThreadStatus (#186 §6.2).
+                return (
+                    gr.update(value="Status: **idle**"),  # status_md
+                    "",  # thread_id_state
+                    gr.update(visible=False),  # po_panel
+                    gr.update(value=""),  # po_questions
+                    gr.update(choices=[], value=[], visible=False),  # po_fanout_checkboxes
+                    gr.update(visible=True),  # po_answers
+                    {},  # po_paused_payload_state
+                    gr.update(visible=False),  # review_panel
+                    gr.update(value=""),  # review_preview
+                    gr.update(visible=False),  # result_panel
+                    gr.update(value=""),  # result_md
+                    gr.update(value=None, visible=False),  # download_file
+                    gr.update(visible=False),  # backlog_target_panel
+                    gr.update(visible=False),  # deep_export_panel
+                    gr.update(visible=False),  # deferred_panel
+                    gr.update(value=""),  # deferred_md
+                    gr.update(choices=[], value=[], visible=False),  # deferred_checkboxes
+                    gr.update(visible=False),  # error_panel
+                    gr.update(value=""),  # error_md
+                    gr.update(interactive=True),  # run_btn
+                )
             state = _runner(app).start(text)
             return _spread(state)
 
@@ -655,17 +766,6 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
         )
 
     return blocks
-
-
-class _IdleState:
-    """Placeholder ThreadState-shaped object for the pre-run UI."""
-
-    status = ThreadStatus.RUNNING  # the panels treat anything non-paused as idle
-    thread_id = ""
-    payload: dict = {}
-
-
-_RUNNER_IDLE_STATE = _IdleState()
 
 
 __all__ = ["build_blocks"]
