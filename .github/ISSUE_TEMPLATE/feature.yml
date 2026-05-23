@@ -1,0 +1,43 @@
+name: Feature / enhancement
+description: Propose a change to RTIA's behaviour, scope, or developer experience.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening: check whether the work belongs under an existing Epic
+        (see issues labeled `Epic:*`). If so, link it. If not, the maintainer
+        will help place it.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is the user-visible gap or pain point? Be concrete.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: |
+        How should RTIA behave differently? Sketch the interface, prompt change,
+        or pipeline edit. A rough idea is fine — this is a starting point.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: |
+        What would prove the change works? Use Given/When/Then if it helps —
+        these flow directly into the eventual user story.
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches and why they were rejected (or deferred).
+    validations:
+      required: false
