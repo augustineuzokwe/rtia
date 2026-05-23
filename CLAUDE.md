@@ -17,7 +17,18 @@ A multi-agent AI assistant that turns raw software requirements (feature request
 
 The artifact is designed to paste directly into a Jira Epic or stand alone on a GitHub Project backlog. Every agent in the pipeline contributes to one or more sections of this single artifact — there are no standalone outputs.
 
-Pipeline today: `Analyst → PO Checkpoint → Story Writer → END`. Future agents (Story Review Checkpoint, AC Generator, Test Case Agent, Reviewer Agent) attach as additional LangGraph nodes per the road-to-production plan.
+Pipeline today (since Phase 15.4) has two paths chosen by a LangGraph conditional edge at the PO checkpoint:
+
+```
+Deep path (single-story requirements, implied_stories ≤ 1):
+  START → Analyst → PO Checkpoint → Story Writer → Story Review Checkpoint
+        → AC Generator → Test Case Writer → Composer → Reviewer → END
+
+Fan-out path (multi-story requirements, implied_stories ≥ 2):
+  START → Analyst → PO Checkpoint (CheckboxGroup UI) → fan_out_node → END
+```
+
+The deep path produces a full `FinalUserStory` (Description / Objective / ACs / Test Cases). The fan-out path produces lightweight backlog stubs only — the PO re-runs RTIA on any individual stub title later to deep-dive that one. See `PR #162` for the topology shift rationale.
 
 ---
 
@@ -34,8 +45,9 @@ rtia/
 │   ├── EVAL_DATA_SPEC.md     # Contract for ground-truth files
 │   └── validate_samples.py   # Sample structural validator
 ├── .github/workflows/     # CI (lint + format + tests)
-├── api/                   # FastAPI (empty placeholder; Phase 14)
-├── ui/                    # Frontend (empty placeholder; Phase 14)
+├── api/                   # FastAPI app + bearer-token auth + exporters bridge (Phase 14)
+├── ui/                    # Gradio Blocks UI mounted at / (Phase 14)
+├── exporters/             # Jira + GitHub backends behind one Exporter Protocol (Phase 15.2)
 └── docs/                  # ADRs + USAGE.md (Phase 16)
 ```
 
@@ -63,6 +75,14 @@ uv run python scripts/run_api.py                       # FastAPI + Gradio UI at 
 The demo requires `ANTHROPIC_API_KEY` in `.env` (see `.env.example`). LangSmith tracing is optional — set `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY=lsv2_pt_…` + `LANGSMITH_PROJECT=rtia` to enable.
 
 **API token (`RTIA_API_TOKEN`, Phase 14):** the `run_api.py` entrypoint mints a fresh URL-safe bearer token per process unless `RTIA_API_TOKEN` is set in `.env`. The token gates all `/pipeline*` and `/uploads/*` endpoints (`Authorization: Bearer <token>`) and the Gradio mount accepts it via `?token=…` so the printed startup URL is one-click. Set `RTIA_API_HOST` / `RTIA_API_PORT` to override the default `127.0.0.1:8000`.
+
+**Multi-story fan-out (Phase 15.4):** when the Analyst's output has `implied_stories ≥ 2`, the PO checkpoint emits a different interrupt payload (`{"mode": "fan_out", "implied_stories": [...], "critical_ambiguities": [...]}`) and resume value (`{"selected_story_titles": [...], "answers": {...}}`); the conditional edge routes to `fan_out_node` (pure Python, no LLM) which writes `state["fan_out_stories"]` and ends. Terminal status is `ThreadStatus.DONE_FANOUT`. The Story Writer / AC Generator / Test Case Writer / Reviewer are SKIPPED entirely on this path. Single-story requirements (`implied_stories ≤ 1`) still go through the deep flow unchanged.
+
+`agents.graph.picked_implied_story` (single picked story, used by Story Writer's scope-aware prompt block) and `agents.graph.deferred_implied_stories` (everything else, used by the Reviewer's scope-aware DEFERRED STORIES block) survive for the 1-implied-story deep case. Both degenerate cleanly when implied_stories is empty.
+
+**Exporters (Phase 15.2):** `POST /pipeline/{thread_id}/export` ships the full deep artifact to Jira (REST v3, ADF codeBlock body) or GitHub (Issues + optional Projects v2 via GraphQL). `POST /pipeline/{thread_id}/export-deferred` batch-creates one lightweight backlog stub per deferred/fan-out story. Both backends use `make_exporter("jira" | "github")` in `exporters/base.py`. `dry_run=true` returns the would-be payload — safe without credentials. Credentials: `JIRA_BASE_URL` / `JIRA_EMAIL` / `JIRA_API_TOKEN`, `GITHUB_TOKEN`.
+
+**State schema version (`PIPELINE_STATE_VERSION`):** bumped 1 → 2 in Phase 15.4 (conditional edge + new state fields). **Clear `~/.rtia/state.db` after pulling 15.4** if any pre-15.4 paused threads existed locally — they're not auto-migrated.
 
 **Environment mode (`RTIA_ENV`, Phase 12.4):** controls the production-tracing guard. Allowed values: `development` (default when unset), `ci`, `production`. When `RTIA_ENV=production` AND `LANGSMITH_TRACING=true`, the demo and any entry point calling `assert_safe_for_env()` refuse to start to prevent requirement text (potentially containing customer PII) from being persisted to LangSmith. See [docs/adr-0008-pii-langsmith.md](docs/adr-0008-pii-langsmith.md).
 
