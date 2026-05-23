@@ -89,6 +89,28 @@ def test_deep_export_hidden_in_non_terminal_states():
         )
 
 
+def test_result_panel_visible_on_both_done_states():
+    """Regression guard for #177 — ``result_panel`` must be visible on
+    BOTH ``DONE`` and ``DONE_FANOUT`` because it now holds the shared
+    export config fields (backend, target, dry_run) that both export
+    handlers read from. If a future refactor accidentally hides
+    ``result_panel`` on either terminal state, the fan-out user loses
+    the ability to toggle dry-run and the push silently no-ops."""
+    for status, payload in [
+        (ThreadStatus.DONE, {"rendered_artifact": "# x\n", "deferred_stories": []}),
+        (
+            ThreadStatus.DONE_FANOUT,
+            {"fan_out_stories": [{"title": "X", "summary": "x"}]},
+        ),
+    ]:
+        state = ThreadState(thread_id="tid", status=status, payload=payload)
+        panels = _state_to_panels(state)
+        assert _visible(panels["result_visible"]) is True, (
+            f"result_panel must be visible on {status.value} so the shared "
+            "export config (backend/target/dry_run) is reachable"
+        )
+
+
 def test_deferred_panel_still_works_on_done_fanout():
     """Regression guard for #170 — the follow-up panel must still be
     visible on DONE_FANOUT so the user can push the stubs."""

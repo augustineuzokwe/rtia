@@ -317,14 +317,18 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             result_md = gr.Markdown("")
             download_file = gr.File(label="Download markdown", visible=False)
 
-            # Deep-flow export form. Wrapped in its own Group so its
-            # visibility is independent from the artifact display —
-            # ``DONE_FANOUT`` reuses ``result_panel`` for the fan-out
-            # stub list but must NOT expose this form (the single-
-            # artifact endpoint has nothing to push in fan-out mode).
-            # See issue #175 / ADR-0010.
-            with gr.Group(visible=False) as deep_export_panel:
-                gr.Markdown("---\n### Push to backlog")
+            # Shared export configuration. The four fields below
+            # (backend, target, extra, dry_run) drive BOTH the deep-flow
+            # "Push to backlog" button AND the fan-out "Create follow-up
+            # issues" button. They must therefore be visible whenever
+            # ``result_panel`` is — i.e. on ``DONE`` and on
+            # ``DONE_FANOUT``. PR #176 originally nested them inside
+            # ``deep_export_panel`` (issue #175 fix), which silently
+            # stuck the fan-out flow in dry-run because the user
+            # couldn't see the checkbox. Issue #177 lifted them out to
+            # this shared group.
+            with gr.Group():
+                gr.Markdown("---\n### Backlog target")
                 export_backend = gr.Dropdown(
                     choices=["jira", "github"],
                     value="github",
@@ -344,6 +348,14 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
                 export_dry_run = gr.Checkbox(
                     label="Dry run (build payload, don't send)", value=True
                 )
+
+            # Deep-flow export trigger. Hidden on ``DONE_FANOUT`` because
+            # the single-artifact endpoint has nothing to push in
+            # fan-out mode (see ADR-0010). The shared config above
+            # stays visible regardless so the fan-out user can still
+            # configure the destination.
+            with gr.Group(visible=False) as deep_export_panel:
+                gr.Markdown("### Push the deep-flow artifact")
                 export_btn = gr.Button("Push to backlog", variant="primary")
                 export_result_md = gr.Markdown("")
 
