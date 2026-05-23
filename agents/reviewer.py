@@ -31,6 +31,7 @@ from agents.config import (
     prompt_hash,
 )
 from agents.final_artifact import FinalUserStory
+from agents.requirements_analyst import ImpliedStory
 from prompts.reviewer_prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
 
 _PROMPT_HASH = prompt_hash(SYSTEM_PROMPT, USER_PROMPT_TEMPLATE)
@@ -80,6 +81,18 @@ def _format_assumptions(artifact: FinalUserStory) -> str:
     return "\n".join(f"- {a}" for a in artifact.assumptions)
 
 
+def _format_deferred_stories(stories: list[ImpliedStory] | None) -> str:
+    """Render the deferred-stories block for the Reviewer's user prompt.
+
+    Empty list / None → ``(none)`` so the Reviewer treats the artifact as
+    covering the full requirement (no story-level scoping happened, which
+    is the common case for single-feature requirements).
+    """
+    if not stories:
+        return "(none)"
+    return "\n".join(f"- {s.title}: {s.summary}" for s in stories)
+
+
 def _format_acs(artifact: FinalUserStory) -> str:
     if not artifact.acceptance_criteria:
         return "(none)"
@@ -102,6 +115,7 @@ def review_artifact(
     requirement_text: str,
     final_artifact: FinalUserStory,
     *,
+    deferred_stories: list[ImpliedStory] | None = None,
     model: str = DEFAULT_MODEL,
     temperature: float | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
@@ -110,11 +124,23 @@ def review_artifact(
 ) -> ReviewReport:
     """Run the Reviewer on the assembled FinalUserStory.
 
-    Inputs: the original requirement text (source of truth) and the
-    assembled artifact produced by the composer. The Reviewer reads the
-    full artifact including description, objective, assumptions, ACs, and
-    test cases so it can detect gaps between the requirement and the
-    artifact's coverage.
+    Inputs: the original requirement text (source of truth), the
+    assembled artifact, and (optionally) any implied stories the PO
+    deferred at the PO checkpoint. The Reviewer reads the full artifact
+    including description, objective, assumptions, ACs, and test cases
+    so it can detect gaps between the requirement and the artifact's
+    coverage.
+
+    ``deferred_stories`` is the scope-aware Reviewer's bug fix
+    (Phase 15.1 / LEARNINGS #31). When the original requirement bundles
+    several independent stories and the PO picks one at the PO
+    checkpoint, the Reviewer would otherwise flag the deferred stories'
+    behaviours as coverage gaps — a false-positive ``needs_work`` every
+    time. Passing the deferred stories tells the Reviewer which
+    behaviours were intentionally left out so it stops complaining
+    about them. Callers that aren't routing through ``graph.py``'s
+    ``reviewer_node`` can omit this — ``None`` and ``[]`` both render
+    as ``(none)`` to the LLM.
 
     Resilience knobs mirror ``analyze_requirement``. See
     ``agents.requirements_analyst.analyze_requirement`` for per-parameter notes.
@@ -131,6 +157,7 @@ def review_artifact(
     llm = ChatGoogleGenerativeAI(**llm_kwargs)
     user_prompt = USER_PROMPT_TEMPLATE.format(
         requirement_text=requirement_text,
+        deferred_stories=_format_deferred_stories(deferred_stories),
         description=final_artifact.description,
         objective=final_artifact.objective,
         assumptions=_format_assumptions(final_artifact),

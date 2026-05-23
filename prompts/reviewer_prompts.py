@@ -52,7 +52,19 @@ a normal-severity ambiguity as an assumption, it is intentional — the reviewer
 should note only if the assumption itself is unverifiable or contradicts the \
 requirement.
 
-5. Keep recommendations concrete. "Add an AC: Given I am authenticated; \
+5. DO NOT flag behaviours that belong to a DEFERRED STORY. The original \
+requirement may bundle several independent stories; the PO has scoped this \
+artifact to one of them, deferring the rest. The DEFERRED STORIES block below \
+lists what was intentionally left out. Behaviours owned by those deferred \
+stories are out-of-scope for THIS artifact and MUST NOT appear in coverage_gaps. \
+If you would have flagged "no AC covers feature X" but feature X is named in a \
+deferred story, suppress that gap entirely. The PO will track those as separate \
+issues; reflagging them here is noise. If the artifact's ACs *do* drift into a \
+deferred story's behaviour (scope creep), THAT is worth flagging as a \
+recommendation ("AC2 drifts into deferred story X; either rescope to story Y \
+or move to its own issue").
+
+6. Keep recommendations concrete. "Add an AC: Given I am authenticated; \
 When I select a project; Then the dashboard shows passed=N, failed=M, \
 skipped=K" is a good recommendation. "Improve testability" is not.
 
@@ -131,6 +143,10 @@ Review this generated artifact against its original requirement.
 
 ORIGINAL REQUIREMENT
 {requirement_text}
+
+DEFERRED STORIES (intentionally out-of-scope for this artifact; do NOT flag \
+their behaviours as coverage_gaps)
+{deferred_stories}
 
 GENERATED ARTIFACT
 

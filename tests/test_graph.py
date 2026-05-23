@@ -418,3 +418,64 @@ def test_story_review_override_partial_keeps_non_overridden_fields():
     artifact = result["final_artifact"]
     assert artifact.description == "Only the description changed."
     assert artifact.objective == "Outcome Y is achieved."
+
+
+def test_reviewer_node_passes_deferred_implied_stories():
+    """Phase 15.1 — graph wires PO answers + implied_stories to the Reviewer.
+
+    When the Analyst returns multiple implied stories and the PO picks
+    one at the PO checkpoint, the others must reach the Reviewer as
+    'deferred' context so the Reviewer doesn't flag their behaviours as
+    coverage gaps (LEARNINGS #31).
+    """
+    from unittest.mock import patch
+
+    captured_deferred_titles: list[str] = []
+
+    def _fake_review_artifact(_req, _artifact, *, deferred_stories=None, **_kw):
+        from agents.reviewer import ReviewReport
+
+        if deferred_stories:
+            captured_deferred_titles.extend(s.title for s in deferred_stories)
+        return ReviewReport(
+            coverage_gaps=[],
+            weak_acs=[],
+            untestable_criteria=[],
+            recommendations=[],
+            overall_quality="strong",
+        )
+
+    analyst_payload = {
+        "intent": "Goal",
+        "actors": ["User"],
+        "ambiguities": [
+            {
+                "question": (
+                    "This requirement implies 3 stories: [Story A, Story B, Story C]. "
+                    "Which single story should this issue cover?"
+                ),
+                "severity": "critical",
+            }
+        ],
+        "implied_stories": [
+            {"title": "Story A", "summary": "First implied story."},
+            {"title": "Story B", "summary": "Second implied story."},
+            {"title": "Story C", "summary": "Third implied story."},
+        ],
+    }
+
+    with (
+        _mock_pipeline_llms(analyst_payload),
+        patch("agents.graph.review_artifact", side_effect=_fake_review_artifact),
+    ):
+        pipeline = build_pipeline(checkpointer=_test_checkpointer())
+        config = {"configurable": {"thread_id": "test-deferred"}}
+        pipeline.invoke({"requirement_text": "multi-story req"}, config=config)
+        # PO picks "Story A" — the other two should be deferred.
+        po_question = analyst_payload["ambiguities"][0]["question"]
+        pipeline.invoke(Command(resume={po_question: "Story A"}), config=config)
+        pipeline.invoke(Command(resume={"accepted": True}), config=config)
+
+    assert "Story B" in captured_deferred_titles
+    assert "Story C" in captured_deferred_titles
+    assert "Story A" not in captured_deferred_titles

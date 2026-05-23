@@ -140,3 +140,55 @@ def test_review_artifact_with_no_acs_or_test_cases():
 
     assert report.overall_quality == "needs_work"
     assert report.coverage_gaps == ["No ACs produced."]
+
+
+def test_review_artifact_passes_deferred_stories_into_prompt():
+    """Phase 15.1 — the deferred-stories list must reach the user prompt verbatim.
+
+    LEARNINGS #31: without this, the Reviewer flags every deferred
+    story's behaviour as a coverage gap on multi-story requirements.
+    The deferred-stories block in the prompt template is what suppresses
+    those false positives; the test pins the contract that the agent
+    actually renders them.
+    """
+    from agents.requirements_analyst import ImpliedStory
+
+    artifact = _minimal_artifact()
+    deferred = [
+        ImpliedStory(
+            title="Quarantined tests dashboard",
+            summary="A dashboard listing all currently quarantined tests with their flake rate.",
+        ),
+        ImpliedStory(
+            title="Audit log for quarantine actions",
+            summary="Track who quarantined what and when.",
+        ),
+    ]
+
+    seen_prompts: list[str] = []
+
+    def _capture_factory(**_kwargs):
+        instance = MagicMock()
+
+        def _invoke(messages, **_):
+            seen_prompts.append(messages[1].content)
+            return AIMessage(content=json.dumps(_STRONG_REPORT))
+
+        instance.invoke.side_effect = _invoke
+        return instance
+
+    with patch("agents.reviewer.ChatGoogleGenerativeAI", side_effect=_capture_factory):
+        review_artifact("Some multi-story requirement.", artifact, deferred_stories=deferred)
+
+    assert len(seen_prompts) == 1
+    rendered = seen_prompts[0]
+    assert "DEFERRED STORIES" in rendered
+    assert "Quarantined tests dashboard" in rendered
+    assert "Audit log for quarantine actions" in rendered
+    # Empty case must render as "(none)" — never as an empty section, so
+    # the LLM gets the same shape every run.
+    seen_prompts.clear()
+    with patch("agents.reviewer.ChatGoogleGenerativeAI", side_effect=_capture_factory):
+        review_artifact("Single-feature requirement.", artifact)
+    assert "DEFERRED STORIES" in seen_prompts[0]
+    assert "(none)" in seen_prompts[0]
