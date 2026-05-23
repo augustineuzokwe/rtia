@@ -73,6 +73,45 @@ def test_generate_token_falls_back_to_random(monkeypatch):
     assert token != generate_token()
 
 
+def test_query_param_sets_session_cookie():
+    """First navigation with ``?token=`` sets the ``rtia_token`` cookie.
+
+    Without this, the browser's subsequent asset fetches under the
+    Gradio mount drop the query string and get 401'd — the page renders
+    blank. The cookie keeps in-browser auth sticky.
+    """
+    from api.models import ThreadState, ThreadStatus
+
+    runner = MagicMock()
+    runner.get_state.return_value = ThreadState(
+        thread_id="abc", status=ThreadStatus.RUNNING, payload={}
+    )
+    app = create_app(runner=runner, token="cookie-token")
+    client = TestClient(app)
+    # Hit the Gradio mount path (middleware path), not the API route.
+    r = client.get("/healthcheck?token=cookie-token", follow_redirects=False)
+    # Whatever the underlying response (likely 404 from Gradio because
+    # the path doesn't exist), the middleware should have set the cookie
+    # because the token was valid.
+    cookie = r.cookies.get("rtia_token")
+    assert cookie == "cookie-token"
+
+
+def test_cookie_accepted_by_api_route():
+    """After the cookie is set, subsequent API calls authenticate from it."""
+    from api.models import ThreadState, ThreadStatus
+
+    runner = MagicMock()
+    runner.get_state.return_value = ThreadState(
+        thread_id="abc", status=ThreadStatus.RUNNING, payload={}
+    )
+    app = create_app(runner=runner, token="cookie-token")
+    client = TestClient(app)
+    client.cookies.set("rtia_token", "cookie-token")
+    r = client.get("/pipeline/abc")
+    assert r.status_code == 200
+
+
 def test_token_store_constant_time_compare():
     store = TokenStore("abc")
     assert store.verify("abc")
