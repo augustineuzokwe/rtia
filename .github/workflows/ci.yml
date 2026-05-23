@@ -153,6 +153,15 @@ jobs:
         if: steps.should_run.outputs.run == 'true'
         run: uv run python evals/check_thresholds.py evals/reports/ci-run.json
 
+      # Phase 13.1 — cost + latency gate. Reads the same eval report
+      # check_thresholds.py just consumed, plus [tool.rtia.budgets] in
+      # pyproject.toml. Separate step (not bundled with floors) so the
+      # PR-status check name surfaces "budget regression" distinctly
+      # from "quality regression" — different signals, different fixes.
+      - name: Enforce cost + latency budgets
+        if: steps.should_run.outputs.run == 'true'
+        run: uv run python evals/check_budgets.py evals/reports/ci-run.json
+
       - name: Upload eval report
         if: always() && steps.should_run.outputs.run == 'true'
         uses: actions/upload-artifact@v4
