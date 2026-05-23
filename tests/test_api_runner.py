@@ -154,15 +154,16 @@ def test_runner_render_markdown_returns_none_before_composer():
         assert runner.render_markdown(paused.thread_id) is None
 
 
-def test_runner_done_payload_includes_deferred_stories():
-    """Phase 15.3 — DONE state surfaces the implied stories the PO didn't pick.
+def test_runner_done_fanout_payload_includes_selected_stories():
+    """Phase 15.4 — multi-story → DONE_FANOUT with fan_out_stories payload.
 
-    The Analyst returns 3 implied stories, PO picks "Story A", runner
-    completes the pipeline. The DONE-state payload's
-    ``deferred_stories`` must contain B and C but not A.
+    Analyst returns 3 implied stories. Runner pauses with fan-out shape.
+    PO resumes selecting 2 of 3 → fan_out_node filters → DONE_FANOUT
+    terminal state with exactly those 2 stubs in the payload. No
+    final_artifact / review_report is produced.
     """
     analyst = {
-        "intent": "Goal",
+        "intent": "multi-story req",
         "actors": ["User"],
         "ambiguities": [
             {
@@ -184,15 +185,79 @@ def test_runner_done_payload_includes_deferred_stories():
         runner = PipelineRunner(pipeline)
         paused = runner.start("requirement")
         assert paused.status == ThreadStatus.PAUSED_PO
-        po_question = paused.payload["critical_ambiguities"][0]
-        review = runner.resume(paused.thread_id, {po_question: "Story A"})
-        assert review.status == ThreadStatus.PAUSED_REVIEW
-        done = runner.resume(paused.thread_id, {"accepted": True})
+        assert paused.payload["mode"] == "fan_out"
+        assert len(paused.payload["implied_stories"]) == 3
 
-    assert done.status == ThreadStatus.DONE
-    deferred = done.payload["deferred_stories"]
-    deferred_titles = {s["title"] for s in deferred}
-    assert deferred_titles == {"Story B", "Story C"}
+        done = runner.resume(
+            paused.thread_id,
+            {
+                "selected_story_titles": ["Story A", "Story C"],
+                "answers": {},
+            },
+        )
+
+    assert done.status == ThreadStatus.DONE_FANOUT
+    titles = [s["title"] for s in done.payload["fan_out_stories"]]
+    assert titles == ["Story A", "Story C"]
+    # Deep-flow fields must NOT be present.
+    assert "final_artifact" not in done.payload
+    assert "review_report" not in done.payload
+
+
+def test_runner_done_fanout_with_no_matching_selection_returns_empty_done_fanout():
+    """Phase 15.4 regression — when the PO's selection doesn't match any
+    implied-story title, fan_out_node writes ``fan_out_stories=[]`` and
+    the runner must still return DONE_FANOUT (not fall through to the
+    deep-state path and KeyError on the missing final_artifact).
+
+    Earlier draft of the runner used ``if result.get(\"fan_out_stories\"):``
+    which is falsy for an empty list — that bug was caught live.
+    """
+    analyst = {
+        "intent": "multi-story req",
+        "actors": ["User"],
+        "ambiguities": [{"question": "Which single story?", "severity": "critical"}],
+        "implied_stories": [
+            {"title": "Story A", "summary": "a"},
+            {"title": "Story B", "summary": "b"},
+        ],
+    }
+    pipeline, stack = _patched_pipeline(analyst)
+    with stack:
+        runner = PipelineRunner(pipeline)
+        paused = runner.start("req")
+        done = runner.resume(
+            paused.thread_id,
+            {"selected_story_titles": ["Unrelated Title"], "answers": {}},
+        )
+
+    assert done.status == ThreadStatus.DONE_FANOUT
+    assert done.payload["fan_out_stories"] == []
+
+
+def test_runner_done_fanout_empty_selection_keeps_all_stories():
+    """Phase 15.4 / Q2 — empty selected_story_titles ⇒ fan out everything."""
+    analyst = {
+        "intent": "multi-story req",
+        "actors": ["User"],
+        "ambiguities": [{"question": "Which single story?", "severity": "critical"}],
+        "implied_stories": [
+            {"title": "Story A", "summary": "a"},
+            {"title": "Story B", "summary": "b"},
+        ],
+    }
+    pipeline, stack = _patched_pipeline(analyst)
+    with stack:
+        runner = PipelineRunner(pipeline)
+        paused = runner.start("req")
+        done = runner.resume(
+            paused.thread_id,
+            {"selected_story_titles": [], "answers": {}},
+        )
+
+    assert done.status == ThreadStatus.DONE_FANOUT
+    titles = [s["title"] for s in done.payload["fan_out_stories"]]
+    assert titles == ["Story A", "Story B"]
 
 
 def test_runner_render_markdown_returns_string_when_done():

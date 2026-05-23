@@ -119,19 +119,42 @@ def _build_deferred_followup_markdown(
 _UPLOAD_FILE: UploadFile = File(...)
 
 
-def _resume_value_from(request: ResumeRequest, current_status: ThreadStatus) -> object:
+def _resume_value_from(
+    request: ResumeRequest,
+    current_status: ThreadStatus,
+    *,
+    paused_payload: dict | None = None,
+) -> object:
     """Translate the API resume body to the LangGraph resume value.
 
-    PO checkpoint expects ``dict[str, str]`` of {question: answer}; story
-    review expects ``{accepted: bool, description?: str, objective?: str}``.
-    Discriminate on the *current* thread status — that's what the graph
-    is waiting for, regardless of which keys the caller sent.
+    Three shapes:
+
+    - PO checkpoint, **deep mode** (Analyst found ≤ 1 implied story):
+      LangGraph expects ``dict[question, answer]`` — pass ``request.answers``
+      through.
+    - PO checkpoint, **fan-out mode** (Phase 15.4): LangGraph expects
+      ``{"selected_story_titles": [...], "answers": {...}}``. Empty
+      ``selected_story_titles`` is the Q2 default — graph treats it as
+      "keep every implied story".
+    - Story Review checkpoint: ``{"accepted": bool, ...}``.
+
+    ``paused_payload`` carries the current paused state's payload so we
+    can discriminate fan-out vs deep at the PO checkpoint without
+    inferring from the body shape.
     """
     if current_status == ThreadStatus.PAUSED_PO:
+        mode = (paused_payload or {}).get("mode", "deep")
+        if mode == "fan_out":
+            # Fan-out: structured selection. None / empty list signals
+            # "fan out everything" — pass-through, graph fills the default.
+            return {
+                "selected_story_titles": list(request.selected_story_titles or []),
+                "answers": dict(request.answers or {}),
+            }
         if request.answers is None:
             raise HTTPException(
                 status_code=400,
-                detail="Resume body for paused_po must include 'answers'.",
+                detail="Resume body for paused_po (deep mode) must include 'answers'.",
             )
         return request.answers
     if current_status == ThreadStatus.PAUSED_REVIEW:
@@ -294,7 +317,7 @@ def _register_routes(app: FastAPI) -> None:
     def resume(thread_id: str, body: ResumeRequest, request: Request) -> ThreadState:
         runner: PipelineRunner = request.app.state.runner
         current = runner.get_state(thread_id)
-        resume_value = _resume_value_from(body, current.status)
+        resume_value = _resume_value_from(body, current.status, paused_payload=current.payload)
         try:
             return runner.resume(thread_id, resume_value)
         except InvalidUpdateError as exc:
@@ -348,7 +371,15 @@ def _register_routes(app: FastAPI) -> None:
         issue for each so they land on the backlog instead of being lost.
         """
         runner: PipelineRunner = request.app.state.runner
-        loaded = runner.get_deferred_stories_and_context(thread_id)
+        # Phase 15.4 — dispatch to the fan-out source on DONE_FANOUT threads.
+        # Fan-out stories are the same shape (ImpliedStory) as deferred, so
+        # the rest of the loop body is identical. The only difference is
+        # *which* state field we read from.
+        current = runner.get_state(thread_id)
+        if current.status == ThreadStatus.DONE_FANOUT:
+            loaded = runner.get_fanout_stories_and_context(thread_id)
+        else:
+            loaded = runner.get_deferred_stories_and_context(thread_id)
         if loaded is None:
             raise HTTPException(status_code=404, detail="Thread not found or has no state.")
         deferred, requirement_text = loaded
