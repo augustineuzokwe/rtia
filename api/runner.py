@@ -131,6 +131,23 @@ class PipelineRunner:
             return None
         return artifact.as_markdown()
 
+    def get_artifact_and_title(self, thread_id: str) -> tuple[Any, str] | None:
+        """Return ``(artifact, title)`` for the export endpoint, or None if absent.
+
+        The export endpoint needs both the markdown body AND a title.
+        The title comes from the user story's description: typically
+        "As a <role>, I want <feature>…" — we trim to the "I want"
+        clause for a punchier issue title (Jira/GitHub display long
+        summaries truncated anyway).
+        """
+        snapshot = self._pipeline.get_state(self._config(thread_id))
+        values: dict[str, Any] = snapshot.values or {}
+        artifact = values.get("final_artifact")
+        if artifact is None:
+            return None
+        title = _derive_title(artifact.description)
+        return artifact, title
+
     # ----- internals --------------------------------------------------
 
     def _translate(self, thread_id: str, result: dict) -> ThreadState:
@@ -187,6 +204,27 @@ class PipelineRunner:
                 "rendered_artifact": stub.as_markdown(),
             },
         )
+
+
+def _derive_title(description: str) -> str:
+    """Build a backlog-issue title from the user story description.
+
+    Heuristics:
+    - If the description starts with "As a/an <role>, I want <feature>",
+      trim to the "I want" clause and cap at 120 chars.
+    - Otherwise use the first line, capped.
+    - Strip the closing period so the title doesn't end with one.
+    """
+    text = (description or "").strip().replace("\n", " ")
+    lower = text.lower()
+    marker = "i want "
+    idx = lower.find(marker)
+    if idx >= 0:
+        text = text[idx + len(marker) :].strip()
+    text = text.rstrip(".").strip()
+    if len(text) > 120:
+        text = text[:117] + "..."
+    return text or "(untitled RTIA export)"
 
 
 __all__ = ["PipelineRunner"]

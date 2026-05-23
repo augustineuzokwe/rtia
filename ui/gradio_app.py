@@ -34,6 +34,12 @@ from api.parsers import (
     extract_pdf,
 )
 from api.runner import PipelineRunner
+from exporters.base import (
+    ExportConfigError,
+    ExporterTransportError,
+    ExportTarget,
+    make_exporter,
+)
 
 
 def _runner(app: FastAPI) -> PipelineRunner:
@@ -143,6 +149,27 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             result_md = gr.Markdown("")
             download_file = gr.File(label="Download markdown", visible=False)
 
+            gr.Markdown("---\n### Push to backlog")
+            export_backend = gr.Dropdown(
+                choices=["jira", "github"],
+                value="github",
+                label="Backend",
+            )
+            export_target = gr.Textbox(
+                label="Target (Jira: project key e.g. 'RTIA' | GitHub: repo 'owner/name')",
+                value="augustineuzokwe/rtia",
+            )
+            export_extra = gr.Textbox(
+                label=(
+                    "Optional: Jira parent epic key (e.g. 'RTIA-1') OR "
+                    "GitHub project number (e.g. '5')"
+                ),
+                value="",
+            )
+            export_dry_run = gr.Checkbox(label="Dry run (build payload, don't send)", value=True)
+            export_btn = gr.Button("Push to backlog", variant="primary")
+            export_result_md = gr.Markdown("")
+
         # ----- event handlers --------------------------------------
 
         def _spread(state):
@@ -230,6 +257,67 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             return _spread(state)
 
         review_accept.click(on_review_accept, [thread_id_state], outputs)
+
+        def on_export(thread_id, backend, target, extra, dry_run):
+            """Push the current thread's artifact to Jira or GitHub.
+
+            All three configurable fields are typed into one Gradio
+            Textbox each to keep the UI simple. The handler shapes them
+            into an ``ExportTarget`` for the correct backend.
+            """
+            loaded = _runner(app).get_artifact_and_title(thread_id)
+            if loaded is None:
+                return "❌ No final artifact for this thread yet."
+            artifact, title = loaded
+
+            target = (target or "").strip()
+            extra = (extra or "").strip()
+            if backend == "jira":
+                tgt = ExportTarget(
+                    backend="jira",
+                    jira_project_key=target or None,
+                    jira_parent_key=extra or None,
+                )
+            else:
+                tgt = ExportTarget(
+                    backend="github",
+                    github_repo=target or None,
+                    github_project_number=int(extra) if extra.isdigit() else None,
+                )
+
+            try:
+                exporter = make_exporter(backend)
+                result = exporter.export(
+                    artifact.as_markdown(), tgt, title=title, dry_run=bool(dry_run)
+                )
+            except ExportConfigError as exc:
+                return f"❌ Config error: {exc}"
+            except ExporterTransportError as exc:
+                return f"❌ Transport error: {exc}"
+
+            if result.dry_run:
+                import json as _json
+
+                payload_json = _json.dumps(result.payload, indent=2)[:2000]
+                return (
+                    f"✅ Dry-run for **{result.backend}**. Title: `{title}`\n\n"
+                    f"```json\n{payload_json}\n```"
+                )
+            if not result.success:
+                return f"❌ {result.backend} export failed: {result.error}"
+            return f"✅ Pushed to {result.backend}: [{result.key}]({result.url})"
+
+        export_btn.click(
+            on_export,
+            [
+                thread_id_state,
+                export_backend,
+                export_target,
+                export_extra,
+                export_dry_run,
+            ],
+            [export_result_md],
+        )
         review_override.click(
             on_review_override,
             [thread_id_state, override_description, override_objective],
