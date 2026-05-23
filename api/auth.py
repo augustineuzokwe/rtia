@@ -28,6 +28,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 _TOKEN_ENV_VAR = "RTIA_API_TOKEN"
 _QUERY_PARAM = "token"
+_COOKIE_NAME = "rtia_token"
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -69,12 +70,17 @@ class TokenStore:
 
 
 def verify_token(request: Request) -> None:
-    """FastAPI dependency: accepts ``Authorization: Bearer …`` OR ``?token=…``.
+    """FastAPI dependency: accepts ``Authorization: Bearer …`` OR ``?token=…`` OR cookie.
 
-    Query-param acceptance keeps the printed startup URL working for both
-    the API smoke flow (``curl ?token=…`` is occasionally convenient) and
-    the Gradio mount. The header form is the canonical one and is what
-    the docs recommend.
+    Three acceptance paths, tried in order:
+
+    1. ``Authorization: Bearer <token>`` — canonical; curl + API clients.
+    2. ``?token=<token>`` query param — one-click open from the printed
+       startup URL; occasionally convenient for curl smoke.
+    3. ``rtia_token`` cookie — set by the UI auth middleware after a
+       successful #1 or #2 so in-browser fetches from the Gradio JS
+       bundle to ``/pipeline*`` / ``/uploads/*`` authenticate without
+       the JS having to handle the token.
     """
     store: TokenStore = request.app.state.token_store
 
@@ -91,6 +97,12 @@ def verify_token(request: Request) -> None:
     # Query-param fallback.
     qp = request.query_params.get(_QUERY_PARAM)
     if qp and store.verify(qp):
+        return
+
+    # Cookie fallback (set by the UI middleware after the initial
+    # tokenized navigation).
+    cookie = request.cookies.get(_COOKIE_NAME)
+    if cookie and store.verify(cookie):
         return
 
     raise HTTPException(

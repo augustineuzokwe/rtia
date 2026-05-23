@@ -17,6 +17,7 @@ Layered like the demo script:
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
@@ -124,39 +125,82 @@ def _install_ui_auth_middleware(app: FastAPI) -> None:
     """Gate the Gradio mount on the same token as the API routes.
 
     ``mount_gradio_app`` mounts the UI as a sub-application that bypasses
-    FastAPI's ``Depends`` machinery, so per-route auth doesn't apply.
-    The middleware checks ``Authorization: Bearer …`` first, then
-    ``?token=…``, for any request that isn't an explicitly-protected
-    API route (those have their own dependency that emits a richer
-    401). Static asset paths under Gradio's mount also pass through
-    the middleware — that's intentional: the printed startup URL sets
-    a session-cookie-equivalent via the ``?token=`` parameter and
-    subsequent asset fetches re-present it in the same query string.
+    FastAPI's ``Depends`` machinery, so per-route auth doesn't apply. The
+    middleware accepts the token from any of three sources, in order:
+
+    1. ``Authorization: Bearer …`` header (canonical; what curl uses).
+    2. ``?token=…`` query param (one-click open from the printed URL).
+    3. ``rtia_token`` cookie (auto-set after a successful #1 or #2,
+       so the browser doesn't 401 itself on the absolute-path asset
+       fetches Gradio emits — ``/assets/index-*.js`` etc. — which the
+       browser fires *without* the original query string).
+
+    API routes ``/pipeline*`` / ``/uploads*`` skip the middleware (they
+    have their own ``Depends(verify_token)`` that emits a richer 401),
+    but they ALSO accept the cookie because the dependency in
+    ``api/auth.py`` reads it. This means an in-browser fetch from the
+    Gradio JS bundle to the API hits succeed without the JS needing to
+    know the token.
+
+    Cookie is ``HttpOnly``, ``SameSite=Strict``, ``Path=/`` — adequate
+    for a localhost-only dev tool. Set ``RTIA_API_COOKIE_SECURE=true``
+    if you ever front this with TLS (post-v1 hardening).
     """
 
     api_prefixes = ("/pipeline", "/uploads", "/docs", "/openapi.json", "/redoc")
+    cookie_name = "rtia_token"
+    cookie_secure = (os.environ.get("RTIA_API_COOKIE_SECURE") or "").lower() in {
+        "true",
+        "1",
+        "yes",
+        "on",
+    }
 
     class _UiAuth(BaseHTTPMiddleware):
         async def dispatch(self, request: Request, call_next):
             path = request.url.path
             if any(path.startswith(p) for p in api_prefixes):
                 return await call_next(request)
+
             store: TokenStore = request.app.state.token_store
-            auth_header = request.headers.get("authorization", "")
-            candidate: str | None = None
-            if auth_header.lower().startswith("bearer "):
-                candidate = auth_header.split(" ", 1)[1].strip()
-            if not candidate:
-                candidate = request.query_params.get("token")
-            if store.verify(candidate):
-                return await call_next(request)
-            return Response(
-                "Missing or invalid API token.\n",
-                status_code=401,
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            candidate, source = _extract_token(request, cookie_name)
+            if not store.verify(candidate):
+                return Response(
+                    "Missing or invalid API token.\n",
+                    status_code=401,
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+
+            response = await call_next(request)
+            # Set the cookie when the token arrived via header or query
+            # so the browser's subsequent asset fetches authenticate
+            # automatically. Skip when the cookie is already the source.
+            if source != "cookie":
+                response.set_cookie(
+                    cookie_name,
+                    candidate,
+                    httponly=True,
+                    samesite="strict",
+                    secure=cookie_secure,
+                    path="/",
+                )
+            return response
 
     app.add_middleware(_UiAuth)
+
+
+def _extract_token(request: Request, cookie_name: str) -> tuple[str | None, str]:
+    """Read the token from header / query / cookie. Returns ``(value, source)``."""
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        return auth_header.split(" ", 1)[1].strip(), "header"
+    qp = request.query_params.get("token")
+    if qp:
+        return qp, "query"
+    cookie = request.cookies.get(cookie_name)
+    if cookie:
+        return cookie, "cookie"
+    return None, "none"
 
 
 def _register_routes(app: FastAPI) -> None:
