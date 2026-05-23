@@ -118,6 +118,12 @@ class SampleReport:
     # not the pipeline being measured. Source: sum of Phase 13.2
     # ``agent_invocation_end`` log records captured during evaluate_sample().
     pipeline_duration_ms: int = 0
+    # Per-agent breakdown of the pipeline duration. Keys match the
+    # ``agent`` field in ``agent_invocation_end`` records. Empty when
+    # capture is unavailable; missing keys mean that agent didn't run.
+    # Added to support issue #163 (pipeline speedup) — without per-agent
+    # baselines we can't tell which agent is the bottleneck.
+    per_agent_duration_ms: dict[str, int] = field(default_factory=dict)
 
     @property
     def pipeline_usage(self) -> UsageTelemetry:
@@ -290,6 +296,7 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
     ac_usage = _usage_from_capture(telemetry, "ac_generator")
     tc_usage = _usage_from_capture(telemetry, "test_case_writer")
     pipeline_duration_ms = telemetry.total_duration_ms
+    per_agent_duration_ms = {obs.agent: obs.duration_ms for obs in telemetry.observations}
 
     # Composite artifact text for the requirement_fidelity metric — the
     # everything-a-junior-engineer-would-read concatenation across all
@@ -336,6 +343,7 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
         ac_usage=ac_usage,
         tc_usage=tc_usage,
         pipeline_duration_ms=pipeline_duration_ms,
+        per_agent_duration_ms=per_agent_duration_ms,
     )
 
 
@@ -343,10 +351,15 @@ def _serialise(reports: list[SampleReport], *, judge_model: str) -> dict:
     aggregate_analyst_usage = UsageTelemetry()
     aggregate_pipeline_usage = UsageTelemetry()
     aggregate_duration_ms = 0
+    aggregate_per_agent_duration_ms: dict[str, int] = {}
     for r in reports:
         aggregate_analyst_usage.add(r.analyst_usage)
         aggregate_pipeline_usage.add(r.pipeline_usage)
         aggregate_duration_ms += r.pipeline_duration_ms
+        for agent_name, ms in r.per_agent_duration_ms.items():
+            aggregate_per_agent_duration_ms[agent_name] = (
+                aggregate_per_agent_duration_ms.get(agent_name, 0) + ms
+            )
 
     by_metric: dict[str, list[float]] = {}
     for report in reports:
@@ -381,6 +394,7 @@ def _serialise(reports: list[SampleReport], *, judge_model: str) -> dict:
                 },
                 "pipeline_usage": asdict(r.pipeline_usage),
                 "pipeline_duration_ms": r.pipeline_duration_ms,
+                "per_agent_duration_ms": dict(r.per_agent_duration_ms),
             }
             for r in reports
         ],
@@ -388,6 +402,7 @@ def _serialise(reports: list[SampleReport], *, judge_model: str) -> dict:
             "analyst_usage": asdict(aggregate_analyst_usage),
             "pipeline_usage": asdict(aggregate_pipeline_usage),
             "pipeline_duration_ms": aggregate_duration_ms,
+            "per_agent_duration_ms": aggregate_per_agent_duration_ms,
             "mean_scores": {name: sum(s) / len(s) for name, s in by_metric.items()},
         },
     }
@@ -407,6 +422,10 @@ def _print_summary(payload: dict) -> None:
             f"    pipeline: input={pu['input_tokens']} output={pu['output_tokens']} "
             f"duration={duration_s:.1f}s"
         )
+        per_agent = s.get("per_agent_duration_ms") or {}
+        if per_agent:
+            breakdown = "  ".join(f"{name}={ms / 1000:.1f}s" for name, ms in per_agent.items())
+            print(f"    per-agent: {breakdown}")
     print("\nmean scores:")
     for name, score in payload["aggregate"]["mean_scores"].items():
         print(f"  {name:<28} {score:.2f}")
@@ -417,6 +436,10 @@ def _print_summary(payload: dict) -> None:
         f"input={agg_pu['input_tokens']} output={agg_pu['output_tokens']}"
     )
     print(f"Pipeline wall-clock (excl. judge): {agg_duration_s:.1f}s")
+    agg_per_agent = payload["aggregate"].get("per_agent_duration_ms") or {}
+    if agg_per_agent:
+        breakdown = "  ".join(f"{name}={ms / 1000:.1f}s" for name, ms in agg_per_agent.items())
+        print(f"Per-agent wall-clock (aggregate): {breakdown}")
 
 
 _COST_DISCLOSURE = (
