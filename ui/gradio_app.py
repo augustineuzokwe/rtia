@@ -42,6 +42,34 @@ from exporters.base import (
 )
 
 
+def _select_followup_source(
+    runner: PipelineRunner, thread_id: str, status: ThreadStatus
+) -> tuple[tuple[list[Any], str] | None, str]:
+    """Pick the right story source for the follow-up export handler.
+
+    Mirrors the dispatch in ``api.main.export_deferred`` so the UI button
+    and the API endpoint surface the same stories: ``fan_out_stories`` on
+    a ``DONE_FANOUT`` thread, otherwise the deferred-implied list. Both
+    paths return ``ImpliedStory``-shaped objects so the caller's loop is
+    identical.
+
+    Returns ``(loaded, empty_message)`` — ``loaded`` is either
+    ``(stories, requirement_text)`` or ``None`` (no thread state), and
+    ``empty_message`` is the human-readable string to show when
+    ``stories`` is empty. The two paths use different empty-state wording
+    so the user sees terminology that matches the visible panel.
+    """
+    if status == ThreadStatus.DONE_FANOUT:
+        return (
+            runner.get_fanout_stories_and_context(thread_id),
+            "_No fan-out stories — nothing to create._",
+        )
+    return (
+        runner.get_deferred_stories_and_context(thread_id),
+        "_No deferred stories — nothing to create._",
+    )
+
+
 def _build_followup_markdown(title: str, summary: str, requirement_text: str) -> str:
     """Compose the body of a deferred follow-up issue.
 
@@ -500,19 +528,34 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
         )
 
         def on_export_deferred(thread_id, backend, target, extra, dry_run, selected_titles):
-            """Batch-create follow-up issues for the deferred implied stories.
+            """Batch-create follow-up issues for the deferred OR fan-out stories.
 
             Reuses the same backend dropdown + target fields from the
             single-export form. ``selected_titles`` is the checkbox-group
-            value (a subset of the deferred titles). Empty selection ⇒
-            create issues for ALL deferred stories.
+            value (a subset of the visible titles). Empty selection ⇒
+            create issues for ALL stories in the active list.
+
+            Dispatch mirrors the API ``/export-deferred`` endpoint: on a
+            ``DONE_FANOUT`` thread the source list is ``fan_out_stories``;
+            otherwise it's the deferred-implied list. Both are the same
+            ``ImpliedStory`` shape so the rest of the loop is identical.
             """
-            loaded = _runner(app).get_deferred_stories_and_context(thread_id)
+            if not (thread_id or "").strip():
+                # Defensive: if the Gradio State component is empty (no
+                # pipeline run in this session, or state was reset), say
+                # so explicitly. Without this guard the runner returns a
+                # RUNNING placeholder for the empty id, which would
+                # silently fall through to the misleading "no deferred
+                # stories" message.
+                return "❌ No active thread — start a pipeline run first."
+            runner = _runner(app)
+            current = runner.get_state(thread_id)
+            loaded, empty_message = _select_followup_source(runner, thread_id, current.status)
             if loaded is None:
                 return "❌ No thread state."
             deferred, requirement_text = loaded
             if not deferred:
-                return "_No deferred stories — nothing to create._"
+                return empty_message
 
             include_titles = selected_titles or [s.title for s in deferred]
 
