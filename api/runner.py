@@ -26,7 +26,11 @@ from typing import Any
 from langgraph.types import Command
 
 from agents._llm_errors import PipelineStepError
-from agents.graph import build_pipeline, build_stub_artifact_from_error
+from agents.graph import (
+    build_pipeline,
+    build_stub_artifact_from_error,
+    deferred_implied_stories,
+)
 from api.models import ThreadState, ThreadStatus
 
 
@@ -107,6 +111,7 @@ class PipelineRunner:
                         "rendered_artifact": artifact.as_markdown(),
                     },
                 )
+            deferred = deferred_implied_stories(values)
             return ThreadState(
                 thread_id=thread_id,
                 status=ThreadStatus.DONE,
@@ -114,6 +119,7 @@ class PipelineRunner:
                     "final_artifact": artifact.model_dump(),
                     "rendered_artifact": artifact.as_markdown(),
                     "review_report": review.model_dump() if review is not None else None,
+                    "deferred_stories": [s.model_dump() for s in deferred],
                 },
             )
 
@@ -130,6 +136,23 @@ class PipelineRunner:
         if artifact is None:
             return None
         return artifact.as_markdown()
+
+    def get_deferred_stories_and_context(self, thread_id: str) -> tuple[list[Any], str] | None:
+        """Return ``(deferred_stories, requirement_text)`` for the export-deferred endpoint.
+
+        Returns ``None`` if no thread state exists. ``deferred_stories``
+        is empty when nothing was deferred (single-feature requirement,
+        or the PO never paused). ``requirement_text`` is included so the
+        endpoint can attribute each follow-up issue back to the originating
+        requirement.
+        """
+        snapshot = self._pipeline.get_state(self._config(thread_id))
+        values: dict[str, Any] = snapshot.values or {}
+        if not values:
+            return None
+        deferred = deferred_implied_stories(values)
+        requirement_text = values.get("requirement_text", "")
+        return deferred, requirement_text
 
     def get_artifact_and_title(self, thread_id: str) -> tuple[Any, str] | None:
         """Return ``(artifact, title)`` for the export endpoint, or None if absent.
@@ -182,6 +205,7 @@ class PipelineRunner:
     def _done_state(thread_id: str, result: dict) -> ThreadState:
         artifact = result["final_artifact"]
         review = result.get("review_report")
+        deferred = deferred_implied_stories(result)
         return ThreadState(
             thread_id=thread_id,
             status=ThreadStatus.DONE,
@@ -189,6 +213,7 @@ class PipelineRunner:
                 "final_artifact": artifact.model_dump(),
                 "rendered_artifact": artifact.as_markdown(),
                 "review_report": review.model_dump() if review is not None else None,
+                "deferred_stories": [s.model_dump() for s in deferred],
             },
         )
 

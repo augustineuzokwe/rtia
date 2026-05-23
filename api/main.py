@@ -23,6 +23,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import PlainTextResponse, Response
 from langgraph.errors import InvalidUpdateError
+from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from agents._logging import configure_logging
@@ -48,10 +49,69 @@ from exporters.base import (
     ExporterTransportError,
     ExportRequest,
     ExportResult,
+    ExportTarget,
     make_exporter,
 )
 
 _log = logging.getLogger("rtia.api")
+
+
+class DeferredExportRequest(BaseModel):
+    """Body shape for ``POST /pipeline/{thread_id}/export-deferred``.
+
+    ``include`` is an optional case-insensitive title filter — when set,
+    only deferred stories whose title matches one of the entries are
+    exported. Default is "export all".
+    """
+
+    target: ExportTarget
+    include: list[str] | None = Field(
+        default=None,
+        description="Optional title filter; omit to export every deferred story.",
+    )
+    dry_run: bool = False
+
+
+class DeferredExportResponse(BaseModel):
+    results: list[ExportResult]
+    skipped: list[str] = Field(
+        default_factory=list,
+        description="Titles that were requested in 'include' but not found among deferred.",
+    )
+
+
+def _build_deferred_followup_markdown(
+    story_title: str,
+    story_summary: str,
+    *,
+    requirement_excerpt: str,
+) -> str:
+    """Compose a follow-up-issue body for a deferred implied story.
+
+    Intentionally lightweight — these are *placeholder* issues a PO
+    triages later. They're not full RTIA artifacts. Each carries enough
+    context (title, summary, originating-requirement excerpt) for the
+    PO to re-run RTIA on the title once they want to flesh it out.
+    """
+    excerpt = (requirement_excerpt or "").strip()
+    if len(excerpt) > 800:
+        excerpt = excerpt[:800].rstrip() + "…"
+    parts = [
+        f"## {story_title}",
+        "",
+        story_summary,
+        "",
+        "## Provenance",
+        (
+            "_Deferred from an RTIA run on a multi-story requirement. "
+            "Re-run RTIA on this title once you're ready to flesh out the "
+            "full Description / Objective / ACs / Test Cases._"
+        ),
+    ]
+    if excerpt:
+        parts.extend(["", "## Originating requirement (excerpt)", "", excerpt])
+    return "\n".join(parts)
+
 
 # Module-level singleton for the ``UploadFile`` default — keeps ruff's
 # B008 happy (no function call in argument defaults) and matches FastAPI's
@@ -271,6 +331,64 @@ def _register_routes(app: FastAPI) -> None:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except ExporterTransportError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.post(
+        "/pipeline/{thread_id}/export-deferred",
+        response_model=DeferredExportResponse,
+        dependencies=[Depends(verify_token)],
+    )
+    def export_deferred(
+        thread_id: str, body: DeferredExportRequest, request: Request
+    ) -> DeferredExportResponse:
+        """Create one follow-up issue per deferred implied story.
+
+        Phase 15.3. When the PO picked one of several implied stories at
+        the PO checkpoint, the others were intentionally left out of the
+        finished artifact. This endpoint pushes a lightweight placeholder
+        issue for each so they land on the backlog instead of being lost.
+        """
+        runner: PipelineRunner = request.app.state.runner
+        loaded = runner.get_deferred_stories_and_context(thread_id)
+        if loaded is None:
+            raise HTTPException(status_code=404, detail="Thread not found or has no state.")
+        deferred, requirement_text = loaded
+        if not deferred:
+            return DeferredExportResponse(results=[], skipped=[])
+
+        # Apply optional include-filter case-insensitively.
+        include_lower: set[str] | None = None
+        if body.include is not None:
+            include_lower = {t.strip().lower() for t in body.include if t and t.strip()}
+
+        try:
+            exporter = make_exporter(body.target.backend)
+        except ExportConfigError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        results: list[ExportResult] = []
+        seen_titles: set[str] = set()
+        for story in deferred:
+            seen_titles.add(story.title.lower())
+            if include_lower is not None and story.title.lower() not in include_lower:
+                continue
+            md = _build_deferred_followup_markdown(
+                story.title,
+                story.summary,
+                requirement_excerpt=requirement_text,
+            )
+            try:
+                result = exporter.export(md, body.target, title=story.title, dry_run=body.dry_run)
+            except ExportConfigError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            except ExporterTransportError as exc:
+                raise HTTPException(status_code=502, detail=str(exc)) from exc
+            results.append(result)
+
+        skipped: list[str] = []
+        if include_lower is not None:
+            skipped = sorted(include_lower - seen_titles)
+
+        return DeferredExportResponse(results=results, skipped=skipped)
 
     @app.get(
         "/pipeline/{thread_id}/export.md",
