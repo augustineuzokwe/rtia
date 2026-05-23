@@ -116,6 +116,10 @@ def _state_to_panels(state) -> dict[str, Any]:
         "po_visible": gr.update(visible=False),
         "review_visible": gr.update(visible=False),
         "result_visible": gr.update(visible=False),
+        # Phase 16 hotfix — deep-flow export form has its own visibility so
+        # it stays hidden on DONE_FANOUT (where no deep artifact exists).
+        # See ADR-0010 and issue #175 for context.
+        "deep_export_visible": gr.update(visible=False),
         "po_questions": gr.update(value=""),
         "po_answers_visible": gr.update(visible=True),
         "po_fanout_visible": gr.update(visible=False),
@@ -184,6 +188,9 @@ def _state_to_panels(state) -> dict[str, Any]:
     elif state.status == ThreadStatus.DONE:
         rendered = state.payload.get("rendered_artifact", "")
         base["result_visible"] = gr.update(visible=True)
+        # Deep flow produced an artifact — the single-artifact "Push to
+        # backlog" form is the right control here.
+        base["deep_export_visible"] = gr.update(visible=True)
         base["result_md"] = gr.update(value=rendered)
         # write a temp .md the user can click to download
         import tempfile
@@ -217,11 +224,15 @@ def _state_to_panels(state) -> dict[str, Any]:
         # CheckboxGroup + Push-to-backlog flow.
         stubs = state.payload.get("fan_out_stories") or []
         base["result_visible"] = gr.update(visible=True)
+        # No deep artifact in fan-out mode — keep the single-artifact
+        # "Push to backlog" form hidden so the PO uses the correct
+        # "Create follow-up issues" control below.
+        base["deep_export_visible"] = gr.update(visible=False)
         md_lines = [
             "### Fan-out result",
             "",
             f"RTIA produced **{len(stubs)} lightweight backlog stubs**.",
-            "Click *Push to backlog* below to create them in Jira / GitHub.",
+            "Click *Create follow-up issues* below to create them in Jira / GitHub.",
             "",
             "_Re-run RTIA on any individual title to deep-dive that story._",
             "",
@@ -306,26 +317,35 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             result_md = gr.Markdown("")
             download_file = gr.File(label="Download markdown", visible=False)
 
-            gr.Markdown("---\n### Push to backlog")
-            export_backend = gr.Dropdown(
-                choices=["jira", "github"],
-                value="github",
-                label="Backend",
-            )
-            export_target = gr.Textbox(
-                label="Target (Jira: project key e.g. 'RTIA' | GitHub: repo 'owner/name')",
-                value="augustineuzokwe/rtia",
-            )
-            export_extra = gr.Textbox(
-                label=(
-                    "Optional: Jira parent epic key (e.g. 'RTIA-1') OR "
-                    "GitHub project number (e.g. '5')"
-                ),
-                value="",
-            )
-            export_dry_run = gr.Checkbox(label="Dry run (build payload, don't send)", value=True)
-            export_btn = gr.Button("Push to backlog", variant="primary")
-            export_result_md = gr.Markdown("")
+            # Deep-flow export form. Wrapped in its own Group so its
+            # visibility is independent from the artifact display —
+            # ``DONE_FANOUT`` reuses ``result_panel`` for the fan-out
+            # stub list but must NOT expose this form (the single-
+            # artifact endpoint has nothing to push in fan-out mode).
+            # See issue #175 / ADR-0010.
+            with gr.Group(visible=False) as deep_export_panel:
+                gr.Markdown("---\n### Push to backlog")
+                export_backend = gr.Dropdown(
+                    choices=["jira", "github"],
+                    value="github",
+                    label="Backend",
+                )
+                export_target = gr.Textbox(
+                    label="Target (Jira: project key e.g. 'RTIA' | GitHub: repo 'owner/name')",
+                    value="augustineuzokwe/rtia",
+                )
+                export_extra = gr.Textbox(
+                    label=(
+                        "Optional: Jira parent epic key (e.g. 'RTIA-1') OR "
+                        "GitHub project number (e.g. '5')"
+                    ),
+                    value="",
+                )
+                export_dry_run = gr.Checkbox(
+                    label="Dry run (build payload, don't send)", value=True
+                )
+                export_btn = gr.Button("Push to backlog", variant="primary")
+                export_result_md = gr.Markdown("")
 
         # Deferred-stories panel (Phase 15.3) — only visible when the
         # Analyst flagged multiple implied stories and the PO scoped
@@ -358,6 +378,7 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
                 mapping["result_visible"],
                 mapping["result_md"],
                 mapping["download_file"],
+                mapping["deep_export_visible"],
                 mapping["deferred_visible"],
                 mapping["deferred_md"],
                 mapping["deferred_checkboxes"],
@@ -376,6 +397,7 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             result_panel,
             result_md,
             download_file,
+            deep_export_panel,
             deferred_panel,
             deferred_md,
             deferred_checkboxes,
