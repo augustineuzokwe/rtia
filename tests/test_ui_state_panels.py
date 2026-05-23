@@ -111,6 +111,174 @@ def test_result_panel_visible_on_both_done_states():
         )
 
 
+def test_state_to_panels_returns_stable_key_set():
+    """Issue #186 §R1 — pin the dict keys ``_state_to_panels`` emits.
+
+    The build-time ``assert`` inside ``build_blocks`` checks that
+    ``_SPREAD_KEYS`` length matches the ``outputs`` list, but it can't
+    catch a renamed key. This test fails fast if anyone adds, removes,
+    or renames a key without updating both ends of the spread.
+    """
+    state = ThreadState(thread_id="tid", status=ThreadStatus.DONE, payload={})
+    panels = _state_to_panels(state)
+
+    expected = {
+        "status_md",
+        "thread_id_state",
+        "po_visible",
+        "po_questions",
+        "po_fanout_checkboxes",
+        "po_answers_visible",
+        "po_paused_payload",
+        "review_visible",
+        "review_preview",
+        "result_visible",
+        "result_md",
+        "download_file",
+        "backlog_visible",
+        "deep_export_visible",
+        "deferred_visible",
+        "deferred_md",
+        "deferred_checkboxes",
+        "error_visible",
+        "error_md",
+        "run_btn_interactive",
+    }
+    assert set(panels) == expected, (
+        f"_state_to_panels emitted unexpected keys: "
+        f"missing={expected - set(panels)} extra={set(panels) - expected}"
+    )
+
+
+def test_unknown_status_renders_loud_error():
+    """Issue #186 §R6 — a future graph change that adds a status must
+    surface visibly, not silently render every panel hidden."""
+
+    class _FakeStatus:
+        value = "fake_new_status"
+
+        def __repr__(self) -> str:
+            return "FAKE_NEW_STATUS"
+
+    class _FakeState:
+        thread_id = "tid"
+        status = _FakeStatus()
+        payload: dict = {}
+
+    panels = _state_to_panels(_FakeState())
+
+    assert _visible(panels["error_visible"]) is True
+    err_update = panels["error_md"]
+    err_value = err_update["value"] if isinstance(err_update, dict) else err_update.value
+    assert "Unknown pipeline status" in err_value
+    assert "FAKE_NEW_STATUS" in err_value
+
+
+def test_error_state_routes_to_error_panel_not_result_panel():
+    """Issue #186 §6.1 — ERROR must not toggle ``result_panel`` because
+    the Backlog target form was a structural child of it. Until #186,
+    every pipeline failure surfaced the "Backlog target" config inputs
+    with no actionable export button beneath them."""
+    state = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.ERROR,
+        payload={"rendered_artifact": "boom: gemini 503"},
+    )
+
+    panels = _state_to_panels(state)
+
+    assert _visible(panels["error_visible"]) is True
+    assert _visible(panels["result_visible"]) is False
+    assert _visible(panels["backlog_visible"]) is False
+    assert _visible(panels["deep_export_visible"]) is False
+    error_update = panels["error_md"]
+    error_value = error_update["value"] if isinstance(error_update, dict) else error_update.value
+    assert "boom: gemini 503" in error_value
+    assert "Re-edit" in error_value
+
+
+def test_error_state_with_no_message_still_renders_recovery_copy():
+    state = ThreadState(thread_id="tid", status=ThreadStatus.ERROR, payload={})
+
+    panels = _state_to_panels(state)
+
+    assert _visible(panels["error_visible"]) is True
+    error_update = panels["error_md"]
+    error_value = error_update["value"] if isinstance(error_update, dict) else error_update.value
+    assert "Re-edit" in error_value
+    assert "Run pipeline" in error_value
+
+
+def test_backlog_visible_on_both_terminal_success_states():
+    """The shared Backlog target form drives BOTH the deep export
+    button and the fan-out follow-up button; it must be reachable on
+    DONE and DONE_FANOUT (#186 §R3)."""
+    for status, payload in [
+        (ThreadStatus.DONE, {"rendered_artifact": "# x\n", "deferred_stories": []}),
+        (
+            ThreadStatus.DONE_FANOUT,
+            {"fan_out_stories": [{"title": "X", "summary": "x"}]},
+        ),
+    ]:
+        state = ThreadState(thread_id="tid", status=status, payload=payload)
+        panels = _state_to_panels(state)
+        assert _visible(panels["backlog_visible"]) is True, (
+            f"backlog_visible should be True on {status.value}"
+        )
+
+
+def test_backlog_hidden_in_non_terminal_states_and_error():
+    for status in [
+        ThreadStatus.RUNNING,
+        ThreadStatus.PAUSED_PO,
+        ThreadStatus.PAUSED_REVIEW,
+        ThreadStatus.ERROR,
+    ]:
+        state = ThreadState(thread_id="tid", status=status, payload={})
+        panels = _state_to_panels(state)
+        assert _visible(panels["backlog_visible"]) is False, (
+            f"backlog_visible should be False on {status.value}"
+        )
+
+
+def _interactive(update_obj) -> bool:
+    if isinstance(update_obj, dict):
+        return update_obj.get("interactive", True)
+    return getattr(update_obj, "interactive", True)
+
+
+def test_run_button_disabled_while_thread_is_active():
+    """Issue #186 §6.4 — clicking Run mid-pipeline used to orphan the
+    in-flight thread silently. The button is now disabled in every
+    non-terminal state."""
+    for status in [
+        ThreadStatus.RUNNING,
+        ThreadStatus.PAUSED_PO,
+        ThreadStatus.PAUSED_REVIEW,
+    ]:
+        state = ThreadState(thread_id="tid", status=status, payload={})
+        panels = _state_to_panels(state)
+        assert _interactive(panels["run_btn_interactive"]) is False, (
+            f"Run button must be disabled on {status.value}"
+        )
+
+
+def test_run_button_enabled_on_terminal_states():
+    for status, payload in [
+        (ThreadStatus.DONE, {"rendered_artifact": "# x\n", "deferred_stories": []}),
+        (
+            ThreadStatus.DONE_FANOUT,
+            {"fan_out_stories": [{"title": "X", "summary": "x"}]},
+        ),
+        (ThreadStatus.ERROR, {}),
+    ]:
+        state = ThreadState(thread_id="tid", status=status, payload=payload)
+        panels = _state_to_panels(state)
+        assert _interactive(panels["run_btn_interactive"]) is True, (
+            f"Run button must stay enabled on {status.value} so the user can start a new run"
+        )
+
+
 def test_deferred_panel_still_works_on_done_fanout():
     """Regression guard for #170 — the follow-up panel must still be
     visible on DONE_FANOUT so the user can push the stubs."""
