@@ -1,0 +1,10 @@
+# CODEOWNERS for RTIA.
+#
+# GitHub uses this file to auto-request review from the listed owners on
+# every PR that touches matching paths. Solo-author project today, so the
+# wildcard covers the whole tree; sub-paths can be carved out as more
+# contributors join.
+#
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+
+*       @augustineuzokwe
