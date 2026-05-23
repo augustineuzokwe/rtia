@@ -39,6 +39,7 @@ from langchain_core.messages import HumanMessage, SystemMessage  # noqa: E402
 from langchain_google_genai import ChatGoogleGenerativeAI  # noqa: E402
 
 from agents._llm_utils import coerce_response_text, strip_json_fence  # noqa: E402
+from agents._logging import configure_logging  # noqa: E402
 from agents.ac_generator import _PROMPT_HASH as AC_PROMPT_HASH  # noqa: E402
 from agents.ac_generator import AcGeneratorOutput, generate_acceptance_criteria  # noqa: E402
 from agents.config import (  # noqa: E402
@@ -50,6 +51,7 @@ from agents.requirements_analyst import _PROMPT_HASH, AnalystOutput  # noqa: E40
 from agents.test_case_writer import _PROMPT_HASH as TC_PROMPT_HASH  # noqa: E402
 from agents.test_case_writer import TestCaseWriterOutput, write_test_cases  # noqa: E402
 from agents.user_story_writer import UserStory, write_user_story  # noqa: E402
+from evals._telemetry_capture import capture_agent_telemetry  # noqa: E402
 from evals.ac_metrics import score_ac_coverage, score_ac_testability  # noqa: E402
 from evals.dataset import SampleRecord, load_all_samples  # noqa: E402
 from evals.judge import GeminiJudge  # noqa: E402
@@ -110,6 +112,12 @@ class SampleReport:
     story_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
     ac_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
     tc_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
+    # Phase 13.1 — wall-clock duration of the production agent chain
+    # (Analyst → Story Writer → AC Generator → Test Case Writer) for this
+    # sample. Excludes judge calls because those are eval scaffolding,
+    # not the pipeline being measured. Source: sum of Phase 13.2
+    # ``agent_invocation_end`` log records captured during evaluate_sample().
+    pipeline_duration_ms: int = 0
 
     @property
     def pipeline_usage(self) -> UsageTelemetry:
@@ -230,6 +238,23 @@ def _run_test_case_writer(
     return result, UsageTelemetry()
 
 
+def _usage_from_capture(telemetry, agent_name: str) -> UsageTelemetry:
+    """Pull a single agent's token usage from the captured log records.
+
+    Returns zeros when the agent didn't emit a record (e.g. the agent
+    was skipped this run, or the log capture wasn't active). Zero is
+    the right default here because a missing record means the agent
+    didn't run, not that it ran and produced no tokens.
+    """
+    obs = telemetry.for_agent(agent_name)
+    if obs is None:
+        return UsageTelemetry()
+    return UsageTelemetry(
+        input_tokens=obs.input_tokens or 0,
+        output_tokens=obs.output_tokens or 0,
+    )
+
+
 def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
     """Score one sample with a single Gemini judge.
 
@@ -237,17 +262,34 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
     or short classification calls — uniform judge use is appropriate
     post-cutover.
     """
-    analyst_output, analyst_usage = _run_analyst_capturing_usage(sample.raw_requirement)
-    po_answers = _auto_po_answers(sample.name, analyst_output)
+    # Phase 13.1 — capture per-agent telemetry (token counts +
+    # duration_ms) by listening to the Phase 13.2 log stream. Wraps the
+    # full production-agent chain so every ``agent_invocation_end``
+    # record lands in the capture bag. Judge calls are NOT inside this
+    # block — they emit no telemetry and are excluded by design.
+    with capture_agent_telemetry() as telemetry:
+        analyst_output, analyst_usage = _run_analyst_capturing_usage(sample.raw_requirement)
+        po_answers = _auto_po_answers(sample.name, analyst_output)
 
-    # Chain forward so AC-layer metrics score against what the AC Generator
-    # actually produces. Couples AC scores to upstream agent quality; the
-    # trade-off is documented in baselines.md. Failure here (e.g. Story
-    # Writer JSON parse) propagates as an exception — eval results for the
-    # AC layer are explicitly unavailable rather than silently zero'd.
-    story, story_usage = _run_story_writer(analyst_output, po_answers)
-    ac_result, ac_usage = _run_ac_generator(story, analyst_output, po_answers)
-    tc_result, tc_usage = _run_test_case_writer(story, ac_result)
+        # Chain forward so AC-layer metrics score against what the AC Generator
+        # actually produces. Couples AC scores to upstream agent quality; the
+        # trade-off is documented in baselines.md. Failure here (e.g. Story
+        # Writer JSON parse) propagates as an exception — eval results for the
+        # AC layer are explicitly unavailable rather than silently zero'd.
+        story, _ = _run_story_writer(analyst_output, po_answers)
+        ac_result, _ = _run_ac_generator(story, analyst_output, po_answers)
+        tc_result, _ = _run_test_case_writer(story, ac_result)
+
+    # Lift per-agent telemetry from the captured log records. Downstream
+    # agents now have real numbers (zero before Phase 13.1). Analyst
+    # telemetry from _run_analyst_capturing_usage is the authoritative
+    # source because it predates Phase 13.2's log path; we cross-check
+    # against the captured observation when available but defer to the
+    # pre-existing direct read.
+    story_usage = _usage_from_capture(telemetry, "user_story_writer")
+    ac_usage = _usage_from_capture(telemetry, "ac_generator")
+    tc_usage = _usage_from_capture(telemetry, "test_case_writer")
+    pipeline_duration_ms = telemetry.total_duration_ms
 
     # Composite artifact text for the requirement_fidelity metric — the
     # everything-a-junior-engineer-would-read concatenation across all
@@ -293,13 +335,18 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
         story_usage=story_usage,
         ac_usage=ac_usage,
         tc_usage=tc_usage,
+        pipeline_duration_ms=pipeline_duration_ms,
     )
 
 
 def _serialise(reports: list[SampleReport], *, judge_model: str) -> dict:
-    aggregate_usage = UsageTelemetry()
+    aggregate_analyst_usage = UsageTelemetry()
+    aggregate_pipeline_usage = UsageTelemetry()
+    aggregate_duration_ms = 0
     for r in reports:
-        aggregate_usage.add(r.analyst_usage)
+        aggregate_analyst_usage.add(r.analyst_usage)
+        aggregate_pipeline_usage.add(r.pipeline_usage)
+        aggregate_duration_ms += r.pipeline_duration_ms
 
     by_metric: dict[str, list[float]] = {}
     for report in reports:
@@ -321,12 +368,26 @@ def _serialise(reports: list[SampleReport], *, judge_model: str) -> dict:
                 "ac_output": r.ac_output,
                 "tc_output": r.tc_output,
                 "metrics": [asdict(m) for m in r.metrics],
+                # Per-agent + pipeline-aggregate usage. ``usage`` (legacy
+                # key) is kept as the Analyst-only view to avoid breaking
+                # any downstream reader; new readers should prefer
+                # ``per_agent_usage`` and ``pipeline_usage``.
                 "usage": asdict(r.analyst_usage),
+                "per_agent_usage": {
+                    "analyst": asdict(r.analyst_usage),
+                    "story_writer": asdict(r.story_usage),
+                    "ac_generator": asdict(r.ac_usage),
+                    "test_case_writer": asdict(r.tc_usage),
+                },
+                "pipeline_usage": asdict(r.pipeline_usage),
+                "pipeline_duration_ms": r.pipeline_duration_ms,
             }
             for r in reports
         ],
         "aggregate": {
-            "analyst_usage": asdict(aggregate_usage),
+            "analyst_usage": asdict(aggregate_analyst_usage),
+            "pipeline_usage": asdict(aggregate_pipeline_usage),
+            "pipeline_duration_ms": aggregate_duration_ms,
             "mean_scores": {name: sum(s) / len(s) for name, s in by_metric.items()},
         },
     }
@@ -340,15 +401,22 @@ def _print_summary(payload: dict) -> None:
         print(f"  {s['name']}")
         for m in s["metrics"]:
             print(f"    {m['name']:<28} {m['score']:.2f}  {m['reason'][:90]}")
-        print(f"    usage: input={s['usage']['input_tokens']} output={s['usage']['output_tokens']}")
+        pu = s.get("pipeline_usage", s["usage"])
+        duration_s = s.get("pipeline_duration_ms", 0) / 1000.0
+        print(
+            f"    pipeline: input={pu['input_tokens']} output={pu['output_tokens']} "
+            f"duration={duration_s:.1f}s"
+        )
     print("\nmean scores:")
     for name, score in payload["aggregate"]["mean_scores"].items():
         print(f"  {name:<28} {score:.2f}")
-    usage = payload["aggregate"]["analyst_usage"]
+    agg_pu = payload["aggregate"].get("pipeline_usage", payload["aggregate"]["analyst_usage"])
+    agg_duration_s = payload["aggregate"].get("pipeline_duration_ms", 0) / 1000.0
     print(
-        f"\nAnalyst token usage (excl. judge): "
-        f"input={usage['input_tokens']} output={usage['output_tokens']}"
+        f"\nPipeline token usage (excl. judge): "
+        f"input={agg_pu['input_tokens']} output={agg_pu['output_tokens']}"
     )
+    print(f"Pipeline wall-clock (excl. judge): {agg_duration_s:.1f}s")
 
 
 _COST_DISCLOSURE = (
@@ -368,6 +436,10 @@ def main(argv: list[str] | None = None) -> int:
     # shell (common when running under sandboxed agent/CI environments)
     # doesn't shadow the value the user set in .env.
     load_dotenv(override=True)
+    # Phase 13.1 — install the JSON log handler so capture_agent_telemetry
+    # has events to read. The runner is an entry point, same contract as
+    # scripts/run_pipeline_demo.py.
+    configure_logging()
     print(_COST_DISCLOSURE)
     print()
     parser = argparse.ArgumentParser(description=__doc__)
