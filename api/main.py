@@ -43,6 +43,13 @@ from api.parsers import (
     extract_pdf,
 )
 from api.runner import PipelineRunner
+from exporters.base import (
+    ExportConfigError,
+    ExporterTransportError,
+    ExportRequest,
+    ExportResult,
+    make_exporter,
+)
 
 _log = logging.getLogger("rtia.api")
 
@@ -232,6 +239,38 @@ def _register_routes(app: FastAPI) -> None:
             return runner.resume(thread_id, resume_value)
         except InvalidUpdateError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post(
+        "/pipeline/{thread_id}/export",
+        response_model=ExportResult,
+        dependencies=[Depends(verify_token)],
+    )
+    def export_to_backlog(thread_id: str, body: ExportRequest, request: Request) -> ExportResult:
+        """Push the thread's final artifact to Jira or GitHub.
+
+        ``body.dry_run=true`` short-circuits the HTTP call and returns
+        the would-be payload — safe to call without credentials.
+        """
+        runner: PipelineRunner = request.app.state.runner
+        loaded = runner.get_artifact_and_title(thread_id)
+        if loaded is None:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "No final artifact for this thread yet. "
+                    "The pipeline hasn't reached the Composer."
+                ),
+            )
+        artifact, title = loaded
+        rendered = artifact.as_markdown()
+
+        try:
+            exporter = make_exporter(body.target.backend)
+            return exporter.export(rendered, body.target, title=title, dry_run=body.dry_run)
+        except ExportConfigError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except ExporterTransportError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     @app.get(
         "/pipeline/{thread_id}/export.md",
