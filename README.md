@@ -52,6 +52,8 @@ A PO or BA has raw requirements. Instead of manually writing user stories, ACs, 
 **Input formats (v1):** Free text · PDF · Markdown
 **Input formats (v2):** Jira Epic via API
 
+> **End-user guide:** if you're a PO, BA, or QA lead using RTIA rather than building it, read [docs/USAGE.md](docs/USAGE.md) — it walks you from "I have a requirement" to "I have a backlog-ready artifact" without assuming any developer knowledge.
+
 ## Stack
 
 | Layer | Tool |
