@@ -388,6 +388,17 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
         # the destination for the follow-up exports below.
         with gr.Group(visible=False) as deep_export_panel:
             gr.Markdown("### Push the deep-flow artifact")
+            # Issue #208 — optional field. Leave blank to create a new
+            # issue (current default). Set to an existing issue number /
+            # key to PATCH that issue instead, collapsing a fan-out stub
+            # into its deep deep-dive in place.
+            export_update_id = gr.Textbox(
+                label=(
+                    "Update existing issue # (leave blank to create new) — "
+                    "GitHub: issue number (e.g. '203') | Jira: issue key (e.g. 'RTIA-42')"
+                ),
+                value="",
+            )
             export_btn = gr.Button("Push to backlog", variant="primary")
             export_result_md = gr.Markdown("")
 
@@ -605,12 +616,18 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
 
         review_accept.click(on_review_accept, [thread_id_state], outputs)
 
-        def on_export(thread_id, backend, target, extra, dry_run):
+        def on_export(thread_id, backend, target, extra, dry_run, update_id):
             """Push the current thread's artifact to Jira or GitHub.
 
-            All three configurable fields are typed into one Gradio
-            Textbox each to keep the UI simple. The handler shapes them
-            into an ``ExportTarget`` for the correct backend.
+            All configurable fields are typed into one Gradio Textbox
+            each to keep the UI simple. The handler shapes them into
+            an ``ExportTarget`` for the correct backend.
+
+            Issue #208 — when ``update_id`` is non-empty, the handler
+            calls ``exporter.update_issue`` instead of ``exporter.export``
+            so the artifact replaces an existing issue rather than
+            creating a duplicate. The success message says "Updated"
+            vs "Pushed" so the PO sees which path ran.
             """
             loaded = _runner(app).get_artifact_and_title(thread_id)
             if loaded is None:
@@ -619,6 +636,7 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
 
             target = (target or "").strip()
             extra = (extra or "").strip()
+            update_id = (update_id or "").strip()
             if backend == "jira":
                 tgt = ExportTarget(
                     backend="jira",
@@ -634,25 +652,36 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
 
             try:
                 exporter = make_exporter(backend)
-                result = exporter.export(
-                    artifact.as_markdown(), tgt, title=title, dry_run=bool(dry_run)
-                )
+                if update_id:
+                    result = exporter.update_issue(
+                        update_id,
+                        artifact.as_markdown(),
+                        tgt,
+                        title=title,
+                        dry_run=bool(dry_run),
+                    )
+                else:
+                    result = exporter.export(
+                        artifact.as_markdown(), tgt, title=title, dry_run=bool(dry_run)
+                    )
             except ExportConfigError as exc:
                 return f"❌ Config error: {exc}"
             except ExporterTransportError as exc:
                 return f"❌ Transport error: {exc}"
 
+            verb = "update" if update_id else "create"
             if result.dry_run:
                 import json as _json
 
                 payload_json = _json.dumps(result.payload, indent=2)[:2000]
                 return (
-                    f"✅ Dry-run for **{result.backend}**. Title: `{title}`\n\n"
+                    f"✅ Dry-run for **{result.backend}** ({verb}). Title: `{title}`\n\n"
                     f"```json\n{payload_json}\n```"
                 )
             if not result.success:
-                return f"❌ {result.backend} export failed: {result.error}"
-            return f"✅ Pushed to {result.backend}: [{result.key}]({result.url})"
+                return f"❌ {result.backend} {verb} failed: {result.error}"
+            action = "Updated" if update_id else "Pushed to"
+            return f"✅ {action} {result.backend}: [{result.key}]({result.url})"
 
         export_btn.click(
             on_export,
@@ -662,6 +691,7 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
                 export_target,
                 export_extra,
                 export_dry_run,
+                export_update_id,
             ],
             [export_result_md],
         )

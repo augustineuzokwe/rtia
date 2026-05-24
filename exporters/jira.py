@@ -114,6 +114,97 @@ class JiraExporter:
             payload=payload,
         )
 
+    def update_issue(
+        self,
+        issue_id: str,
+        artifact_markdown: str,
+        target: ExportTarget,
+        *,
+        title: str,
+        dry_run: bool = False,
+    ) -> ExportResult:
+        """PUT an existing Jira issue's summary + description.
+
+        Maps to ``PUT /rest/api/3/issue/{key}`` with the standard
+        ``{"fields": {...}}`` body shape. Jira returns ``204 No Content``
+        on success — we synthesise the resulting URL from
+        ``JIRA_BASE_URL`` + the issue key. Project / issuetype / parent
+        are intentionally NOT included in the update body — they were
+        set at create time and Jira validates updates against the
+        existing issue's context.
+        """
+        key = (issue_id or "").strip()
+        if not key or "-" not in key:
+            raise ExportConfigError(
+                f"Jira update_issue requires an issue key like 'RTIA-42', got {issue_id!r}."
+            )
+
+        base_url = (os.environ.get("JIRA_BASE_URL") or "").strip().rstrip("/")
+        email = (os.environ.get("JIRA_EMAIL") or "").strip()
+        api_token = (os.environ.get("JIRA_API_TOKEN") or "").strip()
+        if not dry_run and not (base_url and email and api_token):
+            raise ExportConfigError(
+                "Jira update requires JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN "
+                "in the environment (or use dry_run=true to inspect the payload)."
+            )
+
+        payload: dict[str, Any] = {
+            "fields": {
+                "summary": title,
+                "description": {
+                    "type": "doc",
+                    "version": 1,
+                    "content": [
+                        {
+                            "type": "codeBlock",
+                            "attrs": {"language": "markdown"},
+                            "content": [{"type": "text", "text": artifact_markdown}],
+                        }
+                    ],
+                },
+            }
+        }
+
+        if dry_run:
+            payload["_meta"] = {"issue_key": key, "operation": "update"}
+            return ExportResult(backend="jira", success=True, dry_run=True, payload=payload)
+
+        client = self._injected_client or httpx.Client(timeout=30.0)
+        try:
+            auth = base64.b64encode(f"{email}:{api_token}".encode()).decode("ascii")
+            response = client.put(
+                f"{base_url}/rest/api/3/issue/{key}",
+                json={"fields": payload["fields"]},
+                headers={
+                    "Authorization": f"Basic {auth}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            )
+        finally:
+            if self._injected_client is None:
+                client.close()
+
+        if response.status_code >= 400:
+            return ExportResult(
+                backend="jira",
+                success=False,
+                dry_run=False,
+                payload=payload,
+                error=f"Jira API returned {response.status_code}: {response.text[:500]}",
+            )
+
+        # 204 No Content on success — no body to parse. Synthesise URL.
+        url = f"{base_url}/browse/{key}"
+        return ExportResult(
+            backend="jira",
+            success=True,
+            dry_run=False,
+            url=url,
+            key=key,
+            payload=payload,
+        )
+
 
 def _build_payload(target: ExportTarget, title: str, markdown: str) -> dict[str, Any]:
     """Construct the Jira REST v3 issue-create body.

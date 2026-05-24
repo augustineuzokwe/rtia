@@ -76,6 +76,17 @@ class ExportRequest(BaseModel):
             "exactly what would have been sent."
         ),
     )
+    update_issue_id: str | None = Field(
+        default=None,
+        description=(
+            "Optional existing-issue identifier. When set, the exporter "
+            "PATCHes (GitHub) or PUTs (Jira) the existing issue instead "
+            "of creating a new one. Closes the duplicate-issue gap when "
+            "re-running RTIA on a fan-out stub's title (#208). GitHub: "
+            "numeric issue number (e.g. ``203``). Jira: issue key (e.g. "
+            "``RTIA-42``)."
+        ),
+    )
 
 
 class ExportResult(BaseModel):
@@ -126,6 +137,26 @@ class Exporter(Protocol):
         title: str,
         dry_run: bool = False,
     ) -> ExportResult: ...
+
+    def update_issue(
+        self,
+        issue_id: str,
+        artifact_markdown: str,
+        target: ExportTarget,
+        *,
+        title: str,
+        dry_run: bool = False,
+    ) -> ExportResult:
+        """Update an existing issue rather than creating a new one.
+
+        ``issue_id`` is a numeric GitHub issue number (string form, e.g.
+        ``"203"``) or a Jira issue key (e.g. ``"RTIA-42"``). The backend
+        validates the shape and raises ``ExportConfigError`` on a
+        mismatch. Closes the duplicate-issue gap from #208 — when the
+        PO re-runs RTIA on a fan-out stub's title, the deep artifact
+        replaces the stub in place instead of creating a sibling.
+        """
+        ...
 
 
 def make_exporter(backend: BackendName) -> Exporter:
