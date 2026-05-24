@@ -46,6 +46,18 @@ def test_post_pipeline_requires_non_empty_text(client):
     assert r.status_code == 422
 
 
+def test_post_pipeline_rejects_whitespace_only_text(client):
+    """Epic #1 intake-soundness audit (#1) — the UI's ``on_run`` rejects
+    whitespace-only input client-side, but a direct API caller could
+    otherwise slip a blank ``"   "`` past the Pydantic ``min_length=1``
+    check and start an empty pipeline run that the Analyst then errors
+    on confusingly. The ``_reject_blank`` validator on
+    ``PipelineRequest`` is the API-layer guardrail."""
+    for blank in ["   ", "\n\n", "\t  \n", " \r\n "]:
+        r = client.post("/pipeline", headers=_auth(), json={"requirement_text": blank})
+        assert r.status_code == 422, f"expected 422 for {blank!r}, got {r.status_code}"
+
+
 def test_get_pipeline_state(client, runner_mock):
     runner_mock.get_state.return_value = ThreadState(
         thread_id="tid", status=ThreadStatus.DONE, payload={"final_artifact": {}}

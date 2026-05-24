@@ -59,6 +59,28 @@ def test_extract_markdown_rejects_non_utf8():
         extract_markdown(b"\xff\xfe\x00binary garbage")
 
 
+def test_extract_markdown_strips_utf8_bom():
+    """Epic #1 intake-soundness audit (#1) — Markdown files saved by
+    Windows editors or exported from Notion frequently carry a leading
+    UTF-8 BOM (``\\xef\\xbb\\xbf``). Pre-fix, ``data.decode("utf-8")``
+    accepted the BOM but left U+FEFF at the start of the text, which
+    then surfaced in the Analyst's input as an invisible artifact.
+    Switching to ``utf-8-sig`` strips it transparently while still
+    handling BOM-less files identically."""
+    bom = b"\xef\xbb\xbf"
+    text = "# Requirement\n\nAs a user, I want X."
+    extracted = extract_markdown(bom + text.encode("utf-8"))
+    assert extracted == text
+    assert not extracted.startswith("﻿")
+
+
+def test_extract_markdown_bomless_unchanged():
+    """The BOM strip must not affect BOM-less files — their bytes are
+    canonical UTF-8 and round-trip exactly."""
+    text = "# No BOM here\n\nplain ascii."
+    assert extract_markdown(text.encode("utf-8")) == text
+
+
 def test_extract_pdf_blank_pdf_is_scanned():
     with pytest.raises(ScannedPdfError):
         extract_pdf(_make_blank_pdf())

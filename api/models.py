@@ -12,7 +12,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ThreadStatus(StrEnum):
@@ -36,6 +36,19 @@ class PipelineRequest(BaseModel):
     """Body for ``POST /pipeline``."""
 
     requirement_text: str = Field(..., min_length=1)
+
+    @field_validator("requirement_text")
+    @classmethod
+    def _reject_blank(cls, value: str) -> str:
+        """Reject whitespace-only input. Pydantic's ``min_length=1`` accepts
+        ``"   "`` because it counts characters before strip. The UI already
+        guards this client-side (``ui/gradio_app.py:on_run``) but a direct
+        API caller could otherwise start an empty pipeline run that the
+        Analyst then errors on confusingly. Defense in depth — Epic #1
+        intake-soundness audit (#1)."""
+        if not value or not value.strip():
+            raise ValueError("requirement_text must not be empty or whitespace-only")
+        return value
 
 
 class ResumeRequest(BaseModel):
