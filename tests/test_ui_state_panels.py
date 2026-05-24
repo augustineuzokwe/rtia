@@ -331,3 +331,57 @@ def test_fanout_row_checkboxes_have_no_visible_label():
             f"fan-out checkbox row {i} must have show_label=False "
             f"(got show_label={chk.show_label!r}, label={chk.label!r})"
         )
+
+
+def _checkboxes_visible(update_obj) -> bool:
+    if isinstance(update_obj, dict):
+        return update_obj.get("visible", False)
+    return getattr(update_obj, "visible", False)
+
+
+def test_deferred_checkboxgroup_hidden_on_done_fanout():
+    """Issue #214 — on DONE_FANOUT the PO already picked/renamed/dropped
+    at the editable PO checkpoint (#207). Re-surfacing a second
+    CheckboxGroup with the same titles is redundant and looks like the
+    upstream selection didn't take. The panel + button stay visible so
+    the PO can trigger the push; the redundant title list is suppressed."""
+    state = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.DONE_FANOUT,
+        payload={
+            "fan_out_stories": [
+                {"title": "Story A", "summary": "a"},
+                {"title": "Story B", "summary": "b"},
+            ]
+        },
+    )
+    panels = _state_to_panels(state)
+    # Panel (with the export-deferred button inside) must stay visible.
+    assert _visible(panels["deferred_visible"]) is True
+    # CheckboxGroup must NOT be visible — that's the redundancy we removed.
+    assert _checkboxes_visible(panels["deferred_checkboxes"]) is False
+    # And the dangling label that used to head the list is dropped.
+    md_update = panels["deferred_md"]
+    md_value = md_update["value"] if isinstance(md_update, dict) else md_update.value
+    assert md_value == ""
+
+
+def test_deferred_checkboxgroup_still_shown_on_done_with_deferred_stories():
+    """Issue #214 — the DONE (deep flow) branch is unchanged. There, the
+    PO picked ONE story at the PO checkpoint and the rest were *inferred*
+    deferred; the opt-out CheckboxGroup is the only place the PO sees
+    them, so it must stay visible."""
+    state = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.DONE,
+        payload={
+            "rendered_artifact": "# Story\n",
+            "deferred_stories": [
+                {"title": "Other story 1", "summary": "x"},
+                {"title": "Other story 2", "summary": "y"},
+            ],
+        },
+    )
+    panels = _state_to_panels(state)
+    assert _visible(panels["deferred_visible"]) is True
+    assert _checkboxes_visible(panels["deferred_checkboxes"]) is True
