@@ -283,12 +283,21 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
         thread_id_state = gr.State(value="")
         status_md = gr.Markdown("Status: **idle**")
 
+        # Compact intake layout. Before: 12-line textbox + two stacked
+        # full-size gr.File drop zones consumed ~900px before-fold; users
+        # had to scroll just to see the Run button. Now: a tighter
+        # textbox (paragraphs still grow it dynamically) and the two
+        # uploads side-by-side in a Row, with reduced drop-zone height.
+        # Same handlers, same widgets — just denser packing.
         with gr.Row(), gr.Column(scale=2):
             req_text = gr.Textbox(
-                label="Requirement text", lines=12, placeholder="Paste raw requirements here…"
+                label="Requirement text", lines=6, placeholder="Paste raw requirements here…"
             )
-            upload_pdf_input = gr.File(label="…or upload a PDF", file_types=[".pdf"])
-            upload_md_input = gr.File(label="…or upload Markdown", file_types=[".md"])
+            with gr.Row():
+                upload_pdf_input = gr.File(label="…or upload a PDF", file_types=[".pdf"], height=80)
+                upload_md_input = gr.File(
+                    label="…or upload Markdown", file_types=[".md"], height=80
+                )
             run_btn = gr.Button("Run pipeline", variant="primary")
             upload_status = gr.Markdown("")
 
