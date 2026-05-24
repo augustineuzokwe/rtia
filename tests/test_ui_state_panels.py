@@ -294,3 +294,40 @@ def test_deferred_panel_still_works_on_done_fanout():
     panels = _state_to_panels(state)
 
     assert _visible(panels["deferred_visible"]) is True
+
+
+def test_fanout_row_checkboxes_have_no_visible_label():
+    """Issue #213 — every pre-built fan-out row checkbox must be built
+    with ``show_label=False`` so Gradio doesn't fall back to its default
+    literal "Checkbox" label. The neighbouring Textbox already labels
+    the story; the checkbox is implicit "keep"."""
+    from unittest.mock import MagicMock
+
+    import gradio as gr
+    from fastapi import FastAPI
+
+    from ui.gradio_app import _MAX_FANOUT_ROWS, build_blocks
+
+    app = FastAPI()
+    app.state.runner = MagicMock()
+    blocks = build_blocks(app)
+
+    def _walk(comp):
+        if isinstance(comp, gr.Checkbox):
+            yield comp
+        if hasattr(comp, "children"):
+            for child in comp.children:
+                yield from _walk(child)
+
+    checkboxes = list(_walk(blocks))
+    # First N checkboxes are the fan-out row checkboxes (declaration
+    # order); the "Dry run" checkbox sits after them.
+    fanout_chks = checkboxes[:_MAX_FANOUT_ROWS]
+    assert len(fanout_chks) == _MAX_FANOUT_ROWS, (
+        f"expected {_MAX_FANOUT_ROWS} fan-out checkboxes, found {len(fanout_chks)}"
+    )
+    for i, chk in enumerate(fanout_chks):
+        assert chk.show_label is False, (
+            f"fan-out checkbox row {i} must have show_label=False "
+            f"(got show_label={chk.show_label!r}, label={chk.label!r})"
+        )
