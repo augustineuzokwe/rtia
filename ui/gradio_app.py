@@ -314,17 +314,25 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             po_submit = gr.Button("Submit", variant="primary")
 
         # Story review panel.
+        #
+        # Layout: review preview → primary "Accept as-is" button (takes
+        # the Story Writer's output unchanged) → override-edit section
+        # (fields + "Override" button right beneath them, so it's clear
+        # which control acts on which inputs). The prior layout placed
+        # both buttons in a single row ABOVE the textboxes, which made
+        # the textboxes look orphaned and the Override button look like
+        # it acted on the rendered preview rather than the edit fields.
         with gr.Group(visible=False) as review_panel:
             review_preview = gr.Markdown("")
-            with gr.Row():
-                review_accept = gr.Button("Accept as-is", variant="primary")
-                review_override = gr.Button("Override")
+            review_accept = gr.Button("Accept as-is", variant="primary")
+            gr.Markdown("---\n#### …or edit and override")
             override_description = gr.Textbox(
                 label="New description (leave blank to keep)", lines=2, visible=True
             )
             override_objective = gr.Textbox(
                 label="New objective (leave blank to keep)", lines=2, visible=True
             )
+            review_override = gr.Button("Override")
 
         # Result panel — artifact preview + download only.
         with gr.Group(visible=False) as result_panel:
@@ -475,36 +483,64 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
         upload_pdf_input.change(on_upload_pdf, [upload_pdf_input], [req_text, upload_status])
         upload_md_input.change(on_upload_md, [upload_md_input], [req_text, upload_status])
 
+        def _all_hidden_tuple(status_text: str, run_interactive: bool) -> tuple:
+            """Build a panel-update tuple where every gated panel is hidden.
+
+            Shared by the empty-input path and the in-flight "running…"
+            path. Positionally aligned with ``_SPREAD_KEYS`` / ``outputs``
+            (#186 §R1); the build-time assert below guards length drift.
+            """
+            return (
+                gr.update(value=status_text),  # status_md
+                "",  # thread_id_state
+                gr.update(visible=False),  # po_panel
+                gr.update(value=""),  # po_questions
+                gr.update(choices=[], value=[], visible=False),  # po_fanout_checkboxes
+                gr.update(visible=True),  # po_answers
+                {},  # po_paused_payload_state
+                gr.update(visible=False),  # review_panel
+                gr.update(value=""),  # review_preview
+                gr.update(visible=False),  # result_panel
+                gr.update(value=""),  # result_md
+                gr.update(value=None, visible=False),  # download_file
+                gr.update(visible=False),  # backlog_target_panel
+                gr.update(visible=False),  # deep_export_panel
+                gr.update(visible=False),  # deferred_panel
+                gr.update(value=""),  # deferred_md
+                gr.update(choices=[], value=[], visible=False),  # deferred_checkboxes
+                gr.update(visible=False),  # error_panel
+                gr.update(value=""),  # error_md
+                gr.update(interactive=run_interactive),  # run_btn
+            )
+
         def on_run(text):
+            """Generator handler — yields a 'running' frame immediately so
+            the user gets visible feedback during the 5-15s Analyst call,
+            then yields the real state when the runner returns.
+
+            Without this intermediate yield, the only feedback during the
+            pipeline's first leg is the Run button greying out (PR #188
+            §6.4) — a real but easy-to-miss signal. Yielding a
+            'Status: running…' frame on click makes it unambiguous.
+            See: feedback from the live UI walk-through (Epic #1 follow-up).
+            """
             if not (text or "").strip():
                 # Empty input — no thread is started, every gated panel
-                # stays hidden, Run stays enabled. We return raw
-                # gr.update objects positionally so we don't have to
-                # invent an "idle" ThreadStatus (#186 §6.2).
-                return (
-                    gr.update(value="Status: **idle**"),  # status_md
-                    "",  # thread_id_state
-                    gr.update(visible=False),  # po_panel
-                    gr.update(value=""),  # po_questions
-                    gr.update(choices=[], value=[], visible=False),  # po_fanout_checkboxes
-                    gr.update(visible=True),  # po_answers
-                    {},  # po_paused_payload_state
-                    gr.update(visible=False),  # review_panel
-                    gr.update(value=""),  # review_preview
-                    gr.update(visible=False),  # result_panel
-                    gr.update(value=""),  # result_md
-                    gr.update(value=None, visible=False),  # download_file
-                    gr.update(visible=False),  # backlog_target_panel
-                    gr.update(visible=False),  # deep_export_panel
-                    gr.update(visible=False),  # deferred_panel
-                    gr.update(value=""),  # deferred_md
-                    gr.update(choices=[], value=[], visible=False),  # deferred_checkboxes
-                    gr.update(visible=False),  # error_panel
-                    gr.update(value=""),  # error_md
-                    gr.update(interactive=True),  # run_btn
-                )
+                # stays hidden, Run stays enabled. (#186 §6.2)
+                yield _all_hidden_tuple("Status: **idle**", run_interactive=True)
+                return
+            # Immediate 'running' frame so the user sees feedback right
+            # after click; Run button locked (matches #186 §6.4 contract
+            # for active-thread states).
+            yield _all_hidden_tuple(
+                "Status: **running…** _(analysing requirement — this typically takes 5–15 s)_",
+                run_interactive=False,
+            )
+            # Now block on the actual pipeline (Analyst → PO checkpoint
+            # or deep flow). When it returns, _spread emits the final
+            # panel set.
             state = _runner(app).start(text)
-            return _spread(state)
+            yield _spread(state)
 
         run_btn.click(on_run, [req_text], outputs)
 
