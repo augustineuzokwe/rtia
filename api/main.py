@@ -323,6 +323,19 @@ def _register_routes(app: FastAPI) -> None:
 
         try:
             exporter = make_exporter(body.target.backend)
+            # Issue #208 — when ``update_issue_id`` is supplied, replace
+            # the existing issue instead of creating a duplicate. The
+            # common flow: PO copies a fan-out stub's issue number,
+            # re-runs RTIA on the title, sets ``update_issue_id`` to
+            # collapse the deep artifact onto the stub.
+            if body.update_issue_id:
+                return exporter.update_issue(
+                    body.update_issue_id,
+                    rendered,
+                    body.target,
+                    title=title,
+                    dry_run=body.dry_run,
+                )
             return exporter.export(rendered, body.target, title=title, dry_run=body.dry_run)
         except ExportConfigError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc

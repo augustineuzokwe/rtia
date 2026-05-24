@@ -96,3 +96,56 @@ def test_export_jira_dry_run_includes_project_key(client, runner_mock):
     assert r.status_code == 200
     payload = r.json()["payload"]
     assert payload["fields"]["project"]["key"] == "RTIA"
+
+
+def test_export_with_update_issue_id_routes_to_github_update(client, runner_mock, monkeypatch):
+    """Issue #208 — ``update_issue_id`` flips dispatch to ``update_issue``;
+    dry-run payload reflects the update operation."""
+    runner_mock.get_artifact_and_title.return_value = (_stub_artifact(), "do thing X")
+    r = client.post(
+        "/pipeline/tid/export",
+        headers=_auth(),
+        json={
+            "target": {"backend": "github", "github_repo": "owner/name"},
+            "dry_run": True,
+            "update_issue_id": "203",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["success"] is True
+    assert body["dry_run"] is True
+    assert body["payload"]["_meta"]["operation"] == "update"
+    assert body["payload"]["_meta"]["issue_number"] == "203"
+
+
+def test_export_with_update_issue_id_routes_to_jira_update(client, runner_mock):
+    runner_mock.get_artifact_and_title.return_value = (_stub_artifact(), "t")
+    r = client.post(
+        "/pipeline/tid/export",
+        headers=_auth(),
+        json={
+            "target": {"backend": "jira", "jira_project_key": "RTIA"},
+            "dry_run": True,
+            "update_issue_id": "RTIA-42",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["payload"]["_meta"]["operation"] == "update"
+    assert body["payload"]["_meta"]["issue_key"] == "RTIA-42"
+
+
+def test_export_with_invalid_update_issue_id_returns_400(client, runner_mock):
+    """Bad shape (Jira-style key for a GitHub target) → ExportConfigError → 400."""
+    runner_mock.get_artifact_and_title.return_value = (_stub_artifact(), "t")
+    r = client.post(
+        "/pipeline/tid/export",
+        headers=_auth(),
+        json={
+            "target": {"backend": "github", "github_repo": "owner/name"},
+            "dry_run": True,
+            "update_issue_id": "RTIA-42",
+        },
+    )
+    assert r.status_code == 400

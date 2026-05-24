@@ -182,3 +182,128 @@ def test_make_exporter_routes_by_backend():
     assert make_exporter("github").backend == "github"
     with pytest.raises(ExportConfigError):
         make_exporter("teamcity")  # type: ignore[arg-type]
+
+
+# ---------- update_issue (#208) -----------------------------------------
+
+
+def test_github_update_dry_run_builds_patch_payload(monkeypatch):
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    target = ExportTarget(backend="github", github_repo="acme/widgets")
+    result = GitHubExporter().update_issue(
+        "203", "## new body", target, title="Updated title", dry_run=True
+    )
+    assert result.success is True
+    assert result.dry_run is True
+    assert result.payload["title"] == "Updated title"
+    assert result.payload["body"] == "## new body"
+    assert result.payload["_meta"]["operation"] == "update"
+    assert result.payload["_meta"]["issue_number"] == "203"
+
+
+def test_github_update_requires_numeric_id():
+    target = ExportTarget(backend="github", github_repo="acme/widgets")
+    with pytest.raises(ExportConfigError):
+        GitHubExporter().update_issue("RTIA-42", "body", target, title="t", dry_run=True)
+
+
+def test_github_update_real_patch_succeeds(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_xxx")
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.method == "PATCH" and request.url.path.endswith("/issues/203"):
+            return httpx.Response(
+                200,
+                json={
+                    "html_url": "https://github.com/acme/widgets/issues/203",
+                    "number": 203,
+                },
+            )
+        return httpx.Response(500, text=f"unexpected: {request.method} {request.url.path}")
+
+    transport = httpx.MockTransport(handler)
+    client = httpx.Client(transport=transport)
+    target = ExportTarget(backend="github", github_repo="acme/widgets")
+    result = GitHubExporter(http_client=client).update_issue(
+        "203", "body", target, title="t", dry_run=False
+    )
+    assert result.success is True
+    assert result.key == "203"
+    assert result.url == "https://github.com/acme/widgets/issues/203"
+    assert len(seen) == 1
+    assert seen[0].method == "PATCH"
+
+
+def test_github_update_404_returns_error(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_xxx")
+    transport = httpx.MockTransport(lambda r: httpx.Response(404, text='{"message":"Not Found"}'))
+    client = httpx.Client(transport=transport)
+    target = ExportTarget(backend="github", github_repo="acme/widgets")
+    result = GitHubExporter(http_client=client).update_issue(
+        "999", "body", target, title="t", dry_run=False
+    )
+    assert result.success is False
+    assert "404" in result.error
+
+
+def test_jira_update_dry_run_builds_put_payload(monkeypatch):
+    monkeypatch.delenv("JIRA_BASE_URL", raising=False)
+    target = ExportTarget(backend="jira", jira_project_key="RTIA")
+    result = JiraExporter().update_issue(
+        "RTIA-42", "## body", target, title="Updated", dry_run=True
+    )
+    assert result.success is True
+    assert result.dry_run is True
+    assert result.payload["fields"]["summary"] == "Updated"
+    block = result.payload["fields"]["description"]["content"][0]
+    assert block["type"] == "codeBlock"
+    assert block["content"][0]["text"] == "## body"
+    # No project / issuetype / parent on update — those are pinned at create.
+    assert "project" not in result.payload["fields"]
+    assert "issuetype" not in result.payload["fields"]
+    assert result.payload["_meta"]["operation"] == "update"
+
+
+def test_jira_update_requires_key_shape():
+    target = ExportTarget(backend="jira", jira_project_key="RTIA")
+    with pytest.raises(ExportConfigError):
+        JiraExporter().update_issue("123", "body", target, title="t", dry_run=True)
+
+
+def test_jira_update_real_put_succeeds(monkeypatch):
+    monkeypatch.setenv("JIRA_BASE_URL", "https://example.atlassian.net")
+    monkeypatch.setenv("JIRA_EMAIL", "user@example.com")
+    monkeypatch.setenv("JIRA_API_TOKEN", "secret")
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        # Jira returns 204 No Content on a successful update.
+        return httpx.Response(204)
+
+    transport = httpx.MockTransport(handler)
+    client = httpx.Client(transport=transport)
+    target = ExportTarget(backend="jira", jira_project_key="RTIA")
+    result = JiraExporter(http_client=client).update_issue(
+        "RTIA-42", "body", target, title="t", dry_run=False
+    )
+    assert result.success is True
+    assert result.key == "RTIA-42"
+    assert result.url == "https://example.atlassian.net/browse/RTIA-42"
+    assert seen[0].method == "PUT"
+
+
+def test_jira_update_4xx_returns_error(monkeypatch):
+    monkeypatch.setenv("JIRA_BASE_URL", "https://example.atlassian.net")
+    monkeypatch.setenv("JIRA_EMAIL", "user@example.com")
+    monkeypatch.setenv("JIRA_API_TOKEN", "secret")
+    transport = httpx.MockTransport(lambda r: httpx.Response(404, text='{"errorMessages":["x"]}'))
+    client = httpx.Client(transport=transport)
+    target = ExportTarget(backend="jira", jira_project_key="RTIA")
+    result = JiraExporter(http_client=client).update_issue(
+        "RTIA-999", "body", target, title="t", dry_run=False
+    )
+    assert result.success is False
+    assert "404" in result.error

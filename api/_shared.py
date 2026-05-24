@@ -57,6 +57,12 @@ def build_followup_markdown(
             "Re-run RTIA on this title once you're ready to flesh out the "
             "full Description / Objective / ACs / Test Cases._"
         ),
+        "",
+        (
+            '_When you push the deep artifact, set **"Update existing '
+            "issue #\"** to **this issue's number** so the deep dive "
+            "replaces this stub instead of creating a duplicate (#208)._"
+        ),
     ]
     if excerpt:
         parts.extend(["", "## Originating requirement (excerpt)", "", excerpt])

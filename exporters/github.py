@@ -130,6 +130,95 @@ class GitHubExporter:
             if self._injected_client is None:
                 client.close()
 
+    def update_issue(
+        self,
+        issue_id: str,
+        artifact_markdown: str,
+        target: ExportTarget,
+        *,
+        title: str,
+        dry_run: bool = False,
+    ) -> ExportResult:
+        """PATCH an existing GitHub issue with the new title + body.
+
+        Maps to ``PATCH /repos/{owner}/{repo}/issues/{number}``. Skips
+        the optional Project (v2) add — the existing issue is already
+        wherever it was originally created. Returns
+        ``ExportResult(success=True, key=str(number), url=...)`` on
+        success; for 404 / other 4xx, returns ``success=False`` with
+        the response body in ``error``.
+        """
+        if not target.github_repo or "/" not in target.github_repo:
+            raise ExportConfigError(
+                "GitHub update requires target.github_repo in 'owner/name' form."
+            )
+        number = (issue_id or "").strip()
+        if not number.isdigit():
+            raise ExportConfigError(
+                f"GitHub update_issue requires a numeric issue number, got {issue_id!r}."
+            )
+
+        token = (os.environ.get("GITHUB_TOKEN") or "").strip()
+        if not dry_run and not token:
+            raise ExportConfigError(
+                "GitHub update requires GITHUB_TOKEN in the environment "
+                "(or use dry_run=true to inspect the payload)."
+            )
+
+        payload: dict[str, Any] = {
+            "title": title,
+            "body": artifact_markdown,
+        }
+        owner, repo = target.github_repo.split("/", 1)
+
+        if dry_run:
+            payload["_meta"] = {
+                "repo": target.github_repo,
+                "issue_number": number,
+                "operation": "update",
+            }
+            return ExportResult(backend="github", success=True, dry_run=True, payload=payload)
+
+        client = self._injected_client or httpx.Client(timeout=30.0)
+        try:
+            response = client.patch(
+                f"{_GITHUB_API}/repos/{owner}/{repo}/issues/{number}",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                },
+            )
+            if response.status_code >= 400:
+                return ExportResult(
+                    backend="github",
+                    success=False,
+                    dry_run=False,
+                    payload=payload,
+                    error=(
+                        f"GitHub issue-update returned {response.status_code}: "
+                        f"{response.text[:500]}"
+                    ),
+                )
+            try:
+                body = response.json()
+            except ValueError as exc:
+                raise ExporterTransportError(
+                    f"GitHub returned non-JSON body: {response.text[:200]}"
+                ) from exc
+            return ExportResult(
+                backend="github",
+                success=True,
+                dry_run=False,
+                url=body.get("html_url"),
+                key=str(body.get("number")) if body.get("number") is not None else number,
+                payload=payload,
+            )
+        finally:
+            if self._injected_client is None:
+                client.close()
+
 
 def _add_to_project(
     client: httpx.Client,
