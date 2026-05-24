@@ -30,12 +30,18 @@ def test_jira_dry_run_builds_payload_without_creds(monkeypatch):
     assert result.dry_run is True
     assert result.payload["fields"]["project"]["key"] == "RTIA"
     assert result.payload["fields"]["summary"] == "As a user I want X"
-    # ADF codeBlock preserves the markdown text verbatim.
+    # #223 — description is now native ADF (heading + paragraph) rather
+    # than a codeBlock wrap. Markdown→ADF conversion lives in
+    # exporters/_adf.py; this assertion pins the integration point.
     desc = result.payload["fields"]["description"]
     assert desc["type"] == "doc"
-    block = desc["content"][0]
-    assert block["type"] == "codeBlock"
-    assert block["content"][0]["text"].startswith("## Description")
+    first = desc["content"][0]
+    assert first["type"] == "heading"
+    assert first["attrs"]["level"] == 2
+    assert first["content"][0]["text"] == "Description"
+    second = desc["content"][1]
+    assert second["type"] == "paragraph"
+    assert second["content"][0]["text"] == "body"
 
 
 def test_jira_dry_run_includes_parent_when_set():
@@ -257,9 +263,11 @@ def test_jira_update_dry_run_builds_put_payload(monkeypatch):
     assert result.success is True
     assert result.dry_run is True
     assert result.payload["fields"]["summary"] == "Updated"
-    block = result.payload["fields"]["description"]["content"][0]
-    assert block["type"] == "codeBlock"
-    assert block["content"][0]["text"] == "## body"
+    # #223 — update path uses the same native-ADF converter as create.
+    first = result.payload["fields"]["description"]["content"][0]
+    assert first["type"] == "heading"
+    assert first["attrs"]["level"] == 2
+    assert first["content"][0]["text"] == "body"
     # No project / issuetype / parent on update — those are pinned at create.
     assert "project" not in result.payload["fields"]
     assert "issuetype" not in result.payload["fields"]

@@ -144,7 +144,10 @@ def test_export_deferred_400_on_misconfigured_target(client, runner_mock):
     assert r.status_code == 400
 
 
-def test_export_deferred_jira_dry_run_uses_adf_codeblock(client, runner_mock):
+def test_export_deferred_jira_dry_run_uses_native_adf(client, runner_mock):
+    """#223 — deferred-export Jira path uses the same native-ADF
+    converter as the main create path. The follow-up-issue markdown
+    starts with ``## Story A`` so the first ADF node is a level-2 heading."""
     runner_mock.get_deferred_stories_and_context.return_value = (
         [ImpliedStory(title="Story A", summary="A")],
         "req",
@@ -161,7 +164,10 @@ def test_export_deferred_jira_dry_run_uses_adf_codeblock(client, runner_mock):
     result = body["results"][0]
     assert result["payload"]["fields"]["summary"] == "Story A"
     desc = result["payload"]["fields"]["description"]
-    assert desc["content"][0]["type"] == "codeBlock"
+    first = desc["content"][0]
+    assert first["type"] == "heading"
+    assert first["attrs"]["level"] == 2
+    assert first["content"][0]["text"] == "Story A"
 
 
 def test_export_deferred_dispatches_to_fanout_source_on_done_fanout(client, runner_mock):
