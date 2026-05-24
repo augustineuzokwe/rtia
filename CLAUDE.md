@@ -48,7 +48,7 @@ rtia/
 ├── api/                   # FastAPI app + bearer-token auth + exporters bridge (Phase 14)
 ├── ui/                    # Gradio Blocks UI mounted at / (Phase 14)
 ├── exporters/             # Jira + GitHub backends behind one Exporter Protocol (Phase 15.2)
-└── docs/                  # ADRs + USAGE.md (Phase 16) + UI_CONTRACT.md (developer-facing UI rules, #186)
+└── docs/                  # ADRs + USAGE.md (Phase 16)
 ```
 
 `agents/` and `prompts/` mirror 1:1 — each agent owns one prompts module.
@@ -73,6 +73,15 @@ uv run python scripts/run_api.py                       # FastAPI + Gradio UI at 
 ```
 
 The demo requires `ANTHROPIC_API_KEY` in `.env` (see `.env.example`). LangSmith tracing is optional — set `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY=lsv2_pt_…` + `LANGSMITH_PROJECT=rtia` to enable.
+
+**Pre-commit secret scanner (`detect-secrets`, Phase 12.3.1 / #126):** committed alongside `.pre-commit-config.yaml`. Runs on every commit and in CI. New high-entropy strings (AWS keys, JWTs, private keys, base64 blobs above the default-entropy threshold) fail the hook. Legitimate fixtures live in `.secrets.baseline` — the file lists every flagged string the project already knows about (today: the test fixtures in `agents/_secret_scan.py` and `tests/test_secret_scan.py`). When a new finding is real, redact it; when it's an intentional fixture, refresh the baseline:
+
+```bash
+uv run detect-secrets scan > .secrets.baseline   # rebuild from scratch
+uv run pre-commit run detect-secrets --all-files # verify the hook is clean
+```
+
+This is the *commit-time* layer; the runtime layer (`agents/_secret_scan.py`, #124) catches secrets pasted into requirements at invocation time. Both are needed — they cover different threat surfaces.
 
 **API token (`RTIA_API_TOKEN`, Phase 14):** the `run_api.py` entrypoint mints a fresh URL-safe bearer token per process unless `RTIA_API_TOKEN` is set in `.env`. The token gates all `/pipeline*` and `/uploads/*` endpoints (`Authorization: Bearer <token>`) and the Gradio mount accepts it via `?token=…` so the printed startup URL is one-click. Set `RTIA_API_HOST` / `RTIA_API_PORT` to override the default `127.0.0.1:8000`.
 
@@ -234,7 +243,6 @@ Don't start work on a phase without first reading the relevant section of the pl
 - **msgpack deserialization warning** — `AnalystOutput` etc. need to be registered for checkpointing. Phase 2.2 fixes; until then, the warning is benign noise.
 - **`gemini-3.5-flash` is an alias** — not pinned to a date. When Google publishes dated suffixes for the 3.5 line, bump `DEFAULT_MODEL` for reproducibility. Same caveat applied to `gemini-2.5-flash` before the ADR-0007 switch.
 - **Gemini 503s are backend-pool specific, not global.** A Gemini model alias that 503s on GitHub-hosted runners can simultaneously respond fine from a maintainer laptop — Google routes runner IP ranges to a specific backend pool. When a 503 storm hits, probe sibling models live (`client.models.list()` + a 1-token `invoke`) before assuming Google is globally down. See ADR-0007 §"What we proved with live probing".
-- **UI panel visibility is a contract, not free-form** — issues #170 / #176 / #178 / #186 were all reactive patches around `ui/gradio_app.py` state-to-panel mapping. Before any change to a `gr.update(visible=…)` or to `_state_to_panels` / `_SPREAD_KEYS` / `outputs`, read [docs/UI_CONTRACT.md](docs/UI_CONTRACT.md) — it's short and lists the invariants the audit landed on.
 
 ---
 
