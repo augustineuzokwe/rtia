@@ -28,6 +28,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from agents._logging import configure_logging
 from agents.observability import ProductionTracingError, assert_safe_for_env
+from api._shared import build_followup_markdown, select_followup_source
 from api.auth import TokenStore, generate_token, verify_token
 from api.models import (
     PipelineRequest,
@@ -78,39 +79,6 @@ class DeferredExportResponse(BaseModel):
         default_factory=list,
         description="Titles that were requested in 'include' but not found among deferred.",
     )
-
-
-def _build_deferred_followup_markdown(
-    story_title: str,
-    story_summary: str,
-    *,
-    requirement_excerpt: str,
-) -> str:
-    """Compose a follow-up-issue body for a deferred implied story.
-
-    Intentionally lightweight — these are *placeholder* issues a PO
-    triages later. They're not full RTIA artifacts. Each carries enough
-    context (title, summary, originating-requirement excerpt) for the
-    PO to re-run RTIA on the title once they want to flesh it out.
-    """
-    excerpt = (requirement_excerpt or "").strip()
-    if len(excerpt) > 800:
-        excerpt = excerpt[:800].rstrip() + "…"
-    parts = [
-        f"## {story_title}",
-        "",
-        story_summary,
-        "",
-        "## Provenance",
-        (
-            "_Deferred from an RTIA run on a multi-story requirement. "
-            "Re-run RTIA on this title once you're ready to flesh out the "
-            "full Description / Objective / ACs / Test Cases._"
-        ),
-    ]
-    if excerpt:
-        parts.extend(["", "## Originating requirement (excerpt)", "", excerpt])
-    return "\n".join(parts)
 
 
 # Module-level singleton for the ``UploadFile`` default — keeps ruff's
@@ -373,13 +341,11 @@ def _register_routes(app: FastAPI) -> None:
         runner: PipelineRunner = request.app.state.runner
         # Phase 15.4 — dispatch to the fan-out source on DONE_FANOUT threads.
         # Fan-out stories are the same shape (ImpliedStory) as deferred, so
-        # the rest of the loop body is identical. The only difference is
-        # *which* state field we read from.
+        # the rest of the loop body is identical. The shared helper picks
+        # which state field to read; the UI's "Create follow-up issues"
+        # button uses the same call.
         current = runner.get_state(thread_id)
-        if current.status == ThreadStatus.DONE_FANOUT:
-            loaded = runner.get_fanout_stories_and_context(thread_id)
-        else:
-            loaded = runner.get_deferred_stories_and_context(thread_id)
+        loaded = select_followup_source(runner, thread_id, current.status)
         if loaded is None:
             raise HTTPException(status_code=404, detail="Thread not found or has no state.")
         deferred, requirement_text = loaded
@@ -402,7 +368,7 @@ def _register_routes(app: FastAPI) -> None:
             seen_titles.add(story.title.lower())
             if include_lower is not None and story.title.lower() not in include_lower:
                 continue
-            md = _build_deferred_followup_markdown(
+            md = build_followup_markdown(
                 story.title,
                 story.summary,
                 requirement_excerpt=requirement_text,

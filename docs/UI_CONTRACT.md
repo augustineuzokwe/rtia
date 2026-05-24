@@ -218,28 +218,35 @@ shared via `app.state.runner`.
 Every handler in `build_blocks` is a parallel implementation of an
 API endpoint. The shared bottom-of-stack helpers
 (`PipelineRunner`, `make_exporter`, `extract_pdf`, `extract_markdown`)
-are reused, but the *dispatch and shaping* are duplicated.
+are reused, plus — since issue
+[#194](https://github.com/augustineuzokwe/rtia/issues/194) — the
+follow-up-export dispatch helpers in
+[`api/_shared.py`](../api/_shared.py)
+(`build_followup_markdown`, `select_followup_source`,
+`followup_empty_message`). What still differs is the per-endpoint
+*shaping* (request validation, error → user-message mapping).
 
-| UI handler | API endpoint | What's duplicated |
+| UI handler | API endpoint | What's still duplicated |
 |---|---|---|
 | `on_run` | `POST /pipeline` | Empty-input handling, error mapping |
 | `on_po_submit` | `POST /pipeline/{id}/resume` | Resume-value construction (mode-dependent) |
 | `on_review_accept` / `on_review_override` | `POST /pipeline/{id}/resume` | Same |
 | `on_export` | `POST /pipeline/{id}/export` | `ExportTarget` construction, error → user-message |
-| `on_export_deferred` | `POST /pipeline/{id}/export-deferred` | DONE / DONE_FANOUT dispatch, per-story loop |
+| `on_export_deferred` | `POST /pipeline/{id}/export-deferred` | Per-story loop, `ExportTarget` construction (dispatch + body template now shared) |
 | `on_upload_pdf` / `on_upload_md` | `POST /uploads/{pdf,markdown}` | Parser invocation, error mapping |
 
-The drift is tracked separately (R2 in
-[`docs/ui_audit_2026-05-24.md`](ui_audit_2026-05-24.md) §7). The
-proposed fix is to extract the shared shaping helpers to
-`api/_shared.py` so both `api/main.py` and `ui/gradio_app.py` import
-them — the docstring on `_build_followup_markdown` calls out a
-circular-import concern, which `api/_shared.py` resolves.
+The follow-up-export dispatch is the only piece extracted so far —
+that addressed the largest cross-module duplication (the issue-body
+template was a literal copy-paste between files). The remaining rows
+above are smaller and less risky. If you change an API endpoint's
+behaviour, still grep `ui/gradio_app.py` for the matching handler
+and update it in the same PR: the eval and lint gates don't catch
+this kind of drift; it manifests as a UI doing the wrong thing while
+the API tests still pass.
 
-**Until that lands:** when you change an API endpoint's behavior,
-grep `ui/gradio_app.py` for the matching handler and update it in
-the same PR. The eval and lint gates don't catch this — it manifests
-as a UI doing the wrong thing while the API tests still pass.
+**Anything added to `api/_shared.py`** must have at least two callers
+(one in `api/main.py`, one in `ui/gradio_app.py`). Single-caller
+helpers belong in their owning module.
 
 ---
 
