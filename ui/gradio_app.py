@@ -273,13 +273,22 @@ def _state_to_panels(state) -> dict[str, Any]:
         for s in stubs:
             md_lines.append(f"- **{s['title']}** — {s['summary']}")
         base["result_md"] = gr.update(value="\n".join(md_lines))
+        # Issue #214 — on DONE_FANOUT the PO already made the keep/drop
+        # decision seconds earlier at the editable fan-out PO checkpoint
+        # (#207). Surfacing a second "Push these to the backlog"
+        # CheckboxGroup with the same titles looks like the upstream
+        # selection didn't take, and is the round-2 walk-through Wart 2.
+        # Keep the panel + button visible so the PO can trigger the push,
+        # but suppress the redundant title list. ``on_export_deferred``
+        # treats an empty selection as "all stubs" — this preserves the
+        # one-click semantics.
         base["deferred_visible"] = gr.update(visible=bool(stubs))
         if stubs:
-            base["deferred_md"] = gr.update(value="### Push these to the backlog:")
+            base["deferred_md"] = gr.update(value="")
             base["deferred_checkboxes"] = gr.update(
                 choices=[s["title"] for s in stubs],
-                value=[s["title"] for s in stubs],
-                visible=True,
+                value=[],
+                visible=False,
             )
     elif state.status == ThreadStatus.ERROR:
         # #186 §6.1 — ERROR no longer rides on ``result_panel``. Routing
