@@ -753,3 +753,95 @@ def test_is_fanout_mode_branch_criterion():
     assert is_fanout_mode(_state(2)) is True
     assert is_fanout_mode(_state(5)) is True
     assert is_fanout_mode({}) is False  # no analyst output yet
+
+
+def test_fanout_node_passes_through_edited_stories():
+    """Issue #207 — when ``selected_fanout_stories`` is set on state
+    (the PO renamed at least one row at the editable PO checkpoint),
+    ``fan_out_node`` ships those stories through verbatim, bypassing
+    the legacy title-filter on the Analyst's implied list."""
+    from agents.graph import fan_out_node
+    from agents.requirements_analyst import AnalystOutput, ImpliedStory
+
+    analyst_stories = [
+        ImpliedStory(title="Story A", summary="a"),
+        ImpliedStory(title="Story B", summary="b"),
+    ]
+    edited = [ImpliedStory(title="Story A — renamed", summary="a")]
+    state = {
+        "analyst_output": AnalystOutput(
+            intent="x", actors=["u"], ambiguities=[], implied_stories=analyst_stories
+        ),
+        "selected_fanout_stories": edited,
+        # selected_story_titles deliberately stale — the new field wins.
+        "selected_story_titles": ["Story A"],
+    }
+    out = fan_out_node(state)
+    assert [s.title for s in out["fan_out_stories"]] == ["Story A — renamed"]
+    assert [s.summary for s in out["fan_out_stories"]] == ["a"]
+
+
+def test_po_checkpoint_node_builds_edited_stories_from_resume():
+    """Issue #207 — ``po_checkpoint_node`` reads the new
+    ``selected_stories`` shape from the interrupt resume and converts
+    it into ``ImpliedStory`` objects on state, populating
+    ``selected_fanout_stories`` and a back-compat title list."""
+    from unittest.mock import patch
+
+    from agents.graph import po_checkpoint_node
+    from agents.requirements_analyst import AnalystOutput, ImpliedStory
+
+    state = {
+        "analyst_output": AnalystOutput(
+            intent="x",
+            actors=["u"],
+            ambiguities=[],
+            implied_stories=[
+                ImpliedStory(title="Story A", summary="summary-A"),
+                ImpliedStory(title="Story B", summary="summary-B"),
+            ],
+        ),
+    }
+    fake_resume = {
+        "selected_stories": [
+            {
+                "title": "Story A — renamed",
+                # No summary supplied → graph backfills from
+                # ``original_title`` → Analyst's matching implied story.
+                "original_title": "Story A",
+            },
+        ],
+        "answers": {},
+    }
+    with patch("agents.graph.interrupt", return_value=fake_resume):
+        result = po_checkpoint_node(state)
+    assert "selected_fanout_stories" in result
+    assert [s.title for s in result["selected_fanout_stories"]] == ["Story A — renamed"]
+    assert [s.summary for s in result["selected_fanout_stories"]] == ["summary-A"]
+    assert result["selected_story_titles"] == ["Story A — renamed"]
+
+
+def test_po_checkpoint_node_legacy_title_list_still_works():
+    """Issue #207 — legacy resume value (``selected_story_titles`` only)
+    still routes through the old code path; no edited state field set."""
+    from unittest.mock import patch
+
+    from agents.graph import po_checkpoint_node
+    from agents.requirements_analyst import AnalystOutput, ImpliedStory
+
+    state = {
+        "analyst_output": AnalystOutput(
+            intent="x",
+            actors=["u"],
+            ambiguities=[],
+            implied_stories=[
+                ImpliedStory(title="Story A", summary="a"),
+                ImpliedStory(title="Story B", summary="b"),
+            ],
+        ),
+    }
+    fake_resume = {"selected_story_titles": ["Story A"], "answers": {}}
+    with patch("agents.graph.interrupt", return_value=fake_resume):
+        result = po_checkpoint_node(state)
+    assert "selected_fanout_stories" not in result
+    assert result["selected_story_titles"] == ["Story A"]

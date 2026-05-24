@@ -98,6 +98,11 @@ class PipelineState(TypedDict, total=False):
     review_report: ReviewReport
     # Phase 15.4 — fan-out path.
     selected_story_titles: list[str]
+    # Issue #207 — editable fan-out selection. When set, ``fan_out_node``
+    # bypasses the title-filter and uses these (potentially renamed)
+    # stories directly. ``selected_story_titles`` is still populated for
+    # back-compat with consumers that key off it.
+    selected_fanout_stories: list[ImpliedStory]
     fan_out_stories: list[ImpliedStory]
 
 
@@ -215,6 +220,45 @@ def po_checkpoint_node(state: PipelineState) -> dict:
         )
         if not isinstance(response, dict):
             response = {}
+        # Issue #207 — preferred shape: ``selected_stories`` carries
+        # possibly-edited titles + summaries. When present we record the
+        # edited stories on state so ``fan_out_node`` ships them through
+        # unchanged. ``selected_story_titles`` is preserved alongside so
+        # any downstream consumer that keys off the title list (e.g.
+        # legacy tests) keeps working.
+        edited_raw = response.get("selected_stories")
+        edited: list[ImpliedStory] | None = None
+        if isinstance(edited_raw, list) and edited_raw:
+            built: list[ImpliedStory] = []
+            for item in edited_raw:
+                if not isinstance(item, dict):
+                    continue
+                title = (item.get("title") or "").strip()
+                if not title:
+                    continue
+                summary = item.get("summary")
+                if not summary:
+                    # Fall back to the Analyst's original summary when the
+                    # caller didn't ship one — match by ``original_title``
+                    # first (PO renamed the row), else by the current
+                    # title (PO didn't rename).
+                    original = (item.get("original_title") or "").strip().lower()
+                    lookup_key = original or title.lower()
+                    for s in analyst.implied_stories:
+                        if s.title.lower().strip() == lookup_key:
+                            summary = s.summary
+                            break
+                built.append(ImpliedStory(title=title, summary=summary or ""))
+            if built:
+                edited = built
+
+        if edited is not None:
+            return {
+                "selected_fanout_stories": edited,
+                "selected_story_titles": [s.title for s in edited],
+                "po_answers": dict(response.get("answers") or {}),
+            }
+
         selected = response.get("selected_story_titles")
         if not selected:
             # Q2 default: empty selection → fan out every identified story.
@@ -248,6 +292,12 @@ def fan_out_node(state: PipelineState) -> dict:
     no fuzzy match is needed here.
     """
     analyst = state["analyst_output"]
+    # Issue #207 — when the PO ran through the editable-title UI, the
+    # checkpoint already produced the final list (titles renamed,
+    # summaries carried over). Pass it through; no further filtering.
+    edited = state.get("selected_fanout_stories") or []
+    if edited:
+        return {"fan_out_stories": list(edited)}
     selected_titles = state.get("selected_story_titles") or []
     if not selected_titles:
         return {"fan_out_stories": list(analyst.implied_stories)}

@@ -51,24 +51,47 @@ class PipelineRequest(BaseModel):
         return value
 
 
+class SelectedStory(BaseModel):
+    """One implied-story selection in a fan-out PO resume body (Phase 15.4 / #207).
+
+    The PO checkpoint UI shows each implied story as a Checkbox + editable
+    Textbox; on Submit the kept (checked) rows are serialised as
+    ``SelectedStory`` items here, with the edited ``title`` and the
+    original Analyst-provided ``summary`` preserved.
+
+    ``original_title`` is the Analyst's pre-edit title — used by the
+    graph to map the edited title back to the matching implied-story
+    summary even when the PO renamed it.
+    """
+
+    title: str
+    summary: str = ""
+    original_title: str = ""
+
+
 class ResumeRequest(BaseModel):
     """Body for ``POST /pipeline/{thread_id}/resume``.
 
     Shape depends on which checkpoint the thread is paused at:
 
     - PO checkpoint, **deep mode**: ``answers`` is a ``dict[question, answer]``.
-    - PO checkpoint, **fan-out mode** (Phase 15.4): ``selected_story_titles``
-      is the list of implied-story titles the PO kept checked; ``answers``
-      carries any non-story critical question responses. Empty / missing
-      ``selected_story_titles`` means "fan out every identified story"
-      (Q2 default).
+    - PO checkpoint, **fan-out mode** (Phase 15.4): preferred shape is
+      ``selected_stories`` — a list of :class:`SelectedStory` carrying
+      possibly-edited titles + matching summaries. Empty / missing
+      ``selected_stories`` means "fan out every identified story" (Q2 default).
+      The legacy ``selected_story_titles`` (list of plain title strings)
+      is still accepted for back-compat; if both are present,
+      ``selected_stories`` wins.
     - Story review checkpoint: ``accepted`` ± ``description`` / ``objective``.
     """
 
     # PO checkpoint, deep mode (and non-story Qs in fan-out mode).
     answers: dict[str, str] | None = None
 
-    # PO checkpoint, fan-out mode.
+    # PO checkpoint, fan-out mode — preferred shape (#207).
+    selected_stories: list[SelectedStory] | None = None
+    # PO checkpoint, fan-out mode — legacy shape (Phase 15.4). Deprecated
+    # but accepted; superseded by ``selected_stories`` when both present.
     selected_story_titles: list[str] | None = None
 
     # Story review checkpoint.
@@ -103,6 +126,7 @@ __all__ = [
     "ErrorResponse",
     "PipelineRequest",
     "ResumeRequest",
+    "SelectedStory",
     "ThreadState",
     "ThreadStatus",
     "UploadResult",

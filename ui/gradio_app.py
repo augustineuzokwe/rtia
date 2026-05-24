@@ -51,6 +51,31 @@ def _runner(app: FastAPI) -> PipelineRunner:
     return app.state.runner
 
 
+# Issue #207 — editable fan-out title rows. Gradio Blocks must declare
+# every component at build time, so we pre-build a fixed maximum number
+# of (Checkbox + Textbox) row pairs and toggle their visibility per
+# render. Ten is a generous ceiling — the Analyst's multi-story output
+# in practice tops out around 4–5 implied stories.
+_MAX_FANOUT_ROWS = 10
+
+
+def _hidden_fanout_rows() -> list[tuple[Any, Any, Any]]:
+    """Build a list of N hidden ``(row, checkbox, textbox)`` updates.
+
+    Default state for the editable fan-out row slots — every slot
+    invisible, unchecked, empty. Used in non-PAUSED_PO branches and on
+    the empty-input / running-frame paths.
+    """
+    return [
+        (
+            gr.update(visible=False),
+            gr.update(value=False),
+            gr.update(value=""),
+        )
+        for _ in range(_MAX_FANOUT_ROWS)
+    ]
+
+
 def _state_to_panels(state) -> dict[str, Any]:
     """Map a ThreadState onto Gradio update objects for each panel.
 
@@ -92,7 +117,12 @@ def _state_to_panels(state) -> dict[str, Any]:
         "run_btn_interactive": gr.update(interactive=True),
         "po_questions": gr.update(value=""),
         "po_answers_visible": gr.update(visible=True),
-        "po_fanout_checkboxes": gr.update(choices=[], value=[], visible=False),
+        # Issue #207 — list of N fan-out row updates, one tuple per
+        # pre-built ``(Row, Checkbox, Textbox)`` slot. Tuple shape:
+        # ``(row_update, checkbox_update, textbox_update)``. Hidden by
+        # default; populated only on PAUSED_PO + fan_out mode below.
+        "po_fanout_rows": _hidden_fanout_rows(),
+        "po_fanout_originals": [],
         "po_paused_payload": {},
         "review_preview": gr.update(value=""),
         "result_md": gr.update(value=""),
@@ -143,11 +173,33 @@ def _state_to_panels(state) -> dict[str, Any]:
                 )
                 preview_lines.extend(f"{i + 1}. {q}" for i, q in enumerate(questions))
             base["po_questions"] = gr.update(value="\n".join(preview_lines))
-            base["po_fanout_checkboxes"] = gr.update(
-                choices=[s["title"] for s in stories],
-                value=[s["title"] for s in stories],
-                visible=True,
-            )
+            # Issue #207 — one editable row per implied story (up to the
+            # build-time max). Each row carries its own checkbox + title
+            # Textbox; un-checked rows are dropped at Submit, edited
+            # titles flow into ``selected_stories`` on the resume body.
+            rows: list[tuple[Any, Any, Any]] = []
+            originals: list[str] = []
+            for i in range(_MAX_FANOUT_ROWS):
+                if i < len(stories):
+                    title = stories[i].get("title", "") or ""
+                    rows.append(
+                        (
+                            gr.update(visible=True),
+                            gr.update(value=True),
+                            gr.update(value=title, label=f"Story {i + 1}"),
+                        )
+                    )
+                    originals.append(title)
+                else:
+                    rows.append(
+                        (
+                            gr.update(visible=False),
+                            gr.update(value=False),
+                            gr.update(value=""),
+                        )
+                    )
+            base["po_fanout_rows"] = rows
+            base["po_fanout_originals"] = originals
             # Hide the free-text answers box when there are no non-story Qs.
             base["po_answers_visible"] = gr.update(visible=bool(questions))
         else:
@@ -304,14 +356,23 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
         # PO checkpoint panel.
         with gr.Group(visible=False) as po_panel:
             po_questions = gr.Markdown("")
-            # Phase 15.4 — CheckboxGroup for the fan-out case. Hidden in
-            # deep mode; populated from the paused payload's implied_stories.
-            po_fanout_checkboxes = gr.CheckboxGroup(
-                choices=[],
-                value=[],
-                label="Stories to push as backlog stubs (uncheck to drop)",
-                visible=False,
-            )
+            # Issue #207 — N editable (Checkbox + Textbox) rows for the
+            # fan-out case. Replaces the prior single ``gr.CheckboxGroup``
+            # which only supported drop / keep but not rename. Rows are
+            # built at definition time and visibility-toggled per render;
+            # this is the standard Gradio Blocks pattern for variable-N
+            # widgets. Hidden in deep mode and on non-PAUSED_PO states.
+            po_fanout_rows_components: list[tuple[gr.Row, gr.Checkbox, gr.Textbox]] = []
+            for i in range(_MAX_FANOUT_ROWS):
+                with gr.Row(visible=False) as _fanout_row:
+                    _fanout_chk = gr.Checkbox(value=False, label="", scale=0)
+                    _fanout_txt = gr.Textbox(value="", label=f"Story {i + 1}", interactive=True)
+                po_fanout_rows_components.append((_fanout_row, _fanout_chk, _fanout_txt))
+            # Snapshot of the original (pre-edit) titles from the paused
+            # payload, kept aligned with the visible rows. Submit handler
+            # uses this to map an edited title back to the matching
+            # Analyst-provided summary even after the PO renamed the row.
+            po_fanout_originals_state = gr.State(value=[])
             po_answers = gr.Textbox(
                 label="Answers (one per line, in order)",
                 lines=4,
@@ -418,7 +479,6 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             "thread_id_state",
             "po_visible",
             "po_questions",
-            "po_fanout_checkboxes",
             "po_answers_visible",
             "po_paused_payload",
             "review_visible",
@@ -434,18 +494,26 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             "error_visible",
             "error_md",
             "run_btn_interactive",
+            # Issue #207 — originals state (single key, list value).
+            "po_fanout_originals",
         )
 
         def _spread(state):
             mapping = _state_to_panels(state)
-            return tuple(mapping[k] for k in _SPREAD_KEYS)
+            base = tuple(mapping[k] for k in _SPREAD_KEYS)
+            # Issue #207 — flatten the per-row updates onto the tail of
+            # the tuple, matching the positional order in ``outputs``
+            # below. Each row contributes three components in
+            # ``(row, checkbox, textbox)`` order.
+            rows = mapping["po_fanout_rows"]
+            flat_rows = tuple(item for row_tuple in rows for item in row_tuple)
+            return base + flat_rows
 
         outputs = [
             status_md,
             thread_id_state,
             po_panel,
             po_questions,
-            po_fanout_checkboxes,
             po_answers,
             po_paused_payload_state,
             review_panel,
@@ -461,10 +529,17 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             error_panel,
             error_md,
             run_btn,
+            po_fanout_originals_state,
         ]
-        assert len(outputs) == len(_SPREAD_KEYS), (
-            "outputs/_SPREAD_KEYS length mismatch — every key must have "
-            "a positionally-matched Gradio component"
+        # Issue #207 — append the N pre-built fan-out rows (3 components
+        # each: Row container + Checkbox + Textbox) so handlers can
+        # update every row from a single returned tuple.
+        for _row, _chk, _txt in po_fanout_rows_components:
+            outputs.extend([_row, _chk, _txt])
+        assert len(outputs) == len(_SPREAD_KEYS) + 3 * _MAX_FANOUT_ROWS, (
+            "outputs / _SPREAD_KEYS length mismatch — every spread key must "
+            "have a positionally-matched Gradio component, plus 3 components "
+            "per fan-out row"
         )
 
         def on_upload_pdf(f):
@@ -499,12 +574,11 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             path. Positionally aligned with ``_SPREAD_KEYS`` / ``outputs``
             (#186 §R1); the build-time assert below guards length drift.
             """
-            return (
+            base = (
                 gr.update(value=status_text),  # status_md
                 "",  # thread_id_state
                 gr.update(visible=False),  # po_panel
                 gr.update(value=""),  # po_questions
-                gr.update(choices=[], value=[], visible=False),  # po_fanout_checkboxes
                 gr.update(visible=True),  # po_answers
                 {},  # po_paused_payload_state
                 gr.update(visible=False),  # review_panel
@@ -520,7 +594,12 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
                 gr.update(visible=False),  # error_panel
                 gr.update(value=""),  # error_md
                 gr.update(interactive=run_interactive),  # run_btn
+                [],  # po_fanout_originals_state
             )
+            # Issue #207 — append N hidden row triplets so the tuple
+            # matches the extended ``outputs`` length.
+            flat_rows = tuple(item for row_tuple in _hidden_fanout_rows() for item in row_tuple)
+            return base + flat_rows
 
         def on_run(text):
             """Generator handler — yields a 'running' frame immediately so
@@ -553,12 +632,25 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
 
         run_btn.click(on_run, [req_text], outputs)
 
-        def on_po_submit(thread_id, answers_blob, fanout_selection, paused_payload, _text):
-            """Phase 15.4 — submit handler dispatches on paused payload's mode.
+        def on_po_submit(
+            thread_id,
+            answers_blob,
+            paused_payload,
+            originals,
+            _text,
+            *fanout_row_values,
+        ):
+            """Submit handler dispatches on paused payload's mode.
 
-            Fan-out: bundle ``selected_story_titles`` + free-text answers
-            (for any non-story critical questions) into the structured
-            resume value the graph expects.
+            Fan-out (Issue #207): variadic ``*fanout_row_values`` is the
+            flat ``[chk_0, chk_1, …, chk_{N-1}, txt_0, txt_1, …,
+            txt_{N-1}]`` tuple, one Checkbox + one Textbox per row slot.
+            We zip the kept (checked) rows against the ``originals``
+            snapshot to build the structured ``selected_stories`` resume
+            payload — each item carries the edited title, the matching
+            Analyst-provided summary, and the original-title pointer the
+            graph uses to look summary up. Empty selection ⇒ ``[]``,
+            which the graph treats as "fan out everything".
 
             Deep: today's flat ``dict[question, answer]`` shape.
             """
@@ -571,8 +663,34 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
                 for i, q in enumerate(questions)
             }
             if mode == "fan_out":
+                checks = list(fanout_row_values[:_MAX_FANOUT_ROWS])
+                texts = list(fanout_row_values[_MAX_FANOUT_ROWS : 2 * _MAX_FANOUT_ROWS])
+                stories_payload = (paused_payload or {}).get("implied_stories") or []
+                originals_list = list(originals or [])
+                # Build a lookup for the Analyst-provided summary from the
+                # original title so renamed rows still get their summary.
+                summary_by_original = {
+                    (s.get("title") or "").strip().lower(): (s.get("summary") or "")
+                    for s in stories_payload
+                }
+                selected_stories: list[dict[str, str]] = []
+                for i, (checked, edited_title) in enumerate(zip(checks, texts, strict=False)):
+                    if not bool(checked):
+                        continue
+                    title = (edited_title or "").strip()
+                    if not title:
+                        continue
+                    original = originals_list[i] if i < len(originals_list) else title
+                    summary = summary_by_original.get(original.strip().lower(), "")
+                    selected_stories.append(
+                        {
+                            "title": title,
+                            "summary": summary,
+                            "original_title": original,
+                        }
+                    )
                 resume_value = {
-                    "selected_story_titles": list(fanout_selection or []),
+                    "selected_stories": selected_stories,
                     "answers": answers,
                 }
             else:
@@ -580,17 +698,18 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             state = runner.resume(thread_id, resume_value)
             return _spread(state)
 
-        po_submit.click(
-            on_po_submit,
-            [
-                thread_id_state,
-                po_answers,
-                po_fanout_checkboxes,
-                po_paused_payload_state,
-                req_text,
-            ],
-            outputs,
-        )
+        # Inputs: fixed leading args + flat row values
+        # (all checkboxes first, then all textboxes).
+        _po_inputs = [
+            thread_id_state,
+            po_answers,
+            po_paused_payload_state,
+            po_fanout_originals_state,
+            req_text,
+        ]
+        _po_inputs.extend(chk for _row, chk, _txt in po_fanout_rows_components)
+        _po_inputs.extend(txt for _row, _chk, txt in po_fanout_rows_components)
+        po_submit.click(on_po_submit, _po_inputs, outputs)
 
         def on_review_accept(thread_id):
             state = _runner(app).resume(thread_id, {"accepted": True})
