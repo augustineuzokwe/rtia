@@ -246,3 +246,83 @@ def test_resume_deep_mode_still_requires_answers(client, runner_mock):
     )
     r = client.post("/pipeline/tid/resume", headers=_auth(), json={"accepted": True})
     assert r.status_code == 400
+
+
+def test_resume_fanout_prefers_selected_stories_over_legacy_titles(client, runner_mock):
+    """Issue #207 — preferred shape ``selected_stories`` (editable
+    titles + summaries) wins over legacy ``selected_story_titles`` and
+    is forwarded to the runner verbatim."""
+    runner_mock.get_state.return_value = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.PAUSED_PO,
+        payload={
+            "mode": "fan_out",
+            "implied_stories": [
+                {"title": "Story A", "summary": "a"},
+                {"title": "Story B", "summary": "b"},
+            ],
+            "critical_ambiguities": [],
+        },
+    )
+    runner_mock.resume.return_value = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.DONE_FANOUT,
+        payload={"fan_out_stories": [{"title": "Story A renamed", "summary": "a"}]},
+    )
+    r = client.post(
+        "/pipeline/tid/resume",
+        headers=_auth(),
+        json={
+            "selected_stories": [
+                {
+                    "title": "Story A renamed",
+                    "summary": "a",
+                    "original_title": "Story A",
+                }
+            ],
+            # Legacy field also supplied — must be ignored when
+            # ``selected_stories`` is present.
+            "selected_story_titles": ["Story B"],
+        },
+    )
+    assert r.status_code == 200
+    runner_mock.resume.assert_called_once_with(
+        "tid",
+        {
+            "selected_stories": [
+                {
+                    "title": "Story A renamed",
+                    "summary": "a",
+                    "original_title": "Story A",
+                }
+            ],
+            "answers": {},
+        },
+    )
+
+
+def test_resume_fanout_legacy_titles_still_accepted_when_no_selected_stories(client, runner_mock):
+    """Issue #207 — back-compat. When ``selected_stories`` is absent
+    but legacy ``selected_story_titles`` is present, the legacy shape
+    is forwarded unchanged so older API callers keep working."""
+    runner_mock.get_state.return_value = ThreadState(
+        thread_id="tid",
+        status=ThreadStatus.PAUSED_PO,
+        payload={
+            "mode": "fan_out",
+            "implied_stories": [{"title": "Story A", "summary": "a"}],
+            "critical_ambiguities": [],
+        },
+    )
+    runner_mock.resume.return_value = ThreadState(
+        thread_id="tid", status=ThreadStatus.DONE_FANOUT, payload={}
+    )
+    r = client.post(
+        "/pipeline/tid/resume",
+        headers=_auth(),
+        json={"selected_story_titles": ["Story A"]},
+    )
+    assert r.status_code == 200
+    runner_mock.resume.assert_called_once_with(
+        "tid", {"selected_story_titles": ["Story A"], "answers": {}}
+    )

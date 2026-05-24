@@ -115,10 +115,16 @@ def _resume_value_from(
         if mode == "fan_out":
             # Fan-out: structured selection. None / empty list signals
             # "fan out everything" — pass-through, graph fills the default.
-            return {
-                "selected_story_titles": list(request.selected_story_titles or []),
-                "answers": dict(request.answers or {}),
-            }
+            # Issue #207 — prefer the editable ``selected_stories`` shape
+            # (title+summary+original_title) when supplied so PO edits to
+            # titles flow into ``fan_out_stories``; legacy callers may
+            # still send plain ``selected_story_titles``.
+            resume: dict[str, object] = {"answers": dict(request.answers or {})}
+            if request.selected_stories is not None:
+                resume["selected_stories"] = [s.model_dump() for s in request.selected_stories]
+            else:
+                resume["selected_story_titles"] = list(request.selected_story_titles or [])
+            return resume
         if request.answers is None:
             raise HTTPException(
                 status_code=400,
