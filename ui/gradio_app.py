@@ -365,7 +365,12 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             po_fanout_rows_components: list[tuple[gr.Row, gr.Checkbox, gr.Textbox]] = []
             for i in range(_MAX_FANOUT_ROWS):
                 with gr.Row(visible=False) as _fanout_row:
-                    _fanout_chk = gr.Checkbox(value=False, label="", scale=0)
+                    # Issue #213 — pass ``show_label=False`` so Gradio
+                    # doesn't fall back to its default literal "Checkbox"
+                    # label (``label=""`` alone doesn't suppress the
+                    # fallback). The row's adjacent Textbox already
+                    # labels the story; the checkbox is implicit "keep".
+                    _fanout_chk = gr.Checkbox(value=False, show_label=False, scale=0)
                     _fanout_txt = gr.Textbox(value="", label=f"Story {i + 1}", interactive=True)
                 po_fanout_rows_components.append((_fanout_row, _fanout_chk, _fanout_txt))
             # Snapshot of the original (pre-edit) titles from the paused
