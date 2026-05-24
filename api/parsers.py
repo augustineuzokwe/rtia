@@ -76,9 +76,16 @@ def extract_pdf(data: bytes) -> str:
 
 
 def extract_markdown(data: bytes) -> str:
-    """UTF-8 decode + cap. No structural parsing — markdown passes through."""
+    """UTF-8 decode + cap. No structural parsing — markdown passes through.
+
+    Uses ``utf-8-sig`` so a leading byte-order mark (U+FEFF) — common on
+    Markdown files saved by Windows editors or exported from Notion — is
+    stripped instead of surviving into the analyst input as a stray
+    character. Files without a BOM are decoded identically to plain
+    UTF-8. Epic #1 intake-soundness audit (#1).
+    """
     try:
-        text = data.decode("utf-8")
+        text = data.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
         raise ParseError(f"Markdown file is not UTF-8: {exc}") from exc
     return _cap(text)
