@@ -25,6 +25,11 @@ from typing import Any
 import gradio as gr
 from fastapi import FastAPI
 
+from api._shared import (
+    build_followup_markdown,
+    followup_empty_message,
+    select_followup_source,
+)
 from api.models import ThreadStatus
 from api.parsers import (
     FileTooLargeError,
@@ -40,62 +45,6 @@ from exporters.base import (
     ExportTarget,
     make_exporter,
 )
-
-
-def _select_followup_source(
-    runner: PipelineRunner, thread_id: str, status: ThreadStatus
-) -> tuple[tuple[list[Any], str] | None, str]:
-    """Pick the right story source for the follow-up export handler.
-
-    Mirrors the dispatch in ``api.main.export_deferred`` so the UI button
-    and the API endpoint surface the same stories: ``fan_out_stories`` on
-    a ``DONE_FANOUT`` thread, otherwise the deferred-implied list. Both
-    paths return ``ImpliedStory``-shaped objects so the caller's loop is
-    identical.
-
-    Returns ``(loaded, empty_message)`` — ``loaded`` is either
-    ``(stories, requirement_text)`` or ``None`` (no thread state), and
-    ``empty_message`` is the human-readable string to show when
-    ``stories`` is empty. The two paths use different empty-state wording
-    so the user sees terminology that matches the visible panel.
-    """
-    if status == ThreadStatus.DONE_FANOUT:
-        return (
-            runner.get_fanout_stories_and_context(thread_id),
-            "_No fan-out stories — nothing to create._",
-        )
-    return (
-        runner.get_deferred_stories_and_context(thread_id),
-        "_No deferred stories — nothing to create._",
-    )
-
-
-def _build_followup_markdown(title: str, summary: str, requirement_text: str) -> str:
-    """Compose the body of a deferred follow-up issue.
-
-    Mirrors ``api.main._build_deferred_followup_markdown`` so the UI
-    in-process path and the API endpoint produce identical issue bodies.
-    Kept in two places because both consumers live behind their own
-    surface; consolidating would require a circular-import dance.
-    """
-    excerpt = (requirement_text or "").strip()
-    if len(excerpt) > 800:
-        excerpt = excerpt[:800].rstrip() + "…"
-    parts = [
-        f"## {title}",
-        "",
-        summary,
-        "",
-        "## Provenance",
-        (
-            "_Deferred from an RTIA run on a multi-story requirement. "
-            "Re-run RTIA on this title once you're ready to flesh out the "
-            "full Description / Objective / ACs / Test Cases._"
-        ),
-    ]
-    if excerpt:
-        parts.extend(["", "## Originating requirement (excerpt)", "", excerpt])
-    return "\n".join(parts)
 
 
 def _runner(app: FastAPI) -> PipelineRunner:
@@ -695,12 +644,12 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
                 return "❌ No active thread — start a pipeline run first."
             runner = _runner(app)
             current = runner.get_state(thread_id)
-            loaded, empty_message = _select_followup_source(runner, thread_id, current.status)
+            loaded = select_followup_source(runner, thread_id, current.status)
             if loaded is None:
                 return "❌ No thread state."
             deferred, requirement_text = loaded
             if not deferred:
-                return empty_message
+                return followup_empty_message(current.status)
 
             include_titles = selected_titles or [s.title for s in deferred]
 
@@ -729,7 +678,9 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             for story in deferred:
                 if story.title.lower() not in include_lower:
                     continue
-                body = _build_followup_markdown(story.title, story.summary, requirement_text)
+                body = build_followup_markdown(
+                    story.title, story.summary, requirement_excerpt=requirement_text
+                )
                 try:
                     result = exporter.export(body, tgt, title=story.title, dry_run=bool(dry_run))
                 except (ExportConfigError, ExporterTransportError) as exc:
