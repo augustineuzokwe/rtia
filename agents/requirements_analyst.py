@@ -25,6 +25,7 @@ from agents.config import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
     DEFAULT_TIMEOUT_SECONDS,
+    MAX_OUTPUT_TOKENS_ANALYST,
     prompt_hash,
 )
 from prompts.requirements_analyst_prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
@@ -138,7 +139,7 @@ def analyze_requirement(
     temperature: float | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     max_retries: int = DEFAULT_MAX_RETRIES,
-    max_output_tokens: int | None = None,
+    max_output_tokens: int | None = MAX_OUTPUT_TOKENS_ANALYST,
 ) -> AnalystOutput:
     """Run the Requirements Analyst agent on a raw requirement.
 

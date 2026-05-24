@@ -27,6 +27,7 @@ from agents.config import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
     DEFAULT_TIMEOUT_SECONDS,
+    MAX_OUTPUT_TOKENS_TEST_CASE_WRITER,
     prompt_hash,
 )
 from agents.final_artifact import AcceptanceCriterion, TestCase
@@ -69,7 +70,7 @@ def write_test_cases(
     temperature: float | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     max_retries: int = DEFAULT_MAX_RETRIES,
-    max_output_tokens: int | None = None,
+    max_output_tokens: int | None = MAX_OUTPUT_TOKENS_TEST_CASE_WRITER,
 ) -> TestCaseWriterOutput:
     """Run the Test Case Writer on a user story + its acceptance criteria.
 

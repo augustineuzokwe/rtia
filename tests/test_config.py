@@ -26,19 +26,18 @@ def test_defaults_are_present_and_typed():
 def test_default_max_retries_in_resilience_window():
     """Patience budget must ride out brief load events without wedging.
 
-    Window unchanged from the Claude era (ADR-0003 budget table still
-    applies — exponential backoff with N=5 buys ~15.5s of total wait,
-    appropriate for an interactive demo). Bound check kept so an accidental
-    downgrade or runaway upgrade is caught.
-
-    Lower bound (>=4) catches an accidental downgrade that re-introduces
-    the Phase 1.3 sample-03 failure mode.
-    Upper bound (<=10) catches an accidental upgrade that would block an
-    interactive demo for ~47s on a genuinely-down endpoint.
+    Window retuned in issue #163 (pipeline speedup). Prior bound was
+    [4, 10] tracking ADR-0003's Claude-era budget; with the workflow-level
+    ``nick-fields/retry@v4`` (2 outer attempts) added since, SDK
+    ``max_retries=2`` gives a layered worst case of 2×2=4 logical
+    attempts — still enough to ride a single transient 503, but tail
+    latency is bounded. Lower bound (>=1) catches an accidental
+    disable; upper bound (<=4) catches a re-introduction of the prior
+    high-tail-latency regime now that the outer retry exists.
     """
-    assert 4 <= DEFAULT_MAX_RETRIES <= 10, (
+    assert 1 <= DEFAULT_MAX_RETRIES <= 4, (
         f"DEFAULT_MAX_RETRIES={DEFAULT_MAX_RETRIES} is outside the "
-        "resilience window. See ADR-0003 before tuning."
+        "resilience window. See ADR-0003 and issue #163 before tuning."
     )
 
 

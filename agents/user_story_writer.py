@@ -30,6 +30,7 @@ from agents.config import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
     DEFAULT_TIMEOUT_SECONDS,
+    MAX_OUTPUT_TOKENS_STORY_WRITER,
     prompt_hash,
 )
 from agents.requirements_analyst import AnalystOutput, ImpliedStory
@@ -99,7 +100,7 @@ def write_user_story(
     temperature: float | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     max_retries: int = DEFAULT_MAX_RETRIES,
-    max_output_tokens: int | None = None,
+    max_output_tokens: int | None = MAX_OUTPUT_TOKENS_STORY_WRITER,
 ) -> UserStory:
     """Run the User Story Writer agent.
 

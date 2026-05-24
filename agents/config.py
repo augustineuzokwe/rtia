@@ -33,19 +33,42 @@ reproducibility — same caveat that applied to 2.5-flash.
 DEFAULT_TIMEOUT_SECONDS = 60.0
 """Wall-clock seconds per LLM call. Caps stuck network requests."""
 
-DEFAULT_MAX_RETRIES = 5
+DEFAULT_MAX_RETRIES = 2
 """LangChain retry count for transient errors.
 
 The Gemini wrapper retries on rate limits and transient server errors with
-exponential backoff. Patience budget with N=5 is comparable to the
-Anthropic-era setting documented in ADR-0003 — tuned so a brief load event
-doesn't wedge an interactive demo while a sustained outage fails fast.
+exponential backoff. Trimmed 5→2 in issue #163 (pipeline speedup) — the
+prior N=5 stacked badly with the workflow-level retry: a stuck call would
+burn 5 SDK attempts × exponential backoff, then ``nick-fields/retry@v4``
+(``.github/workflows/ci.yml``) would re-run the entire eval, for up to 10
+logical attempts at a single LLM call. With N=2 the layered worst case is
+2 SDK × 2 workflow = 4 attempts — still enough to ride out a single 503,
+but tail latency is bounded.
+
 Override per call when the agent runs in a different SLO context
-(tight: 2; batch: 10+).
+(interactive UI may want 1; offline batch may want 5+).
 
 NOTE: retries are silent at the wrapper layer. LangSmith trace metadata
 remains the place to surface retry counts if/when needed for debugging.
 """
+
+# Per-agent output-token ceilings (issue #163). Setting an explicit cap
+# is the difference between Gemini failing fast on a malformed/over-long
+# response vs. spending the full timeout window streaming tokens. Values
+# are calibrated at ~2× the maximum output_tokens observed across the 7
+# eval samples in ``evals/reports/baseline-2026-05-24.json``, rounded up
+# to the nearest 500. Generous enough not to truncate legitimate outputs,
+# tight enough to bound tail latency. Re-run ``evals/run_evals.py`` and
+# bump these if a future prompt change shifts the distribution.
+#
+# Reviewer is not in the eval suite (only the LangGraph deep-flow runs
+# it). Its cap is set to match Story Writer pending a follow-up
+# calibration via ``scripts/run_pipeline_demo.py``.
+MAX_OUTPUT_TOKENS_ANALYST = 4000  # observed max 1972 (sample-03)
+MAX_OUTPUT_TOKENS_STORY_WRITER = 3000  # observed max 1378 (sample-02)
+MAX_OUTPUT_TOKENS_AC_GENERATOR = 4500  # observed max 2042 (sample-06)
+MAX_OUTPUT_TOKENS_TEST_CASE_WRITER = 6500  # observed max 3012 (sample-05)
+MAX_OUTPUT_TOKENS_REVIEWER = 3000  # uncalibrated — match Story Writer
 
 
 def prompt_hash(*prompts: str) -> str:
