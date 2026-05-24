@@ -291,24 +291,91 @@ class PipelineRunner:
         )
 
 
+_TITLE_SOFT_CAP = 60
+"""Aim for backlog-issue titles around this length — fits Jira / GitHub
+list views without truncation."""
+
+_TITLE_HARD_CAP = 120
+"""Absolute upper bound. Used as a fallback when word-boundary breaks
+don't fire and as the historical contract for downstream consumers."""
+
+# Subordinate-clause openers we cut at first occurrence to shorten
+# verbose Story Writer descriptions. Order matters: we scan in order
+# and stop at the earliest match. Each token is matched as a whole
+# word (leading space) to avoid e.g. " that " matching inside a noun.
+_TITLE_CUT_MARKERS: tuple[str, ...] = (
+    " located ",
+    " that ",
+    " which ",
+    " so that ",
+    " in order to ",
+    " so ",
+    " when ",
+    " by ",
+)
+
+
 def _derive_title(description: str) -> str:
     """Build a backlog-issue title from the user story description.
 
-    Heuristics:
-    - If the description starts with "As a/an <role>, I want <feature>",
-      trim to the "I want" clause and cap at 120 chars.
-    - Otherwise use the first line, capped.
-    - Strip the closing period so the title doesn't end with one.
+    Heuristics (issue #222 — produces short, skimmable backlog titles):
+
+    1. Collapse whitespace; if the text contains "I want ", drop everything
+       up to and including the marker (case-insensitive).
+    2. Strip a leading article ("a ", "an ", "the ") so the title reads as
+       a bare noun phrase.
+    3. Cut at the first subordinate-clause opener (``_TITLE_CUT_MARKERS``)
+       — these usually introduce restrictive detail that belongs in the
+       description, not the title.
+    4. Strip the trailing period.
+    5. If still over ``_TITLE_SOFT_CAP``, truncate at the last word
+       boundary that fits and append "…". A ``_TITLE_HARD_CAP`` fallback
+       ensures we never return more than 120 chars even on pathological
+       single-word inputs.
+    6. Capitalise the first letter so the title reads as a label.
+    7. Empty / whitespace-only → ``(untitled RTIA export)``.
     """
     text = (description or "").strip().replace("\n", " ")
+    # Collapse internal whitespace so word-boundary math below is honest.
+    text = " ".join(text.split())
     lower = text.lower()
     marker = "i want "
     idx = lower.find(marker)
     if idx >= 0:
         text = text[idx + len(marker) :].strip()
+
+    # Drop a leading article so the title is a noun phrase.
+    for article in ("a ", "an ", "the "):
+        if text.lower().startswith(article):
+            text = text[len(article) :]
+            break
+
+    # Cut at the first subordinate-clause opener — but only if cutting
+    # leaves at least a few words, otherwise the cut produces a useless
+    # 1-2 word stub.
+    lower = text.lower()
+    cut_idx = -1
+    for token in _TITLE_CUT_MARKERS:
+        candidate = lower.find(token)
+        if candidate > 0 and (cut_idx == -1 or candidate < cut_idx):
+            cut_idx = candidate
+    if cut_idx > 0 and len(text[:cut_idx].split()) >= 2:
+        text = text[:cut_idx].rstrip()
+
     text = text.rstrip(".").strip()
-    if len(text) > 120:
-        text = text[:117] + "..."
+
+    # Word-boundary soft cap.
+    if len(text) > _TITLE_SOFT_CAP:
+        truncated = text[:_TITLE_SOFT_CAP].rsplit(" ", 1)[0].rstrip()
+        if truncated:
+            text = truncated + "…"
+    # Pathological single-word case where the soft cap couldn't fire on
+    # a word boundary — hard cap with the legacy "..." sentinel.
+    if len(text) > _TITLE_HARD_CAP:
+        text = text[: _TITLE_HARD_CAP - 3] + "..."
+
+    if text:
+        text = text[0].upper() + text[1:]
     return text or "(untitled RTIA export)"
 
 
