@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -312,24 +313,40 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
         ]
     )
 
-    metrics = [
-        score_actor_set_completeness(analyst_output, sample.expected_analyst, judge),
-        score_ambiguity_discipline(analyst_output, sample.expected_analyst, judge),
-        score_intent_keyword_overlap(analyst_output, sample.expected_analyst),
-        score_ac_coverage(ac_result, sample.expected_acs, judge),
-        score_ac_testability(ac_result),
-        score_tc_coverage_breadth(tc_result.cases, ac_result.criteria),
-        score_tc_executability(tc_result.cases),
-        score_requirement_fidelity(artifact_text, sample.requirement_key_terms),
+    # Score metrics concurrently (issue #163). 3 of the 8 base metrics
+    # are LLM-judge calls (actor_set_completeness, ambiguity_discipline,
+    # ac_coverage) that each take ~3-10s on Gemini Flash; the rest are
+    # programmatic and finish in milliseconds. Running them in a thread
+    # pool lets the slow ones overlap, dropping per-sample judge wall-
+    # clock from ~sum() to ~max(). max_workers=4 covers all judge slots
+    # plus headroom for the cheap programmatic ones. Order is preserved
+    # below for reporting stability. GeminiJudge wraps a stateless
+    # ChatGoogleGenerativeAI (see evals/judge.py), so concurrent
+    # ``.invoke()`` calls are safe.
+    metric_calls = [
+        lambda: score_actor_set_completeness(analyst_output, sample.expected_analyst, judge),
+        lambda: score_ambiguity_discipline(analyst_output, sample.expected_analyst, judge),
+        lambda: score_intent_keyword_overlap(analyst_output, sample.expected_analyst),
+        lambda: score_ac_coverage(ac_result, sample.expected_acs, judge),
+        lambda: score_ac_testability(ac_result),
+        lambda: score_tc_coverage_breadth(tc_result.cases, ac_result.criteria),
+        lambda: score_tc_executability(tc_result.cases),
+        lambda: score_requirement_fidelity(artifact_text, sample.requirement_key_terms),
     ]
     # Phase 12.1 — injection_resistance only runs on samples that ship an
     # `## Injection Test` block. Mean aggregation in `_serialise` skips
     # metrics absent from a sample, so adding/removing adversarial samples
     # does not distort the headline averages of the other metrics.
     if sample.injection_test is not None:
-        metrics.append(
-            score_injection_resistance(analyst_output, artifact_text, sample.injection_test)
+        metric_calls.append(
+            lambda: score_injection_resistance(analyst_output, artifact_text, sample.injection_test)
         )
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        # ``executor.map`` preserves input order, so the resulting
+        # ``metrics`` list lines up with the ``metric_calls`` definitions
+        # above — the report and the metric-floor check both rely on
+        # this ordering.
+        metrics = list(pool.map(lambda call: call(), metric_calls))
 
     return SampleReport(
         name=sample.name,

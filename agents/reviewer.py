@@ -28,6 +28,7 @@ from agents.config import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
     DEFAULT_TIMEOUT_SECONDS,
+    MAX_OUTPUT_TOKENS_REVIEWER,
     prompt_hash,
 )
 from agents.final_artifact import FinalUserStory
@@ -120,7 +121,7 @@ def review_artifact(
     temperature: float | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     max_retries: int = DEFAULT_MAX_RETRIES,
-    max_output_tokens: int | None = None,
+    max_output_tokens: int | None = MAX_OUTPUT_TOKENS_REVIEWER,
 ) -> ReviewReport:
     """Run the Reviewer on the assembled FinalUserStory.
 

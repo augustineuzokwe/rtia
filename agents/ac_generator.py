@@ -27,6 +27,7 @@ from agents.config import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
     DEFAULT_TIMEOUT_SECONDS,
+    MAX_OUTPUT_TOKENS_AC_GENERATOR,
     prompt_hash,
 )
 from agents.final_artifact import AcceptanceCriterion
@@ -73,7 +74,7 @@ def generate_acceptance_criteria(
     temperature: float | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     max_retries: int = DEFAULT_MAX_RETRIES,
-    max_output_tokens: int | None = None,
+    max_output_tokens: int | None = MAX_OUTPUT_TOKENS_AC_GENERATOR,
 ) -> AcGeneratorOutput:
     """Run the AC Generator on a Story Writer output + Analyst context.
 
