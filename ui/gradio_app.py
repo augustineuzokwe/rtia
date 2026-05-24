@@ -59,6 +59,37 @@ def _runner(app: FastAPI) -> PipelineRunner:
 _MAX_FANOUT_ROWS = 10
 
 
+def _build_export_target(backend: str, target: str, extra: str) -> ExportTarget:
+    """Map the three Backlog-target Textbox values onto an ``ExportTarget``.
+
+    Issue #215 — extracted from ``on_export`` / ``on_export_deferred``
+    where the same logic was duplicated. Centralising lets a unit test
+    pin the "extra → ``github_project_number``" hop that the round-1
+    walk-through left unverified.
+
+    Conventions (matched to the Textbox labels):
+
+    - ``target`` is the Jira project key (e.g. ``"RTIA"``) OR the
+      GitHub repo in ``owner/name`` form. Empty → ``None``.
+    - ``extra`` is the Jira parent-epic key (e.g. ``"RTIA-1"``) OR the
+      GitHub project number as a digit string (e.g. ``"5"``). Empty
+      or non-digit-for-GitHub → ``None`` (no parent / no project add).
+    """
+    target = (target or "").strip()
+    extra = (extra or "").strip()
+    if backend == "jira":
+        return ExportTarget(
+            backend="jira",
+            jira_project_key=target or None,
+            jira_parent_key=extra or None,
+        )
+    return ExportTarget(
+        backend="github",
+        github_repo=target or None,
+        github_project_number=int(extra) if extra.isdigit() else None,
+    )
+
+
 def _hidden_fanout_rows() -> list[tuple[Any, Any, Any]]:
     """Build a list of N hidden ``(row, checkbox, textbox)`` updates.
 
@@ -767,21 +798,8 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
                 return "❌ No final artifact for this thread yet."
             artifact, title = loaded
 
-            target = (target or "").strip()
-            extra = (extra or "").strip()
             update_id = (update_id or "").strip()
-            if backend == "jira":
-                tgt = ExportTarget(
-                    backend="jira",
-                    jira_project_key=target or None,
-                    jira_parent_key=extra or None,
-                )
-            else:
-                tgt = ExportTarget(
-                    backend="github",
-                    github_repo=target or None,
-                    github_project_number=int(extra) if extra.isdigit() else None,
-                )
+            tgt = _build_export_target(backend, target, extra)
 
             try:
                 exporter = make_exporter(backend)
@@ -861,20 +879,7 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
 
             include_titles = selected_titles or [s.title for s in deferred]
 
-            target = (target or "").strip()
-            extra = (extra or "").strip()
-            if backend == "jira":
-                tgt = ExportTarget(
-                    backend="jira",
-                    jira_project_key=target or None,
-                    jira_parent_key=extra or None,
-                )
-            else:
-                tgt = ExportTarget(
-                    backend="github",
-                    github_repo=target or None,
-                    github_project_number=int(extra) if extra.isdigit() else None,
-                )
+            tgt = _build_export_target(backend, target, extra)
 
             try:
                 exporter = make_exporter(backend)
