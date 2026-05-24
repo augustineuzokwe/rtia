@@ -15,17 +15,21 @@ can still inspect the would-be POST body via ``dry_run=True``.
 from __future__ import annotations
 
 import base64
+import logging
 import os
 from typing import Any
 
 import httpx
 
+from exporters._adf import markdown_to_adf
 from exporters.base import (
     ExportConfigError,
     ExporterTransportError,
     ExportResult,
     ExportTarget,
 )
+
+_log = logging.getLogger("rtia.exporters.jira")
 
 
 class JiraExporter:
@@ -148,20 +152,14 @@ class JiraExporter:
                 "in the environment (or use dry_run=true to inspect the payload)."
             )
 
+        # #223 — same native-ADF conversion as the create path. Update
+        # bodies must match what create sends so an update doesn't
+        # silently regress a previously-ADF-rendered description into a
+        # codeBlock wall.
         payload: dict[str, Any] = {
             "fields": {
                 "summary": title,
-                "description": {
-                    "type": "doc",
-                    "version": 1,
-                    "content": [
-                        {
-                            "type": "codeBlock",
-                            "attrs": {"language": "markdown"},
-                            "content": [{"type": "text", "text": artifact_markdown}],
-                        }
-                    ],
-                },
+                "description": _description_adf(artifact_markdown),
             }
         }
 
@@ -209,17 +207,41 @@ class JiraExporter:
 def _build_payload(target: ExportTarget, title: str, markdown: str) -> dict[str, Any]:
     """Construct the Jira REST v3 issue-create body.
 
-    Description uses an ADF ``codeBlock`` so the markdown survives the
-    round-trip through Jira's renderer. ``parent`` is set only when
-    ``jira_parent_key`` is supplied — Jira Cloud company-managed
-    projects honor ``parent`` for Epic Link; team-managed projects use
-    the same field for parent issues.
+    Description is converted from RTIA's Markdown shape to native ADF
+    (#223). Native ADF renders as proper headings, lists, and inline
+    bold/italic in Jira instead of a static code-block wall.
+
+    ``parent`` is set only when ``jira_parent_key`` is supplied — Jira
+    Cloud company-managed projects honor ``parent`` for Epic Link;
+    team-managed projects use the same field for parent issues.
     """
     fields: dict[str, Any] = {
         "project": {"key": target.jira_project_key},
         "issuetype": {"name": target.jira_issue_type},
         "summary": title,
-        "description": {
+        "description": _description_adf(markdown),
+    }
+    if target.jira_parent_key:
+        fields["parent"] = {"key": target.jira_parent_key}
+    return {"fields": fields}
+
+
+def _description_adf(markdown: str) -> dict[str, Any]:
+    """Convert ``markdown`` to an ADF ``doc`` for Jira's description field.
+
+    Falls back to the legacy ``codeBlock`` wrap if the converter raises
+    — keeping a push working through a parser bug is more valuable than
+    a clean ADF (we'll see and fix the bug from logs). #223 contract.
+    """
+    try:
+        return markdown_to_adf(markdown)
+    except Exception:
+        _log.warning(
+            "rtia.exporters.jira.adf_fallback",
+            extra={"event": "adf_fallback"},
+            exc_info=True,
+        )
+        return {
             "type": "doc",
             "version": 1,
             "content": [
@@ -229,11 +251,7 @@ def _build_payload(target: ExportTarget, title: str, markdown: str) -> dict[str,
                     "content": [{"type": "text", "text": markdown}],
                 }
             ],
-        },
-    }
-    if target.jira_parent_key:
-        fields["parent"] = {"key": target.jira_parent_key}
-    return {"fields": fields}
+        }
 
 
 __all__ = ["JiraExporter"]
