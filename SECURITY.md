@@ -14,7 +14,7 @@ RTIA is pre-1.0. Only the `main` branch receives security fixes. No patch releas
 **Preferred channel — GitHub Security Advisories**
 
 Open a private advisory at:
-`https://github.com/<owner>/rtia/security/advisories/new`
+[https://github.com/augustineuzokwe/rtia/security/advisories/new](https://github.com/augustineuzokwe/rtia/security/advisories/new)
 
 GitHub keeps the report confidential until disclosure is coordinated. Do not open a public issue or pull request for security vulnerabilities.
 
