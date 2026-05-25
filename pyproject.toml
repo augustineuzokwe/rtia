@@ -18,7 +18,7 @@ dependencies = [
     "pypdf>=5.0.0",
     "python-dotenv>=1.2.2",
     "python-multipart>=0.0.20",
-    "uvicorn[standard]>=0.32.0",
+    "uvicorn[standard]>=0.48.0",
 ]
 
 [tool.ruff]
