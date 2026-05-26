@@ -108,10 +108,10 @@ uv run pre-commit install        # one-time: enable the pre-commit hooks
 `.env.example` documents every variable. The minimum to run the demo:
 
 ```
-ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=...               # Google AI Studio key — RTIA defaults to Gemini 3.5 Flash
 ```
 
-To turn on **LangSmith tracing** (recommended — every LLM call is traced, with token counts, latency, and full input/output), add:
+Optional but recommended — **LangSmith tracing** (every LLM call surfaces with token counts, latency, and full input/output in the LangSmith UI):
 
 ```
 LANGSMITH_TRACING=true
@@ -119,45 +119,16 @@ LANGSMITH_API_KEY=lsv_...
 LANGSMITH_PROJECT=rtia
 ```
 
-Tracing is purely opt-in. Leaving the vars unset (the CI default) runs the pipeline identically with no external calls beyond Anthropic.
+Tracing is purely opt-in. Production-trace safety (refuses to start under `RTIA_ENV=production` + tracing) is covered by [ADR-0008](docs/adr-0008-pii-langsmith.md).
 
-**LLM response cache** (see [ADR-0013](docs/adr-0013-llm-response-cache.md) and Issue #230). Local iteration on the same input hits a disk cache by default, so a re-run of `scripts/run_pipeline_demo.py` against the same sample is ~free after the first warm-up. Knobs:
+### Deeper topics — pointers, not duplication
 
-```
-RTIA_LLM_CACHE=enabled         # default; set to "disabled" to bypass
-RTIA_LLM_CACHE_TTL=86400       # seconds, default 24h (deliberately shorter than Promptfoo's 14d)
-RTIA_LLM_CACHE_DIR=~/.rtia/cache  # default; override only when sharing across worktrees
-```
+The README intentionally stops at "what you need to get running." For each topic below, the linked doc has the design rationale + the env-var contract + the trade-offs:
 
-The cache key includes the prompt hash, so a prompt edit auto-invalidates — you cannot accidentally measure stale prompt behaviour. The CI regression job and `scripts/run_integration_smoke.py` disable the cache by default; pass `--no-cache` to `evals/run_evals.py` locally when re-baselining or running adversarial regressions.
-
-**Stochastic AC validation** (Issue #233, [ADR-0014](docs/adr-0014-stochastic-ac-validation.md)). Adversarial samples (`04–07`) test the *tail* of the model's distribution — single-pass measurement misses the rare-but-real failure that motivates the sample existing. Run them stochastically:
-
-```bash
-uv run python evals/run_evals.py sample-04 --n-runs 10 --no-cache
-```
-
-The N-run gate measures pass-rate per metric (fraction of runs at-or-above each metric's floor in `evals/thresholds.yaml`) against an adjustable threshold (default 95 % for adversarial samples, 100 % for non-adversarial). N > 1 forces `RTIA_LLM_CACHE=disabled` automatically — otherwise the N draws collapse to 1 cached measurement and the gate is dishonest.
-
-The `nightly-safety-regression` workflow (`.github/workflows/nightly-safety-regression.yml`) runs N=10 on samples 04–07 every night at 02:00 UTC and gates the build on the pass-rate threshold; the per-PR regression job stays cheap at N=1.
-
-**Cost tiers** — RTIA defaults to Gemini 3.5 Flash because the cost is already near-free (a full pipeline demo runs ~$0.005, a full eval gate ~$0.03), but a strictly **zero-API-spend** path exists for adopters who don't want any external dependency:
-
-| Configuration | Generator | Judge | Cost per eval run | Quality vs default |
-|---|---|---|---|---|
-| Default (recommended) | Gemini 3.5 Flash | Gemini 3.5 Flash | ~$0.03 | baseline |
-| Local generator, hosted judge | Ollama (`llama3.1:8b`) | Gemini 3.5 Flash | ~$0.01-0.02 | -45 % to +5 % per metric — see [ollama-probe-2026-05-26.md](docs/ollama-probe-2026-05-26.md) |
-| **Full local** | Ollama (`llama3.1:8b`) | Ollama (`llama3.1:8b`) | **$0** | not directly measured — judge precision likely lower; treat as exploratory |
-
-To opt into the zero-cost path, set **both** switches:
-
-```bash
-export RTIA_LLM_PROVIDER=ollama      # routes the 5 production agents to Ollama
-export RTIA_OLLAMA_JUDGE=1           # routes the deepeval judge to Ollama too
-uv run python evals/run_evals.py sample-01
-```
-
-The two switches are deliberately independent so you can mix them: keep Gemini for the judge when you want apples-to-apples eval signal (per the §7.3 methodology); flip both when the question is "can RTIA run end-to-end without external API spend?"
+- **LLM response cache** — disk-backed, prompt-hash keyed, 24h TTL, disabled in CI. Env vars: `RTIA_LLM_CACHE`, `RTIA_LLM_CACHE_TTL`, `RTIA_LLM_CACHE_DIR`. See [ADR-0013](docs/adr-0013-llm-response-cache.md).
+- **Stochastic AC validation (N-runs)** — `--n-runs N` on the eval runner, pass-rate gating, nightly cron at 02:00 UTC on adversarial samples. See [ADR-0014](docs/adr-0014-stochastic-ac-validation.md) and [USAGE §9](docs/USAGE.md#9-stochastic-ac-validation-for-adversarial-samples).
+- **Full-local mode ($0 API spend)** — set `RTIA_LLM_PROVIDER=ollama` + `RTIA_OLLAMA_JUDGE=1`. Default uses Gemini at ~$0.005/demo, ~$0.03/eval; full local uses Ollama for both generator and judge. See [USAGE §10](docs/USAGE.md#10-running-rtia-with-zero-api-spend-full-local-mode).
+- **When tests fire (CI + nightly cron)** — full trigger table, PR timeline, 24h timeline, and a mental-shortcut table at [docs/ci-and-testing.md](docs/ci-and-testing.md).
 
 ### Run the demo
 
