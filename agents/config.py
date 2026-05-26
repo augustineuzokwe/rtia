@@ -40,6 +40,34 @@ local models without code edits.
 
 DEFAULT_OLLAMA_MODEL = "llama3.1:8b"
 
+OLLAMA_JUDGE_ENV_VAR = "RTIA_OLLAMA_JUDGE"
+"""Env-var that opts the deepeval judge into Ollama too (full local stack).
+
+Accepted values (case-insensitive truthy set): ``1``, ``true``, ``yes``,
+``on``. Anything else (including unset) keeps the judge on Gemini.
+
+By default, ``RTIA_LLM_PROVIDER=ollama`` swaps only the production
+agents and leaves the judge on Gemini for apples-to-apples comparison
+against the ``docs/pipeline-baseline-2026-05-26.md`` baseline (see the
+inline comment in ``evals/judge.py:load_model``). Setting
+``RTIA_OLLAMA_JUDGE=1`` additionally routes the judge through Ollama,
+making the eval suite cost zero API dollars at the price of varying
+both components at once — useful when answering "is RTIA usable
+end-to-end without any API spend?" rather than "how much does the
+generator alone degrade locally?"
+"""
+
+OLLAMA_JUDGE_MODEL_ENV_VAR = "RTIA_OLLAMA_JUDGE_MODEL"
+"""Env-var that picks the Ollama judge model when ``RTIA_OLLAMA_JUDGE`` is on.
+
+Defaults to ``DEFAULT_OLLAMA_MODEL`` (same as the generator) when unset.
+Override if you want an asymmetric local stack — e.g. an 8B generator
+plus a 14B judge to recover some judge precision without paying for
+Gemini.
+"""
+
+_OLLAMA_JUDGE_TRUTHY = {"1", "true", "yes", "on"}
+
 
 def _llm_provider() -> str:
     return os.environ.get(LLM_PROVIDER_ENV_VAR, "google").strip().lower()
@@ -48,6 +76,17 @@ def _llm_provider() -> str:
 def use_ollama() -> bool:
     """Return True when the process is configured to use the Ollama provider."""
     return _llm_provider() == "ollama"
+
+
+def use_ollama_judge() -> bool:
+    """Return True when the deepeval judge should run through Ollama too.
+
+    Independent of :func:`use_ollama` — the generator and judge each have
+    their own switch, and the judge default stays on Gemini regardless of
+    the generator setting. Set ``RTIA_OLLAMA_JUDGE=1`` to flip the judge.
+    """
+    raw = os.environ.get(OLLAMA_JUDGE_ENV_VAR, "").strip().lower()
+    return raw in _OLLAMA_JUDGE_TRUTHY
 
 
 LLM_CACHE_ENABLED_ENV_VAR = "RTIA_LLM_CACHE"

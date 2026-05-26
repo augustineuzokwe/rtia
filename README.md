@@ -141,6 +141,27 @@ The N-run gate measures pass-rate per metric (fraction of runs at-or-above each 
 
 The `nightly-safety-regression` workflow (`.github/workflows/nightly-safety-regression.yml`) runs N=10 on samples 04–07 every night at 02:00 UTC and gates the build on the pass-rate threshold; the per-PR regression job stays cheap at N=1.
 
+**Cost tiers** — RTIA defaults to Gemini 3.5 Flash because the cost is already near-free (a full pipeline demo runs ~$0.005, a full eval gate ~$0.03), but a strictly **zero-API-spend** path exists for adopters who don't want any external dependency:
+
+| Configuration | Generator | Judge | Cost per eval run | Quality vs default |
+|---|---|---|---|---|
+| Default (recommended) | Gemini 3.5 Flash | Gemini 3.5 Flash | ~$0.03 | baseline |
+| Local generator, hosted judge | Ollama (`llama3.1:8b`) | Gemini 3.5 Flash | ~$0.01-0.02 | -45 % to +5 % per metric — see [ollama-probe-2026-05-26.md](docs/ollama-probe-2026-05-26.md) |
+| **Full local** | Ollama (`llama3.1:8b`) | Ollama (`llama3.1:8b`) | **$0** | not directly measured — judge precision likely lower; treat as exploratory |
+
+To opt into the zero-cost path, set **both** switches:
+
+```bash
+export RTIA_LLM_PROVIDER=ollama      # routes the 5 production agents to Ollama
+export RTIA_OLLAMA_JUDGE=1           # routes the deepeval judge to Ollama too
+# Optional: pick stronger local models if your RAM allows
+# export RTIA_OLLAMA_MODEL=qwen2.5:14b
+# export RTIA_OLLAMA_JUDGE_MODEL=qwen2.5:14b
+uv run python evals/run_evals.py sample-01
+```
+
+The two switches are deliberately independent so you can mix them: keep Gemini for the judge when you want apples-to-apples eval signal (per the §7.3 methodology); flip both when the question is "can RTIA run end-to-end without external API spend?"
+
 ### Run the demo
 
 ```bash

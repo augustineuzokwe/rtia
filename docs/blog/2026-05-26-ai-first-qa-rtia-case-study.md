@@ -171,6 +171,26 @@ Three takeaways:
 
 Conditional trigger (defined in the plan that drove this probe): if the chosen Ollama model lands within 15 % of Gemini Flash on metric floors, file a follow-up Task to discuss Ollama as a v1 fallback. **Three metrics broke that threshold, so no Task was filed.** Ollama stays an opt-in local-dev experiment behind the `RTIA_LLM_PROVIDER` env var; Gemini stays the v1 default.
 
+### The "$0 total" option, for the adopters who need it
+
+The probe above kept the deepeval judge on Gemini for apples-to-apples. But the moment we shipped the `RTIA_LLM_PROVIDER` knob, a different question became answerable: *can RTIA run end-to-end with no API spend at all?* The answer ships as an independent second switch — `RTIA_OLLAMA_JUDGE=1` — that routes the judge through Ollama too. Set both env vars and the entire stack is local:
+
+```bash
+export RTIA_LLM_PROVIDER=ollama   # 5 production agents
+export RTIA_OLLAMA_JUDGE=1        # deepeval judge
+uv run python evals/run_evals.py sample-01
+```
+
+That's the **third tier** of RTIA's cost story:
+
+| Configuration | Cost per eval | Use case |
+|---|---|---|
+| Default — Gemini generator + Gemini judge | ~$0.03 | Production-grade quality; what the CI gate uses |
+| Local generator + Gemini judge | ~$0.01-0.02 | Cost-conscious adopter; apples-to-apples eval signal |
+| **Full local — both Ollama** | **$0** | Air-gapped demo, privacy-sensitive deployment, learning the patterns offline |
+
+The two switches stay independent on purpose. Recommending "set both" doesn't help an adopter who wants to vary only the generator and keep the eval reliable; recommending "always Gemini" leaves the zero-cost path closed for the adopter who has hard reasons to need it. Two switches, two questions, two honest answers. The blog narrative isn't "Llama is free, use Llama" — it's "RTIA defaults to ~$0.03 because the quality earns it; if you need $0, the door is open and here are the caveats."
+
 ---
 
 ## What this taught me about AI-first QA
@@ -201,7 +221,7 @@ uv run python scripts/run_pipeline_demo.py  # default sample-01
 
 Expected output: a fully populated user story (Description + Objective + ACs + Test Cases) printed to stdout, ~30s wall-clock, ~$0.005 of Gemini calls. The fan-out path triggers automatically if you swap in `sample-03-multi-feature.md`; the PO checkpoint pauses for input if the Analyst flagged critical ambiguities.
 
-To run the eval gate yourself: `uv run python evals/run_evals.py` (~90s, ~$0.03). To run the local-model probe: `RTIA_LLM_PROVIDER=ollama uv run python evals/run_evals.py` after `ollama pull llama3.1:8b` (~25 min wall-clock, ~$0.01 of Gemini judge calls — see ADR-0013 §"Per-workflow defaults" for why the judge isn't local).
+To run the eval gate yourself: `uv run python evals/run_evals.py` (~90s, ~$0.03). To run the local-model probe with the Gemini judge held constant: `RTIA_LLM_PROVIDER=ollama uv run python evals/run_evals.py` after `ollama pull llama3.1:8b` (~25 min wall-clock, ~$0.01 of Gemini judge calls). For a strictly $0 stack, add `RTIA_OLLAMA_JUDGE=1` — both env vars together route every LLM call to local Ollama. Caveats above in Section 8.
 
 The full setup recipe is in [`README.md`](https://github.com/augustineuzokwe/rtia#readme); the daily-driver checkpoints are in [`docs/USAGE.md`](https://github.com/augustineuzokwe/rtia/blob/main/docs/USAGE.md); the architectural choices are in the `docs/adr-*.md` series.
 

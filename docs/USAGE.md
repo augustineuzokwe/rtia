@@ -193,6 +193,41 @@ Run nightly: the `nightly-safety-regression` workflow runs N=10 on the
 four adversarial samples every night at 02:00 UTC. If you suspect a
 regression off-cycle, trigger it manually from the Actions tab.
 
+## 10. Running RTIA with zero API spend (full-local mode)
+
+RTIA's default config uses Gemini 3.5 Flash because it's already
+near-free (~$0.005 per pipeline demo, ~$0.03 per eval gate). But if you
+want to run the whole stack without making any external API call — for
+an air-gapped demo, a privacy-sensitive deployment, or just curiosity
+about how a local model handles your inputs — set two env vars:
+
+```bash
+export RTIA_LLM_PROVIDER=ollama
+export RTIA_OLLAMA_JUDGE=1
+uv run python scripts/run_pipeline_demo.py
+```
+
+Prerequisites: Ollama installed (`brew install ollama` then
+`brew services start ollama`) and at least one model pulled
+(`ollama pull llama3.1:8b` — the default).
+
+The two switches are independent on purpose. Setting only
+`RTIA_LLM_PROVIDER=ollama` swaps the **generator** (5 production agents)
+but keeps the deepeval **judge** on Gemini — useful for the
+apples-to-apples comparison documented in
+[ollama-probe-2026-05-26.md](ollama-probe-2026-05-26.md). Setting both
+gives you a strictly $0 stack but mixes two variables, so eval scores
+are less reliable as a quality signal.
+
+**Quality caveat.** On the 7-sample golden set,
+[Llama 3.1 8B](ollama-probe-2026-05-26.md) regressed > 15 % vs Gemini
+on three Analyst-side metrics (`ambiguity_discipline`,
+`intent_keyword_overlap`, `requirement_fidelity`) while AC and Test Case
+generation tolerated the swap within ±3 %. A stronger local model
+(`qwen2.5:14b` is the recommended next step on a 24 GB machine) will
+close some of that gap. Either way, treat full-local mode as
+exploratory until you've run the probe on your own dataset.
+
 ## See also
 
 - [README](../README.md) — setup, architecture, contributing.
@@ -200,3 +235,4 @@ regression off-cycle, trigger it manually from the Actions tab.
 - [docs/adr-0004-final-artifact.md](adr-0004-final-artifact.md) — why the artifact has these four sections and not others.
 - [docs/adr-0013-llm-response-cache.md](adr-0013-llm-response-cache.md) — the cache design that backs §8 above.
 - [docs/adr-0014-stochastic-ac-validation.md](adr-0014-stochastic-ac-validation.md) — the N-run design that backs §9 above.
+- [docs/ollama-probe-2026-05-26.md](ollama-probe-2026-05-26.md) — quality + cost + latency measurements behind the §10 caveats.
