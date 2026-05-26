@@ -516,7 +516,20 @@ def main(argv: list[str] | None = None) -> int:
             "Gemini version against the baseline)."
         ),
     )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help=(
+            "Bypass the LLM response cache for this run (sets "
+            "RTIA_LLM_CACHE=disabled in the process env). The CI regression "
+            "job sets this implicitly; pass it locally when re-baselining or "
+            "running adversarial regressions where you need a live measurement. "
+            "See Issue #230."
+        ),
+    )
     args = parser.parse_args(argv)
+    if args.no_cache:
+        os.environ["RTIA_LLM_CACHE"] = "disabled"
 
     samples = load_all_samples()
     if args.sample:

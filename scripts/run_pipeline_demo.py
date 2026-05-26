@@ -17,6 +17,7 @@ Run with:
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
@@ -199,7 +200,17 @@ def main() -> None:
             f"Default: {DEFAULT_SAMPLE}"
         ),
     )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help=(
+            "Bypass the LLM response cache for this run (sets "
+            "RTIA_LLM_CACHE=disabled in the process env). See Issue #230."
+        ),
+    )
     args = parser.parse_args()
+    if args.no_cache:
+        os.environ["RTIA_LLM_CACHE"] = "disabled"
     sample_path = resolve_sample(args.sample)
 
     raw_markdown = sample_path.read_text(encoding="utf-8")

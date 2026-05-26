@@ -149,8 +149,31 @@ If a pattern repeats — same agent producing the same kind of
 unwanted output across runs — that's worth flagging via a bug report;
 see the issue templates in `.github/ISSUE_TEMPLATE`.
 
+## 8. Caching and re-runs
+
+By default RTIA caches LLM responses on disk so that a second run of
+the same input doesn't re-pay for the same answer. The cache lives at
+`~/.rtia/cache/` and entries expire after 24 hours.
+
+You almost never need to think about this. The two times you do:
+
+1. **You just edited a prompt** — no action needed. The cache key
+   includes the prompt hash, so your edit auto-invalidates every
+   relevant entry on the first re-run.
+2. **You want a fresh measurement on purpose** — for a re-baseline,
+   an adversarial probe, or a sanity check against model drift. Pass
+   `--no-cache` to `evals/run_evals.py` or `scripts/run_pipeline_demo.py`,
+   or export `RTIA_LLM_CACHE=disabled` for the session.
+
+The CI regression job (`.github/workflows/ci.yml`) always disables the
+cache so the eval gate measures live behaviour on every PR. See
+[ADR-0013](adr-0013-llm-response-cache.md) for the design rationale,
+including why the 24h TTL is deliberately shorter than Promptfoo's
+14-day default.
+
 ## See also
 
 - [README](../README.md) — setup, architecture, contributing.
 - [CLAUDE.md](../CLAUDE.md) — repo-local rules for Claude Code sessions.
 - [docs/adr-0004-final-artifact.md](adr-0004-final-artifact.md) — why the artifact has these four sections and not others.
+- [docs/adr-0013-llm-response-cache.md](adr-0013-llm-response-cache.md) — the cache design that backs §8 above.

@@ -32,3 +32,19 @@ def _dummy_provider_keys(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("GOOGLE_API_KEY", "test-placeholder-google-key")
     if not os.environ.get("ANTHROPIC_API_KEY"):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-placeholder-anthropic-key")
+
+
+@pytest.fixture(autouse=True)
+def _disable_llm_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Disable the LLM response cache for every test by default.
+
+    Mocked tests patch ``llm.invoke`` per-call; a stale cache entry from a
+    previous test would shadow the new mock and return cached text instead
+    of letting the mock run. Per-test cache isolation via temp dirs would
+    also work but is heavier — disabling is the simpler invariant for the
+    mocked-LLM contract tests this suite is built around.
+
+    Tests that specifically exercise the cache (``tests/test_llm_cache.py``)
+    re-enable it explicitly via ``monkeypatch.setenv`` inside the test.
+    """
+    monkeypatch.setenv("RTIA_LLM_CACHE", "disabled")

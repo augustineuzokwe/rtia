@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+from pathlib import Path
 
 LLM_PROVIDER_ENV_VAR = "RTIA_LLM_PROVIDER"
 """Env-var name that selects the chat-LLM provider per process.
@@ -48,6 +49,37 @@ def use_ollama() -> bool:
     """Return True when the process is configured to use the Ollama provider."""
     return _llm_provider() == "ollama"
 
+
+LLM_CACHE_ENABLED_ENV_VAR = "RTIA_LLM_CACHE"
+"""Env-var that enables or disables the LLM response cache for this process.
+
+Accepted values (case-insensitive): ``enabled`` (default) or ``disabled``.
+The CI regression job in ``.github/workflows/ci.yml`` sets this to
+``disabled`` so the eval gate always re-measures live behaviour — see
+[Issue #230](https://github.com/augustineuzokwe/rtia/issues/230) §"three-part fix" for the
+"false-green CI" trap this avoids.
+
+Cache key includes ``prompt_hash`` so a prompt edit auto-invalidates;
+the TTL bounds how long a stale cache can silently linger.
+"""
+
+LLM_CACHE_TTL_ENV_VAR = "RTIA_LLM_CACHE_TTL"
+"""Cache TTL in seconds. Default 86 400 (24h) per [Issue #230](https://github.com/augustineuzokwe/rtia/issues/230).
+
+Deliberately shorter than Promptfoo's 14-day default — RTIA's faster
+iteration cadence means a 14-day stale window would hide too much
+real model drift. 24 hours bounds the worst-case stale window to one
+workday.
+"""
+
+LLM_CACHE_DIR_ENV_VAR = "RTIA_LLM_CACHE_DIR"
+"""Path of the cache directory. Default ``~/.rtia/cache/`` (mirrors
+``~/.rtia/state.db`` from ADR-0002). Override only when sharing a
+cache between worktrees or running in a sandbox without HOME.
+"""
+
+DEFAULT_CACHE_DIR = Path("~/.rtia/cache").expanduser()
+DEFAULT_CACHE_TTL_SECONDS = 86400  # 24 hours
 
 DEFAULT_MODEL = "gemini-3.5-flash"
 """Canonical Gemini model ID used by all production agents.

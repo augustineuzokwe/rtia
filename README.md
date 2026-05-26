@@ -121,6 +121,16 @@ LANGSMITH_PROJECT=rtia
 
 Tracing is purely opt-in. Leaving the vars unset (the CI default) runs the pipeline identically with no external calls beyond Anthropic.
 
+**LLM response cache** (see [ADR-0013](docs/adr-0013-llm-response-cache.md) and Issue #230). Local iteration on the same input hits a disk cache by default, so a re-run of `scripts/run_pipeline_demo.py` against the same sample is ~free after the first warm-up. Knobs:
+
+```
+RTIA_LLM_CACHE=enabled         # default; set to "disabled" to bypass
+RTIA_LLM_CACHE_TTL=86400       # seconds, default 24h (deliberately shorter than Promptfoo's 14d)
+RTIA_LLM_CACHE_DIR=~/.rtia/cache  # default; override only when sharing across worktrees
+```
+
+The cache key includes the prompt hash, so a prompt edit auto-invalidates — you cannot accidentally measure stale prompt behaviour. The CI regression job and `scripts/run_integration_smoke.py` disable the cache by default; pass `--no-cache` to `evals/run_evals.py` locally when re-baselining or running adversarial regressions.
+
 ### Run the demo
 
 ```bash

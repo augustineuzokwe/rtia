@@ -151,11 +151,19 @@ jobs:
         env:
           # Keep this in sync with the Verify Gemini API key step above.
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
+          # Issue #230 — the CI regression job MUST run with the LLM
+          # response cache disabled. The cache exists to speed up local
+          # iteration; on the gate we need a fresh live measurement on
+          # every PR so a warm cache cannot mask model drift ("false-green
+          # CI" trap). The `--no-cache` CLI flag below sets the same env;
+          # both are set so the disable survives whether `command:` is
+          # invoked directly or through a wrapper that might strip flags.
+          RTIA_LLM_CACHE: disabled
         with:
           timeout_minutes: 10
           max_attempts: 2
           retry_wait_seconds: 30
-          command: uv run python evals/run_evals.py --report-path evals/reports/ci-run.json
+          command: uv run python evals/run_evals.py --no-cache --report-path evals/reports/ci-run.json
 
       - name: Enforce metric floors
         if: steps.should_run.outputs.run == 'true'
