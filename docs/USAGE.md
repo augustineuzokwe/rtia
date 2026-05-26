@@ -171,9 +171,32 @@ cache so the eval gate measures live behaviour on every PR. See
 including why the 24h TTL is deliberately shorter than Promptfoo's
 14-day default.
 
+## 9. Stochastic AC validation for adversarial samples
+
+The four adversarial samples (`sample-04` through `sample-07`) test the
+*tail* of the model's distribution — the rare 1-in-50 failure that's the
+entire point of an adversarial sample existing. Single-pass measurement
+misses it. Run them stochastically when you change anything that could
+affect safety behaviour:
+
+```bash
+uv run python evals/run_evals.py sample-04 --n-runs 10 --no-cache
+```
+
+Sample passes when every metric's pass-rate (fraction of runs at-or-above
+the metric's floor) meets the configured threshold — default 95 % for
+adversarial samples. N > 1 forces the cache off automatically;
+[ADR-0013](adr-0013-llm-response-cache.md) and
+[ADR-0014](adr-0014-stochastic-ac-validation.md) explain why.
+
+Run nightly: the `nightly-safety-regression` workflow runs N=10 on the
+four adversarial samples every night at 02:00 UTC. If you suspect a
+regression off-cycle, trigger it manually from the Actions tab.
+
 ## See also
 
 - [README](../README.md) — setup, architecture, contributing.
 - [CLAUDE.md](../CLAUDE.md) — repo-local rules for Claude Code sessions.
 - [docs/adr-0004-final-artifact.md](adr-0004-final-artifact.md) — why the artifact has these four sections and not others.
 - [docs/adr-0013-llm-response-cache.md](adr-0013-llm-response-cache.md) — the cache design that backs §8 above.
+- [docs/adr-0014-stochastic-ac-validation.md](adr-0014-stochastic-ac-validation.md) — the N-run design that backs §9 above.

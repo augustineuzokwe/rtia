@@ -131,6 +131,16 @@ RTIA_LLM_CACHE_DIR=~/.rtia/cache  # default; override only when sharing across w
 
 The cache key includes the prompt hash, so a prompt edit auto-invalidates — you cannot accidentally measure stale prompt behaviour. The CI regression job and `scripts/run_integration_smoke.py` disable the cache by default; pass `--no-cache` to `evals/run_evals.py` locally when re-baselining or running adversarial regressions.
 
+**Stochastic AC validation** (Issue #233, [ADR-0014](docs/adr-0014-stochastic-ac-validation.md)). Adversarial samples (`04–07`) test the *tail* of the model's distribution — single-pass measurement misses the rare-but-real failure that motivates the sample existing. Run them stochastically:
+
+```bash
+uv run python evals/run_evals.py sample-04 --n-runs 10 --no-cache
+```
+
+The N-run gate measures pass-rate per metric (fraction of runs at-or-above each metric's floor in `evals/thresholds.yaml`) against an adjustable threshold (default 95 % for adversarial samples, 100 % for non-adversarial). N > 1 forces `RTIA_LLM_CACHE=disabled` automatically — otherwise the N draws collapse to 1 cached measurement and the gate is dishonest.
+
+The `nightly-safety-regression` workflow (`.github/workflows/nightly-safety-regression.yml`) runs N=10 on samples 04–07 every night at 02:00 UTC and gates the build on the pass-rate threshold; the per-PR regression job stays cheap at N=1.
+
 ### Run the demo
 
 ```bash

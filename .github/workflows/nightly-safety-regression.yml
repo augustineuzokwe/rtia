@@ -1,0 +1,110 @@
+# Nightly stochastic safety regression — N=10 on adversarial samples 04-07.
+#
+# Per [Issue #233](https://github.com/augustineuzokwe/rtia/issues/233): adversarial samples target the
+# tail of the model's distribution. A single-pass measurement (the PR
+# regression job) only ever sees 1 draw and would report PASS for the
+# 49 safe runs while missing the 1 unsafe run that's the entire point of
+# the adversarial sample existing. The fix is to run them N times nightly
+# and gate on pass-rate.
+#
+# Why not per-PR: cost. N=10 × 4 adversarial samples × ~30 s/run ≈ 20 min
+# wall-clock and ~$0.12 of Gemini calls per night. Per-PR would multiply
+# the PR cost by ~5x; nightly keeps the per-PR gate at ~$0.03.
+#
+# Failure handling: when a nightly run fails, the next morning's first PR
+# is informed via the workflow's failure notification (GitHub issue
+# auto-filed via a comment on the failing run). Production ship-cadence
+# is NOT blocked by overnight flakiness — engineers see the signal and
+# decide whether to investigate.
+
+name: nightly-safety-regression
+
+on:
+  # 02:00 UTC daily — quiet hours for Western Europe and US-East.
+  schedule:
+    - cron: "0 2 * * *"
+  # Allow manual triggering from the Actions tab when investigating a
+  # suspected regression off-cycle.
+  workflow_dispatch:
+    inputs:
+      n_runs:
+        description: "Number of runs per sample (default 10)"
+        required: false
+        default: "10"
+      adversarial_threshold:
+        description: "Pass-rate threshold for adversarial samples (default 0.95)"
+        required: false
+        default: "0.95"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-safety-regression
+  cancel-in-progress: false
+
+jobs:
+  stochastic-adversarial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python via uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install Python toolchain
+        run: |
+          uv python install 3.13
+          uv sync --frozen
+
+      - name: Verify Gemini API key present
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
+        run: |
+          if [ -z "$GOOGLE_API_KEY" ]; then
+            echo "::error::GOOGLE_API_KEY secret is not configured. The nightly safety regression cannot run without it."
+            exit 1
+          fi
+          echo "::notice::GOOGLE_API_KEY present; proceeding."
+
+      - name: Run N=10 stochastic adversarial regression
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
+          # Issue #230 + #233 — the N-run gate REQUIRES the cache off so the
+          # N draws actually come from N live model calls. Set explicitly
+          # here AND the run_evals.py --n-runs > 1 path also force-sets it
+          # in evals/n_runs.py:assert_cache_disabled_for_n_runs.
+          RTIA_LLM_CACHE: disabled
+        run: |
+          N_RUNS="${{ github.event.inputs.n_runs || '10' }}"
+          THRESHOLD="${{ github.event.inputs.adversarial_threshold || '0.95' }}"
+          # Run each adversarial sample (04, 05, 06, 07) N times.
+          # The runner accepts a single-sample prefix at a time, so loop.
+          FAILED=0
+          for SAMPLE in sample-04 sample-05 sample-06 sample-07; do
+            echo "::group::N=$N_RUNS for $SAMPLE"
+            uv run python evals/run_evals.py \
+              "$SAMPLE" \
+              --no-cache \
+              --n-runs "$N_RUNS" \
+              --adversarial-threshold "$THRESHOLD" \
+              --report-path "evals/reports/nightly-${SAMPLE}.json" \
+              || FAILED=$((FAILED + 1))
+            echo "::endgroup::"
+          done
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::error::$FAILED adversarial sample(s) failed the N=$N_RUNS pass-rate threshold."
+            exit 1
+          fi
+          echo "::notice::All adversarial samples passed the pass-rate threshold."
+
+      - name: Upload N-run reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-reports-${{ github.run_id }}
+          path: evals/reports/nightly-*.json
+          retention-days: 30
