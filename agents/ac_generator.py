@@ -15,6 +15,7 @@ Provider: Gemini 2.5 Flash. See ADR-0006.
 from __future__ import annotations
 
 import json
+import os
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -26,9 +27,12 @@ from agents._logging import log_agent_invocation
 from agents.config import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
+    DEFAULT_OLLAMA_MODEL,
     DEFAULT_TIMEOUT_SECONDS,
     MAX_OUTPUT_TOKENS_AC_GENERATOR,
+    OLLAMA_MODEL_ENV_VAR,
     prompt_hash,
+    use_ollama,
 )
 from agents.final_artifact import AcceptanceCriterion
 from agents.requirements_analyst import AnalystOutput
@@ -96,7 +100,17 @@ def generate_acceptance_criteria(
     if temperature is not None:
         llm_kwargs["temperature"] = temperature
 
-    llm = ChatGoogleGenerativeAI(**llm_kwargs)
+    if use_ollama():
+        from langchain_ollama import ChatOllama
+
+        llm = ChatOllama(
+            model=os.environ.get(OLLAMA_MODEL_ENV_VAR, DEFAULT_OLLAMA_MODEL),
+            temperature=0 if temperature is None else temperature,
+            num_predict=max_output_tokens,
+            format="json",
+        )
+    else:
+        llm = ChatGoogleGenerativeAI(**llm_kwargs)
     user_prompt = USER_PROMPT_TEMPLATE.format(
         description=user_story.description,
         objective=user_story.objective,
