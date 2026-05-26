@@ -219,7 +219,12 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Personal learning log — local-only, not shared
+# Personal learning artifacts — local-only, not shared.
+# `learning/` consolidates LEARNINGS.md + interview prep + follow-up
+# blog ideas + private reference exports (Miro PDFs etc.). The
+# top-level `LEARNINGS.md` entry is kept as a safety-net in case any
+# session writes back to the historical location before migration.
+learning/
 LEARNINGS.md
 
 # Eval run artifacts — regenerated per run, baselines.md is the curated record
