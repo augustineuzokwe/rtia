@@ -12,6 +12,7 @@ this provider as of the cutover.
 from __future__ import annotations
 
 import json
+import os
 from typing import Literal
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -24,9 +25,12 @@ from agents._logging import log_agent_invocation
 from agents.config import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
+    DEFAULT_OLLAMA_MODEL,
     DEFAULT_TIMEOUT_SECONDS,
     MAX_OUTPUT_TOKENS_ANALYST,
+    OLLAMA_MODEL_ENV_VAR,
     prompt_hash,
+    use_ollama,
 )
 from prompts.requirements_analyst_prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
 
@@ -169,7 +173,17 @@ def analyze_requirement(
     if temperature is not None:
         llm_kwargs["temperature"] = temperature
 
-    llm = ChatGoogleGenerativeAI(**llm_kwargs)
+    if use_ollama():
+        from langchain_ollama import ChatOllama
+
+        llm = ChatOllama(
+            model=os.environ.get(OLLAMA_MODEL_ENV_VAR, DEFAULT_OLLAMA_MODEL),
+            temperature=0 if temperature is None else temperature,
+            num_predict=max_output_tokens,
+            format="json",
+        )
+    else:
+        llm = ChatGoogleGenerativeAI(**llm_kwargs)
     messages = [
         SystemMessage(content=SYSTEM_PROMPT),
         HumanMessage(content=USER_PROMPT_TEMPLATE.format(requirement_text=requirement_text)),

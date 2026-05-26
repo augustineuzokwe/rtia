@@ -35,6 +35,16 @@ class GeminiJudge(DeepEvalBaseLLM):
         super().__init__(model=model)
 
     def load_model(self) -> ChatGoogleGenerativeAI:
+        # Judge intentionally stays on Gemini even when
+        # ``RTIA_LLM_PROVIDER=ollama`` swaps the production agents. The
+        # local-model probe in §7.3 of the plan
+        # ``~/.claude/plans/before-we-draft-adr-declarative-leaf.md``
+        # compares Ollama-generated artifacts against the 2026-05-26
+        # baseline ``docs/pipeline-baseline-2026-05-26.md`` — which was
+        # Gemini-judged. Switching the judge too would move two
+        # variables at once and the metric deltas could not be
+        # attributed cleanly to the generator switch. Hold the judge
+        # constant; vary only the generator.
         return ChatGoogleGenerativeAI(
             model=self._model_id,
             timeout=DEFAULT_TIMEOUT_SECONDS,

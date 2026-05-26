@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
@@ -46,7 +47,10 @@ from agents.ac_generator import AcGeneratorOutput, generate_acceptance_criteria 
 from agents.config import (  # noqa: E402
     DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
+    DEFAULT_OLLAMA_MODEL,
     DEFAULT_TIMEOUT_SECONDS,
+    OLLAMA_MODEL_ENV_VAR,
+    use_ollama,
 )
 from agents.requirements_analyst import _PROMPT_HASH, AnalystOutput  # noqa: E402
 from agents.test_case_writer import _PROMPT_HASH as TC_PROMPT_HASH  # noqa: E402
@@ -144,11 +148,20 @@ def _run_analyst_capturing_usage(text: str) -> tuple[AnalystOutput, UsageTelemet
     (which carries `usage_metadata` on the LangChain response) is available
     to the runner without leaking telemetry plumbing into agent code.
     """
-    llm = ChatGoogleGenerativeAI(
-        model=DEFAULT_MODEL,
-        timeout=DEFAULT_TIMEOUT_SECONDS,
-        max_retries=DEFAULT_MAX_RETRIES,
-    )
+    if use_ollama():
+        from langchain_ollama import ChatOllama
+
+        llm = ChatOllama(
+            model=os.environ.get(OLLAMA_MODEL_ENV_VAR, DEFAULT_OLLAMA_MODEL),
+            temperature=0,
+            format="json",
+        )
+    else:
+        llm = ChatGoogleGenerativeAI(
+            model=DEFAULT_MODEL,
+            timeout=DEFAULT_TIMEOUT_SECONDS,
+            max_retries=DEFAULT_MAX_RETRIES,
+        )
     messages = [
         SystemMessage(content=SYSTEM_PROMPT),
         HumanMessage(content=USER_PROMPT_TEMPLATE.format(requirement_text=text)),

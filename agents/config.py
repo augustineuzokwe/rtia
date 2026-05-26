@@ -13,6 +13,41 @@ era; ADR-0001 captures the original Claude Opus 4.7 choice.
 from __future__ import annotations
 
 import hashlib
+import os
+
+LLM_PROVIDER_ENV_VAR = "RTIA_LLM_PROVIDER"
+"""Env-var name that selects the chat-LLM provider per process.
+
+Accepted values (case-insensitive): ``google`` (default) or ``ollama``.
+When unset or anything else, the production Gemini path runs unchanged.
+
+This knob exists to support the local-model probe in §7.3 of the
+plan at ``~/.claude/plans/before-we-draft-adr-declarative-leaf.md``
+without introducing a provider-abstraction factory. ADR-0006 chose
+"one provider, one consumer per import site"; the per-site ``if/else``
+branches honour that intent. Promote to a proper factory only when a
+third provider lands.
+"""
+
+OLLAMA_MODEL_ENV_VAR = "RTIA_OLLAMA_MODEL"
+"""Env-var name that picks the Ollama model when the provider is ``ollama``.
+
+Defaults to ``llama3.1:8b`` — the model pulled in §7.1 of the same plan
+on a 24 GB M3 MacBook Air. Override at process start to compare other
+local models without code edits.
+"""
+
+DEFAULT_OLLAMA_MODEL = "llama3.1:8b"
+
+
+def _llm_provider() -> str:
+    return os.environ.get(LLM_PROVIDER_ENV_VAR, "google").strip().lower()
+
+
+def use_ollama() -> bool:
+    """Return True when the process is configured to use the Ollama provider."""
+    return _llm_provider() == "ollama"
+
 
 DEFAULT_MODEL = "gemini-3.5-flash"
 """Canonical Gemini model ID used by all production agents.
