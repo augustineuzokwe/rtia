@@ -154,9 +154,6 @@ To opt into the zero-cost path, set **both** switches:
 ```bash
 export RTIA_LLM_PROVIDER=ollama      # routes the 5 production agents to Ollama
 export RTIA_OLLAMA_JUDGE=1           # routes the deepeval judge to Ollama too
-# Optional: pick stronger local models if your RAM allows
-# export RTIA_OLLAMA_MODEL=qwen2.5:14b
-# export RTIA_OLLAMA_JUDGE_MODEL=qwen2.5:14b
 uv run python evals/run_evals.py sample-01
 ```
 
