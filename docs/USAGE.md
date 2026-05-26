@@ -223,9 +223,7 @@ are less reliable as a quality signal.
 [Llama 3.1 8B](ollama-probe-2026-05-26.md) regressed > 15 % vs Gemini
 on three Analyst-side metrics (`ambiguity_discipline`,
 `intent_keyword_overlap`, `requirement_fidelity`) while AC and Test Case
-generation tolerated the swap within ±3 %. A stronger local model
-(`qwen2.5:14b` is the recommended next step on a 24 GB machine) will
-close some of that gap. Either way, treat full-local mode as
+generation tolerated the swap within ±3 %. Treat full-local mode as
 exploratory until you've run the probe on your own dataset.
 
 ## See also
