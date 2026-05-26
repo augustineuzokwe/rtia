@@ -22,7 +22,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
 from agents._llm_errors import wrap_llm_exception
-from agents._llm_utils import coerce_response_text, strip_json_fence
+from agents._llm_utils import cached_invoke, coerce_response_text, strip_json_fence
 from agents._logging import log_agent_invocation
 from agents.config import (
     DEFAULT_MAX_RETRIES,
@@ -103,14 +103,17 @@ def generate_acceptance_criteria(
     if use_ollama():
         from langchain_ollama import ChatOllama
 
+        actual_model = os.environ.get(OLLAMA_MODEL_ENV_VAR, DEFAULT_OLLAMA_MODEL)
         llm = ChatOllama(
-            model=os.environ.get(OLLAMA_MODEL_ENV_VAR, DEFAULT_OLLAMA_MODEL),
+            model=actual_model,
             temperature=0 if temperature is None else temperature,
             num_predict=max_output_tokens,
             format="json",
         )
+        cache_model_id = f"ollama:{actual_model}"
     else:
         llm = ChatGoogleGenerativeAI(**llm_kwargs)
+        cache_model_id = f"google:{model}"
     user_prompt = USER_PROMPT_TEMPLATE.format(
         description=user_story.description,
         objective=user_story.objective,
@@ -127,7 +130,13 @@ def generate_acceptance_criteria(
     # Phase 12.5 — see analyze_requirement for the rationale.
     with log_agent_invocation("ac_generator", prompt_hash=_PROMPT_HASH) as rec:
         try:
-            response = llm.invoke(messages, config=config)
+            response = cached_invoke(
+                llm,
+                messages,
+                model_id=cache_model_id,
+                prompt_hash=_PROMPT_HASH,
+                config=config,
+            )
         except Exception as exc:
             raise wrap_llm_exception("ac_generator", exc, retries_attempted=max_retries) from exc
         rec.record_response(response)

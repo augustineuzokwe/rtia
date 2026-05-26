@@ -36,6 +36,7 @@ from __future__ import annotations
 # ruff: noqa: E402
 import argparse
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -268,7 +269,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", default=DEFAULT_INTEGRATION_MODEL)
     parser.add_argument("--budget-input-tokens", type=int, default=DEFAULT_BUDGET_INPUT_TOKENS)
     parser.add_argument("--budget-output-tokens", type=int, default=DEFAULT_BUDGET_OUTPUT_TOKENS)
+    parser.add_argument(
+        "--use-cache",
+        action="store_true",
+        help=(
+            "Allow the LLM response cache for this run. Default OFF: the "
+            "integration smoke exists to verify live behaviour, not snapshot "
+            "replay (Issue #230 table)."
+        ),
+    )
     args = parser.parse_args(argv)
+    if not args.use_cache:
+        os.environ["RTIA_LLM_CACHE"] = "disabled"
 
     samples = load_all_samples()
     print(f"running integration smoke against {len(samples)} samples using model={args.model}")
