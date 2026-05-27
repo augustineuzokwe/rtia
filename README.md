@@ -103,6 +103,18 @@ cp .env.example .env             # then fill in your keys (see below)
 uv run pre-commit install        # one-time: enable the pre-commit hooks
 ```
 
+### Platform notes
+
+The setup commands above assume **macOS, Linux, or WSL** (POSIX shell). RTIA's *runtime* — `uv`, Python, the agents, the cache, LangGraph — is cross-platform; only the *setup shell syntax* differs. Translations for Windows-native and Linux:
+
+| What | macOS / Linux / WSL (default in this README) | Windows PowerShell | Windows cmd |
+|---|---|---|---|
+| Copy `.env` template | `cp .env.example .env` | `Copy-Item .env.example .env` | `copy .env.example .env` |
+| Set an env var inline | `export RTIA_LLM_PROVIDER=ollama` | `$env:RTIA_LLM_PROVIDER = "ollama"` | `set RTIA_LLM_PROVIDER=ollama` |
+| Install Ollama (only needed for full-local mode) | macOS: `brew install ollama` · Linux: `curl -fsSL https://ollama.com/install.sh \| sh` | Installer from <https://ollama.com/download> | Installer from <https://ollama.com/download> |
+
+Everything else in the recipe — `uv sync`, `uv run …`, the `.env` file format — is identical on every platform.
+
 ### Environment variables
 
 `.env.example` documents every variable. The minimum to run the demo:
@@ -153,7 +165,7 @@ uv run pytest -q                 # unit tests (mocked, offline)
 uv run pre-commit run --all-files
 ```
 
-> **Note on AI testing:** the unit tests mock the LLM — they validate prompt assembly, JSON parsing, and pipeline wiring, not the model's behavior. Behavioral evaluation (faithfulness, ambiguity discipline, story quality) is the next track on the roadmap and will live under `evals/` with its own runner.
+> **What gets tested when:** the suite spans mocked unit tests (every PR), a live Gemini eval gate (PRs touching `agents/`, `prompts/`, or `evals/`), and a nightly N=10 adversarial regression at 02:00 UTC. See [docs/ci-and-testing.md](docs/ci-and-testing.md) for the full trigger map.
 
 ## Workshop Context
 
