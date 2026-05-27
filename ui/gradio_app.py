@@ -51,12 +51,12 @@ def _runner(app: FastAPI) -> PipelineRunner:
     return app.state.runner
 
 
-# Issue #207 — editable fan-out title rows. Gradio Blocks must declare
+# Issue #207 — editable split title rows. Gradio Blocks must declare
 # every component at build time, so we pre-build a fixed maximum number
 # of (Checkbox + Textbox) row pairs and toggle their visibility per
 # render. Ten is a generous ceiling — the Analyst's multi-story output
 # in practice tops out around 4–5 implied stories.
-_MAX_FANOUT_ROWS = 10
+_MAX_SPLIT_ROWS = 10
 
 
 def _build_export_target(backend: str, target: str, extra: str) -> ExportTarget:
@@ -90,10 +90,10 @@ def _build_export_target(backend: str, target: str, extra: str) -> ExportTarget:
     )
 
 
-def _hidden_fanout_rows() -> list[tuple[Any, Any, Any]]:
+def _hidden_split_rows() -> list[tuple[Any, Any, Any]]:
     """Build a list of N hidden ``(row, checkbox, textbox)`` updates.
 
-    Default state for the editable fan-out row slots — every slot
+    Default state for the editable split row slots — every slot
     invisible, unchecked, empty. Used in non-PAUSED_PO branches and on
     the empty-input / running-frame paths.
     """
@@ -103,7 +103,7 @@ def _hidden_fanout_rows() -> list[tuple[Any, Any, Any]]:
             gr.update(value=False),
             gr.update(value=""),
         )
-        for _ in range(_MAX_FANOUT_ROWS)
+        for _ in range(_MAX_SPLIT_ROWS)
     ]
 
 
@@ -118,13 +118,13 @@ def _state_to_panels(state) -> dict[str, Any]:
 
     - ``po_visible`` — PO checkpoint inputs
     - ``review_visible`` — Story review checkpoint
-    - ``result_visible`` — Rendered artifact / fan-out stub list
+    - ``result_visible`` — Rendered artifact / split placeholder list
     - ``backlog_visible`` — Shared "Backlog target" config form
       (backend / target / extras / dry-run). Visible on both terminal
       success states; hidden on ERROR so the user can't pre-fill a form
       that connects to nothing actionable. See issue #186 §6.1.
     - ``deep_export_visible`` — "Push to backlog" button (deep flow only)
-    - ``deferred_visible`` — Deferred/fan-out follow-up panel
+    - ``deferred_visible`` — Deferred/split follow-up panel
     - ``error_visible`` — Dedicated error panel (sibling of
       ``result_panel``); replaces the prior pattern of overloading
       ``result_panel`` with the error message.
@@ -148,12 +148,12 @@ def _state_to_panels(state) -> dict[str, Any]:
         "run_btn_interactive": gr.update(interactive=True),
         "po_questions": gr.update(value=""),
         "po_answers_visible": gr.update(visible=True),
-        # Issue #207 — list of N fan-out row updates, one tuple per
+        # Issue #207 — list of N split row updates, one tuple per
         # pre-built ``(Row, Checkbox, Textbox)`` slot. Tuple shape:
         # ``(row_update, checkbox_update, textbox_update)``. Hidden by
-        # default; populated only on PAUSED_PO + fan_out mode below.
-        "po_fanout_rows": _hidden_fanout_rows(),
-        "po_fanout_originals": [],
+        # default; populated only on PAUSED_PO + split mode below.
+        "po_split_rows": _hidden_split_rows(),
+        "po_split_originals": [],
         "po_paused_payload": {},
         "review_preview": gr.update(value=""),
         "result_md": gr.update(value=""),
@@ -178,7 +178,7 @@ def _state_to_panels(state) -> dict[str, Any]:
         base["po_visible"] = gr.update(visible=True)
         base["po_paused_payload"] = dict(state.payload)
         questions = state.payload.get("critical_ambiguities", [])
-        if mode == "fan_out":
+        if mode == "split":
             # Phase 15.4 — CheckboxGroup for implied stories + text input
             # for any remaining non-story critical questions.
             stories = state.payload.get("implied_stories", [])
@@ -210,7 +210,7 @@ def _state_to_panels(state) -> dict[str, Any]:
             # titles flow into ``selected_stories`` on the resume body.
             rows: list[tuple[Any, Any, Any]] = []
             originals: list[str] = []
-            for i in range(_MAX_FANOUT_ROWS):
+            for i in range(_MAX_SPLIT_ROWS):
                 if i < len(stories):
                     title = stories[i].get("title", "") or ""
                     rows.append(
@@ -229,8 +229,8 @@ def _state_to_panels(state) -> dict[str, Any]:
                             gr.update(value=""),
                         )
                     )
-            base["po_fanout_rows"] = rows
-            base["po_fanout_originals"] = originals
+            base["po_split_rows"] = rows
+            base["po_split_originals"] = originals
             # Hide the free-text answers box when there are no non-story Qs.
             base["po_answers_visible"] = gr.update(visible=bool(questions))
         else:
@@ -248,7 +248,7 @@ def _state_to_panels(state) -> dict[str, Any]:
         rendered = state.payload.get("rendered_artifact", "")
         base["result_visible"] = gr.update(visible=True)
         # Shared backlog-target form is visible on both success terminals
-        # (used by deep export AND fan-out follow-up exports).
+        # (used by deep export AND split follow-up exports).
         base["backlog_visible"] = gr.update(visible=True)
         # Deep flow produced an artifact — the single-artifact "Push to
         # backlog" button is the right control here.
@@ -279,45 +279,45 @@ def _state_to_panels(state) -> dict[str, Any]:
         else:
             base["deferred_md"] = gr.update(value="")
             base["deferred_checkboxes"] = gr.update(choices=[], value=[], visible=False)
-    elif state.status == ThreadStatus.DONE_FANOUT:
-        # Phase 15.4 — fan-out terminal state. No deep artifact; render
-        # the lightweight stub list and reuse the deferred-stories
+    elif state.status == ThreadStatus.DONE_SPLIT:
+        # Phase 15.4 — split terminal state. No deep artifact; render
+        # the lightweight placeholder list and reuse the deferred-stories
         # CheckboxGroup + Push-to-backlog flow.
-        stubs = state.payload.get("fan_out_stories") or []
+        placeholders = state.payload.get("split_stories") or []
         base["result_visible"] = gr.update(visible=True)
-        # Shared backlog-target form is visible — the fan-out export
+        # Shared backlog-target form is visible — the split export
         # below reads from the same fields.
         base["backlog_visible"] = gr.update(visible=True)
-        # No deep artifact in fan-out mode — keep the single-artifact
+        # No deep artifact in split mode — keep the single-artifact
         # "Push to backlog" button hidden so the PO uses the correct
         # "Create follow-up issues" control below.
         base["deep_export_visible"] = gr.update(visible=False)
         md_lines = [
-            "### Fan-out result",
+            "### Split result",
             "",
-            f"RTIA produced **{len(stubs)} lightweight backlog stubs**.",
+            f"RTIA produced **{len(placeholders)} placeholder stories**.",
             "Click *Create follow-up issues* below to create them in Jira / GitHub.",
             "",
             "_Re-run RTIA on any individual title to deep-dive that story._",
             "",
         ]
-        for s in stubs:
+        for s in placeholders:
             md_lines.append(f"- **{s['title']}** — {s['summary']}")
         base["result_md"] = gr.update(value="\n".join(md_lines))
-        # Issue #214 — on DONE_FANOUT the PO already made the keep/drop
-        # decision seconds earlier at the editable fan-out PO checkpoint
+        # Issue #214 — on DONE_SPLIT the PO already made the keep/drop
+        # decision seconds earlier at the editable split PO checkpoint
         # (#207). Surfacing a second "Push these to the backlog"
         # CheckboxGroup with the same titles looks like the upstream
         # selection didn't take, and is the round-2 walk-through Wart 2.
         # Keep the panel + button visible so the PO can trigger the push,
         # but suppress the redundant title list. ``on_export_deferred``
-        # treats an empty selection as "all stubs" — this preserves the
-        # one-click semantics.
-        base["deferred_visible"] = gr.update(visible=bool(stubs))
-        if stubs:
+        # treats an empty selection as "all placeholders" — this preserves
+        # the one-click semantics.
+        base["deferred_visible"] = gr.update(visible=bool(placeholders))
+        if placeholders:
             base["deferred_md"] = gr.update(value="")
             base["deferred_checkboxes"] = gr.update(
-                choices=[s["title"] for s in stubs],
+                choices=[s["title"] for s in placeholders],
                 value=[],
                 visible=False,
             )
@@ -397,27 +397,27 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
         with gr.Group(visible=False) as po_panel:
             po_questions = gr.Markdown("")
             # Issue #207 — N editable (Checkbox + Textbox) rows for the
-            # fan-out case. Replaces the prior single ``gr.CheckboxGroup``
+            # split case. Replaces the prior single ``gr.CheckboxGroup``
             # which only supported drop / keep but not rename. Rows are
             # built at definition time and visibility-toggled per render;
             # this is the standard Gradio Blocks pattern for variable-N
             # widgets. Hidden in deep mode and on non-PAUSED_PO states.
-            po_fanout_rows_components: list[tuple[gr.Row, gr.Checkbox, gr.Textbox]] = []
-            for i in range(_MAX_FANOUT_ROWS):
-                with gr.Row(visible=False) as _fanout_row:
+            po_split_rows_components: list[tuple[gr.Row, gr.Checkbox, gr.Textbox]] = []
+            for i in range(_MAX_SPLIT_ROWS):
+                with gr.Row(visible=False) as _split_row:
                     # Issue #213 — pass ``show_label=False`` so Gradio
                     # doesn't fall back to its default literal "Checkbox"
                     # label (``label=""`` alone doesn't suppress the
                     # fallback). The row's adjacent Textbox already
                     # labels the story; the checkbox is implicit "keep".
-                    _fanout_chk = gr.Checkbox(value=False, show_label=False, scale=0)
-                    _fanout_txt = gr.Textbox(value="", label=f"Story {i + 1}", interactive=True)
-                po_fanout_rows_components.append((_fanout_row, _fanout_chk, _fanout_txt))
+                    _split_chk = gr.Checkbox(value=False, show_label=False, scale=0)
+                    _split_txt = gr.Textbox(value="", label=f"Story {i + 1}", interactive=True)
+                po_split_rows_components.append((_split_row, _split_chk, _split_txt))
             # Snapshot of the original (pre-edit) titles from the paused
             # payload, kept aligned with the visible rows. Submit handler
             # uses this to map an edited title back to the matching
             # Analyst-provided summary even after the PO renamed the row.
-            po_fanout_originals_state = gr.State(value=[])
+            po_split_originals_state = gr.State(value=[])
             po_answers = gr.Textbox(
                 label="Answers (one per line, in order)",
                 lines=4,
@@ -463,10 +463,10 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             error_md = gr.Markdown("")
 
         # Shared export configuration. The four fields below drive BOTH
-        # the deep-flow "Push to backlog" button AND the fan-out
+        # the deep-flow "Push to backlog" button AND the split
         # "Create follow-up issues" button. Lifted to its own gated
         # group (#186 §R3 / §6.1) with an independent ``backlog_visible``
-        # flag — visible on DONE and DONE_FANOUT, hidden on ERROR.
+        # flag — visible on DONE and DONE_SPLIT, hidden on ERROR.
         with gr.Group(visible=False) as backlog_target_panel:
             gr.Markdown("---\n### Backlog target")
             export_backend = gr.Dropdown(
@@ -487,16 +487,16 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             )
             export_dry_run = gr.Checkbox(label="Dry run (build payload, don't send)", value=True)
 
-        # Deep-flow export trigger. Hidden on ``DONE_FANOUT`` because
-        # the single-artifact endpoint has nothing to push in fan-out
+        # Deep-flow export trigger. Hidden on ``DONE_SPLIT`` because
+        # the single-artifact endpoint has nothing to push in split
         # mode (see ADR-0010). ``backlog_target_panel`` above stays
-        # visible regardless so the fan-out user can still configure
+        # visible regardless so the split user can still configure
         # the destination for the follow-up exports below.
         with gr.Group(visible=False) as deep_export_panel:
             gr.Markdown("### Push the deep-flow artifact")
             # Issue #208 — optional field. Leave blank to create a new
             # issue (current default). Set to an existing issue number /
-            # key to PATCH that issue instead, collapsing a fan-out stub
+            # key to PATCH that issue instead, collapsing a split placeholder
             # into its deep deep-dive in place.
             export_update_id = gr.Textbox(
                 label=(
@@ -551,7 +551,7 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             "error_md",
             "run_btn_interactive",
             # Issue #207 — originals state (single key, list value).
-            "po_fanout_originals",
+            "po_split_originals",
         )
 
         def _spread(state):
@@ -561,7 +561,7 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             # the tuple, matching the positional order in ``outputs``
             # below. Each row contributes three components in
             # ``(row, checkbox, textbox)`` order.
-            rows = mapping["po_fanout_rows"]
+            rows = mapping["po_split_rows"]
             flat_rows = tuple(item for row_tuple in rows for item in row_tuple)
             return base + flat_rows
 
@@ -585,17 +585,17 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             error_panel,
             error_md,
             run_btn,
-            po_fanout_originals_state,
+            po_split_originals_state,
         ]
-        # Issue #207 — append the N pre-built fan-out rows (3 components
+        # Issue #207 — append the N pre-built split rows (3 components
         # each: Row container + Checkbox + Textbox) so handlers can
         # update every row from a single returned tuple.
-        for _row, _chk, _txt in po_fanout_rows_components:
+        for _row, _chk, _txt in po_split_rows_components:
             outputs.extend([_row, _chk, _txt])
-        assert len(outputs) == len(_SPREAD_KEYS) + 3 * _MAX_FANOUT_ROWS, (
+        assert len(outputs) == len(_SPREAD_KEYS) + 3 * _MAX_SPLIT_ROWS, (
             "outputs / _SPREAD_KEYS length mismatch — every spread key must "
             "have a positionally-matched Gradio component, plus 3 components "
-            "per fan-out row"
+            "per split row"
         )
 
         def on_upload_pdf(f):
@@ -650,11 +650,11 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
                 gr.update(visible=False),  # error_panel
                 gr.update(value=""),  # error_md
                 gr.update(interactive=run_interactive),  # run_btn
-                [],  # po_fanout_originals_state
+                [],  # po_split_originals_state
             )
             # Issue #207 — append N hidden row triplets so the tuple
             # matches the extended ``outputs`` length.
-            flat_rows = tuple(item for row_tuple in _hidden_fanout_rows() for item in row_tuple)
+            flat_rows = tuple(item for row_tuple in _hidden_split_rows() for item in row_tuple)
             return base + flat_rows
 
         def on_run(text):
@@ -694,11 +694,11 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             paused_payload,
             originals,
             _text,
-            *fanout_row_values,
+            *split_row_values,
         ):
             """Submit handler dispatches on paused payload's mode.
 
-            Fan-out (Issue #207): variadic ``*fanout_row_values`` is the
+            Split (Issue #207): variadic ``*split_row_values`` is the
             flat ``[chk_0, chk_1, …, chk_{N-1}, txt_0, txt_1, …,
             txt_{N-1}]`` tuple, one Checkbox + one Textbox per row slot.
             We zip the kept (checked) rows against the ``originals``
@@ -718,9 +718,9 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
                 q: (lines[i] if i < len(lines) else "no answer given")
                 for i, q in enumerate(questions)
             }
-            if mode == "fan_out":
-                checks = list(fanout_row_values[:_MAX_FANOUT_ROWS])
-                texts = list(fanout_row_values[_MAX_FANOUT_ROWS : 2 * _MAX_FANOUT_ROWS])
+            if mode == "split":
+                checks = list(split_row_values[:_MAX_SPLIT_ROWS])
+                texts = list(split_row_values[_MAX_SPLIT_ROWS : 2 * _MAX_SPLIT_ROWS])
                 stories_payload = (paused_payload or {}).get("implied_stories") or []
                 originals_list = list(originals or [])
                 # Build a lookup for the Analyst-provided summary from the
@@ -760,11 +760,11 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             thread_id_state,
             po_answers,
             po_paused_payload_state,
-            po_fanout_originals_state,
+            po_split_originals_state,
             req_text,
         ]
-        _po_inputs.extend(chk for _row, chk, _txt in po_fanout_rows_components)
-        _po_inputs.extend(txt for _row, _chk, txt in po_fanout_rows_components)
+        _po_inputs.extend(chk for _row, chk, _txt in po_split_rows_components)
+        _po_inputs.extend(txt for _row, _chk, txt in po_split_rows_components)
         po_submit.click(on_po_submit, _po_inputs, outputs)
 
         def on_review_accept(thread_id):
@@ -848,7 +848,7 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
         )
 
         def on_export_deferred(thread_id, backend, target, extra, dry_run, selected_titles):
-            """Batch-create follow-up issues for the deferred OR fan-out stories.
+            """Batch-create follow-up issues for the deferred OR split stories.
 
             Reuses the same backend dropdown + target fields from the
             single-export form. ``selected_titles`` is the checkbox-group
@@ -856,7 +856,7 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             create issues for ALL stories in the active list.
 
             Dispatch mirrors the API ``/export-deferred`` endpoint: on a
-            ``DONE_FANOUT`` thread the source list is ``fan_out_stories``;
+            ``DONE_SPLIT`` thread the source list is ``split_stories``;
             otherwise it's the deferred-implied list. Both are the same
             ``ImpliedStory`` shape so the rest of the loop is identical.
             """

@@ -2,7 +2,7 @@
 
 Regression cover for the bug where the UI's "Create follow-up issues"
 button reported "No deferred stories — nothing to create." on a
-``DONE_FANOUT`` thread even when four fan-out stories were visible in
+``DONE_SPLIT`` thread even when four split stories were visible in
 the panel directly above it.
 
 Root cause: the in-process Gradio handler called
@@ -28,13 +28,13 @@ from api._shared import (
 from api.models import ThreadStatus
 
 
-def test_done_fanout_uses_fanout_source():
+def test_done_split_uses_split_source():
     runner = MagicMock()
-    runner.get_fanout_stories_and_context.return_value = (["story"], "req")
+    runner.get_split_stories_and_context.return_value = (["story"], "req")
 
-    loaded = select_followup_source(runner, "tid", ThreadStatus.DONE_FANOUT)
+    loaded = select_followup_source(runner, "tid", ThreadStatus.DONE_SPLIT)
 
-    runner.get_fanout_stories_and_context.assert_called_once_with("tid")
+    runner.get_split_stories_and_context.assert_called_once_with("tid")
     runner.get_deferred_stories_and_context.assert_not_called()
     assert loaded == (["story"], "req")
 
@@ -46,14 +46,14 @@ def test_done_uses_deferred_source():
     loaded = select_followup_source(runner, "tid", ThreadStatus.DONE)
 
     runner.get_deferred_stories_and_context.assert_called_once_with("tid")
-    runner.get_fanout_stories_and_context.assert_not_called()
+    runner.get_split_stories_and_context.assert_not_called()
     assert loaded == (["story"], "req")
 
 
 def test_paused_states_fall_through_to_deferred_source():
-    """Anything that isn't DONE_FANOUT routes to the deferred path. The
+    """Anything that isn't DONE_SPLIT routes to the deferred path. The
     button is only visible in terminal states, but the helper shouldn't
-    silently change behaviour for any non-fanout status."""
+    silently change behaviour for any non-split status."""
     for status in [ThreadStatus.PAUSED_PO, ThreadStatus.PAUSED_REVIEW, ThreadStatus.RUNNING]:
         runner = MagicMock()
         runner.get_deferred_stories_and_context.return_value = (None, None)
@@ -61,7 +61,7 @@ def test_paused_states_fall_through_to_deferred_source():
         select_followup_source(runner, "tid", status)
 
         runner.get_deferred_stories_and_context.assert_called_once_with("tid")
-        runner.get_fanout_stories_and_context.assert_not_called()
+        runner.get_split_stories_and_context.assert_not_called()
 
 
 def test_loaded_none_propagates():
@@ -69,9 +69,9 @@ def test_loaded_none_propagates():
     the helper returns ``None`` so the caller can render an explicit
     error rather than crash."""
     runner = MagicMock()
-    runner.get_fanout_stories_and_context.return_value = None
+    runner.get_split_stories_and_context.return_value = None
 
-    loaded = select_followup_source(runner, "tid", ThreadStatus.DONE_FANOUT)
+    loaded = select_followup_source(runner, "tid", ThreadStatus.DONE_SPLIT)
 
     assert loaded is None
 
@@ -81,28 +81,28 @@ def test_dispatch_uses_status_not_thread_id():
     future refactor doesn't quietly reintroduce e.g. a path lookup off the
     thread_id instead of off the status enum."""
     runner = MagicMock()
-    runner.get_fanout_stories_and_context.return_value = (["s"], "r")
+    runner.get_split_stories_and_context.return_value = (["s"], "r")
 
     # Same thread_id, different statuses → different sources.
-    select_followup_source(runner, "shared-tid", ThreadStatus.DONE_FANOUT)
-    runner.get_fanout_stories_and_context.assert_called_once()
+    select_followup_source(runner, "shared-tid", ThreadStatus.DONE_SPLIT)
+    runner.get_split_stories_and_context.assert_called_once()
 
     runner.reset_mock()
     runner.get_deferred_stories_and_context.return_value = (["s"], "r")
     select_followup_source(runner, "shared-tid", ThreadStatus.DONE)
     runner.get_deferred_stories_and_context.assert_called_once()
-    runner.get_fanout_stories_and_context.assert_not_called()
+    runner.get_split_stories_and_context.assert_not_called()
 
 
-def test_followup_empty_message_pivots_on_fanout():
+def test_followup_empty_message_pivots_on_split():
     """The status-matched empty-state copy is the UI's only need for the
     legacy ``(loaded, empty_msg)`` tuple — extracted into its own helper
     so both wordings live next to the dispatch they're paired with."""
-    assert "fan-out" in followup_empty_message(ThreadStatus.DONE_FANOUT)
+    assert "split" in followup_empty_message(ThreadStatus.DONE_SPLIT)
     assert "deferred" in followup_empty_message(ThreadStatus.DONE)
     # Non-terminal statuses follow the "deferred" wording — the message
     # is rarely surfaced from those states, but the contract is
-    # "anything not DONE_FANOUT" matches the dispatch.
+    # "anything not DONE_SPLIT" matches the dispatch.
     assert "deferred" in followup_empty_message(ThreadStatus.PAUSED_PO)
 
 

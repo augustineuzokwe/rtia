@@ -186,13 +186,13 @@ def test_upload_markdown_roundtrip(client):
     assert body["char_count"] == len(body["text"])
 
 
-def test_resume_routes_fanout_resume_shape(client, runner_mock):
+def test_resume_routes_split_resume_shape(client, runner_mock):
     """Phase 15.4 — resume with selected_story_titles → structured payload."""
     runner_mock.get_state.return_value = ThreadState(
         thread_id="tid",
         status=ThreadStatus.PAUSED_PO,
         payload={
-            "mode": "fan_out",
+            "mode": "split",
             "implied_stories": [
                 {"title": "Story A", "summary": "a"},
                 {"title": "Story B", "summary": "b"},
@@ -202,8 +202,8 @@ def test_resume_routes_fanout_resume_shape(client, runner_mock):
     )
     runner_mock.resume.return_value = ThreadState(
         thread_id="tid",
-        status=ThreadStatus.DONE_FANOUT,
-        payload={"fan_out_stories": [{"title": "Story A", "summary": "a"}]},
+        status=ThreadStatus.DONE_SPLIT,
+        payload={"split_stories": [{"title": "Story A", "summary": "a"}]},
     )
     r = client.post(
         "/pipeline/tid/resume",
@@ -212,25 +212,25 @@ def test_resume_routes_fanout_resume_shape(client, runner_mock):
     )
     assert r.status_code == 200
     body = r.json()
-    assert body["status"] == "done_fanout"
+    assert body["status"] == "done_split"
     runner_mock.resume.assert_called_once_with(
         "tid", {"selected_story_titles": ["Story A"], "answers": {}}
     )
 
 
-def test_resume_fanout_empty_selection_passes_empty_list(client, runner_mock):
+def test_resume_split_empty_selection_passes_empty_list(client, runner_mock):
     """Phase 15.4 / Q2 — None or empty selected_story_titles passes [] through."""
     runner_mock.get_state.return_value = ThreadState(
         thread_id="tid",
         status=ThreadStatus.PAUSED_PO,
         payload={
-            "mode": "fan_out",
+            "mode": "split",
             "implied_stories": [{"title": "A", "summary": "a"}],
             "critical_ambiguities": [],
         },
     )
     runner_mock.resume.return_value = ThreadState(
-        thread_id="tid", status=ThreadStatus.DONE_FANOUT, payload={}
+        thread_id="tid", status=ThreadStatus.DONE_SPLIT, payload={}
     )
     r = client.post("/pipeline/tid/resume", headers=_auth(), json={})
     assert r.status_code == 200
@@ -248,7 +248,7 @@ def test_resume_deep_mode_still_requires_answers(client, runner_mock):
     assert r.status_code == 400
 
 
-def test_resume_fanout_prefers_selected_stories_over_legacy_titles(client, runner_mock):
+def test_resume_split_prefers_selected_stories_over_legacy_titles(client, runner_mock):
     """Issue #207 — preferred shape ``selected_stories`` (editable
     titles + summaries) wins over legacy ``selected_story_titles`` and
     is forwarded to the runner verbatim."""
@@ -256,7 +256,7 @@ def test_resume_fanout_prefers_selected_stories_over_legacy_titles(client, runne
         thread_id="tid",
         status=ThreadStatus.PAUSED_PO,
         payload={
-            "mode": "fan_out",
+            "mode": "split",
             "implied_stories": [
                 {"title": "Story A", "summary": "a"},
                 {"title": "Story B", "summary": "b"},
@@ -266,8 +266,8 @@ def test_resume_fanout_prefers_selected_stories_over_legacy_titles(client, runne
     )
     runner_mock.resume.return_value = ThreadState(
         thread_id="tid",
-        status=ThreadStatus.DONE_FANOUT,
-        payload={"fan_out_stories": [{"title": "Story A renamed", "summary": "a"}]},
+        status=ThreadStatus.DONE_SPLIT,
+        payload={"split_stories": [{"title": "Story A renamed", "summary": "a"}]},
     )
     r = client.post(
         "/pipeline/tid/resume",
@@ -301,7 +301,7 @@ def test_resume_fanout_prefers_selected_stories_over_legacy_titles(client, runne
     )
 
 
-def test_resume_fanout_legacy_titles_still_accepted_when_no_selected_stories(client, runner_mock):
+def test_resume_split_legacy_titles_still_accepted_when_no_selected_stories(client, runner_mock):
     """Issue #207 — back-compat. When ``selected_stories`` is absent
     but legacy ``selected_story_titles`` is present, the legacy shape
     is forwarded unchanged so older API callers keep working."""
@@ -309,13 +309,13 @@ def test_resume_fanout_legacy_titles_still_accepted_when_no_selected_stories(cli
         thread_id="tid",
         status=ThreadStatus.PAUSED_PO,
         payload={
-            "mode": "fan_out",
+            "mode": "split",
             "implied_stories": [{"title": "Story A", "summary": "a"}],
             "critical_ambiguities": [],
         },
     )
     runner_mock.resume.return_value = ThreadState(
-        thread_id="tid", status=ThreadStatus.DONE_FANOUT, payload={}
+        thread_id="tid", status=ThreadStatus.DONE_SPLIT, payload={}
     )
     r = client.post(
         "/pipeline/tid/resume",
