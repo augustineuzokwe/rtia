@@ -82,7 +82,7 @@ class ExportRequest(BaseModel):
             "Optional existing-issue identifier. When set, the exporter "
             "PATCHes (GitHub) or PUTs (Jira) the existing issue instead "
             "of creating a new one. Closes the duplicate-issue gap when "
-            "re-running RTIA on a fan-out stub's title (#208). GitHub: "
+            "re-running RTIA on a split placeholder's title (#208). GitHub: "
             "numeric issue number (e.g. ``203``). Jira: issue key (e.g. "
             "``RTIA-42``)."
         ),
@@ -153,8 +153,8 @@ class Exporter(Protocol):
         ``"203"``) or a Jira issue key (e.g. ``"RTIA-42"``). The backend
         validates the shape and raises ``ExportConfigError`` on a
         mismatch. Closes the duplicate-issue gap from #208 — when the
-        PO re-runs RTIA on a fan-out stub's title, the deep artifact
-        replaces the stub in place instead of creating a sibling.
+        PO re-runs RTIA on a split placeholder's title, the deep artifact
+        replaces the placeholder in place instead of creating a sibling.
         """
         ...
 

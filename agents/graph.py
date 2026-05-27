@@ -42,7 +42,7 @@ from agents.user_story_writer import UserStory, write_user_story
 DEFAULT_CHECKPOINT_DB = "~/.rtia/state.db"
 """Default SQLite path for the checkpointer; overridable via RTIA_CHECKPOINT_DB."""
 
-PIPELINE_STATE_VERSION = 2
+PIPELINE_STATE_VERSION = 3
 """Schema version marker for PipelineState.
 
 Bump when fields are removed or renamed (additions are backward-compatible
@@ -79,10 +79,10 @@ class PipelineState(TypedDict, total=False):
     Schema version: see PIPELINE_STATE_VERSION. Field additions are safe;
     removals or renames require a version bump + migration plan.
 
-    Phase 15.4 added the fan-out fields (``selected_story_titles``,
-    ``fan_out_stories``). Multi-story requirements bypass the deep nodes
-    entirely — those fields are populated by ``fan_out_node`` and
-    consumed by the API runner's DONE_FANOUT state and the
+    Phase 15.4 added the split fields (``selected_story_titles``,
+    ``split_stories``). Multi-story requirements bypass the deep nodes
+    entirely — those fields are populated by ``split_node`` and
+    consumed by the API runner's DONE_SPLIT state and the
     ``/export-deferred`` endpoint. The deep-path fields
     (``user_story`` → ``final_artifact`` → ``review_report``) remain
     populated for single-story requirements.
@@ -96,14 +96,14 @@ class PipelineState(TypedDict, total=False):
     test_cases: list[TestCase]
     final_artifact: FinalUserStory
     review_report: ReviewReport
-    # Phase 15.4 — fan-out path.
+    # Phase 15.4 — split path.
     selected_story_titles: list[str]
-    # Issue #207 — editable fan-out selection. When set, ``fan_out_node``
+    # Issue #207 — editable split selection. When set, ``split_node``
     # bypasses the title-filter and uses these (potentially renamed)
     # stories directly. ``selected_story_titles`` is still populated for
     # back-compat with consumers that key off it.
-    selected_fanout_stories: list[ImpliedStory]
-    fan_out_stories: list[ImpliedStory]
+    selected_split_stories: list[ImpliedStory]
+    split_stories: list[ImpliedStory]
 
 
 def _wrap_node_exceptions(agent_name: str, fn):
@@ -150,14 +150,14 @@ def analyst_node(state: PipelineState) -> dict:
     return {"analyst_output": result}
 
 
-def is_fanout_mode(state: PipelineState) -> bool:
+def is_split_mode(state: PipelineState) -> bool:
     """Return True when the Analyst identified ≥ 2 implied stories.
 
     Phase 15.4. The branch criterion for the conditional edge at the PO
     checkpoint. Pure function of the Analyst's output — independent of
     the PO's eventual answer — so the same value is used both to shape
     the interrupt payload (CheckboxGroup vs text input) and to route
-    after the checkpoint (fan-out vs deep).
+    after the checkpoint (split vs deep).
     """
     analyst = state.get("analyst_output")
     return bool(analyst and analyst.implied_stories and len(analyst.implied_stories) >= 2)
@@ -169,7 +169,7 @@ def _looks_like_story_picker_question(question: str) -> bool:
     Heuristic, not authoritative. The Analyst's prompt emits this
     question in a recognisable shape ("This requirement implies N
     independent stories: [..]. Which single story should this issue
-    cover?"). In fan-out mode we drop this question from the PO panel's
+    cover?"). In split mode we drop this question from the PO panel's
     text-input list because the CheckboxGroup replaces it.
 
     If the heuristic misses (Analyst rewords the question), the worst
@@ -183,11 +183,11 @@ def _looks_like_story_picker_question(question: str) -> bool:
 
 
 def po_checkpoint_node(state: PipelineState) -> dict:
-    """Pause the graph for PO input. Shape depends on fan-out vs deep mode.
+    """Pause the graph for PO input. Shape depends on split vs deep mode.
 
     Phase 15.4. Two distinct interrupt payloads:
 
-    - **Fan-out mode** (``implied_stories ≥ 2``): always pause, even when
+    - **Split mode** (``implied_stories ≥ 2``): always pause, even when
       there are no non-story critical questions, so the PO confirms or
       unchecks the implied-story list. Payload carries the implied
       stories so the UI can render them as a CheckboxGroup. Resume
@@ -198,22 +198,22 @@ def po_checkpoint_node(state: PipelineState) -> dict:
 
     The ``mode`` key in the interrupt payload tells the UI which control
     set to render. The ``_route_after_po`` conditional edge then
-    dispatches to ``fan_out`` or ``story_writer`` based on
-    :func:`is_fanout_mode`.
+    dispatches to ``split`` or ``story_writer`` based on
+    :func:`is_split_mode`.
 
     Requires the compiled graph to have a checkpointer (see build_pipeline).
     """
     analyst = state["analyst_output"]
     critical = [a for a in analyst.ambiguities if a.severity == "critical"]
-    fan_out = is_fanout_mode(state)
+    in_split_mode = is_split_mode(state)
 
-    if fan_out:
+    if in_split_mode:
         non_story_critical = [
             a.question for a in critical if not _looks_like_story_picker_question(a.question)
         ]
         response = interrupt(
             {
-                "mode": "fan_out",
+                "mode": "split",
                 "implied_stories": [s.model_dump() for s in analyst.implied_stories],
                 "critical_ambiguities": non_story_critical,
             }
@@ -222,7 +222,7 @@ def po_checkpoint_node(state: PipelineState) -> dict:
             response = {}
         # Issue #207 — preferred shape: ``selected_stories`` carries
         # possibly-edited titles + summaries. When present we record the
-        # edited stories on state so ``fan_out_node`` ships them through
+        # edited stories on state so ``split_node`` ships them through
         # unchanged. ``selected_story_titles`` is preserved alongside so
         # any downstream consumer that keys off the title list (e.g.
         # legacy tests) keeps working.
@@ -254,7 +254,7 @@ def po_checkpoint_node(state: PipelineState) -> dict:
 
         if edited is not None:
             return {
-                "selected_fanout_stories": edited,
+                "selected_split_stories": edited,
                 "selected_story_titles": [s.title for s in edited],
                 "po_answers": dict(response.get("answers") or {}),
             }
@@ -275,13 +275,13 @@ def po_checkpoint_node(state: PipelineState) -> dict:
     return {"po_answers": answers}
 
 
-def fan_out_node(state: PipelineState) -> dict:
+def split_node(state: PipelineState) -> dict:
     """Filter the Analyst's implied stories by the PO's checkbox selection.
 
     Phase 15.4. Pure Python — no LLM call. Skipped entirely in the
     deep-flow branch. The selected stories land in
-    ``state["fan_out_stories"]`` and are surfaced by the API runner as
-    a ``DONE_FANOUT`` payload + by the existing
+    ``state["split_stories"]`` and are surfaced by the API runner as
+    a ``DONE_SPLIT`` payload + by the existing
     ``/pipeline/{id}/export-deferred`` endpoint when dispatching off
     that status.
 
@@ -295,15 +295,15 @@ def fan_out_node(state: PipelineState) -> dict:
     # Issue #207 — when the PO ran through the editable-title UI, the
     # checkpoint already produced the final list (titles renamed,
     # summaries carried over). Pass it through; no further filtering.
-    edited = state.get("selected_fanout_stories") or []
+    edited = state.get("selected_split_stories") or []
     if edited:
-        return {"fan_out_stories": list(edited)}
+        return {"split_stories": list(edited)}
     selected_titles = state.get("selected_story_titles") or []
     if not selected_titles:
-        return {"fan_out_stories": list(analyst.implied_stories)}
+        return {"split_stories": list(analyst.implied_stories)}
     titles_set = {t.lower().strip() for t in selected_titles if t and t.strip()}
     return {
-        "fan_out_stories": [
+        "split_stories": [
             s for s in analyst.implied_stories if s.title.lower().strip() in titles_set
         ]
     }
@@ -312,13 +312,13 @@ def fan_out_node(state: PipelineState) -> dict:
 def _route_after_po(state: PipelineState) -> str:
     """Conditional edge: where to send the graph after the PO checkpoint.
 
-    ``is_fanout_mode`` is the sole criterion — the Analyst's output
+    ``is_split_mode`` is the sole criterion — the Analyst's output
     decides the mode, not the PO's selection. (A PO who unchecks all
-    but one story still goes through fan-out; they just get a
-    one-story fan-out. To get a deep artifact for that title, they
+    but one story still goes through split; they just get a
+    one-story split. To get a deep artifact for that title, they
     re-run RTIA on the title alone.)
     """
-    return "fan_out" if is_fanout_mode(state) else "deep"
+    return "split" if is_split_mode(state) else "deep"
 
 
 def story_writer_node(state: PipelineState) -> dict:
@@ -482,7 +482,7 @@ def picked_implied_story(state: PipelineState) -> ImpliedStory | None:
         return None
     # Exactly one implied story → unambiguously the picked one, no PO
     # answer needed. Phase 15.4 makes this the common deep-path case
-    # (multi-implied requirements route to fan-out instead of reaching
+    # (multi-implied requirements route to split instead of reaching
     # the Story Writer at all).
     if len(analyst.implied_stories) == 1:
         return analyst.implied_stories[0]
@@ -665,20 +665,20 @@ def build_pipeline(checkpointer: BaseCheckpointSaver | None = None):
     )
     builder.add_node("composer", _wrap_node_exceptions("composer", composer_node))
     builder.add_node("reviewer", _wrap_node_exceptions("reviewer", reviewer_node))
-    # Phase 15.4 — fan-out node. Pure Python, no wrapper LLM concerns.
-    builder.add_node("fan_out", _wrap_node_exceptions("fan_out", fan_out_node))
+    # Phase 15.4 — split node. Pure Python, no wrapper LLM concerns.
+    builder.add_node("split", _wrap_node_exceptions("split", split_node))
     builder.add_edge(START, "analyst")
     builder.add_edge("analyst", "po_checkpoint")
     # Phase 15.4 — conditional edge after the PO checkpoint. Multi-story
     # requirements (≥ 2 implied stories) skip every downstream LLM node
-    # and route straight to the fan-out node, which produces lightweight
-    # backlog stubs instead of a deep artifact.
+    # and route straight to the split node, which produces lightweight
+    # placeholder stories instead of a deep artifact.
     builder.add_conditional_edges(
         "po_checkpoint",
         _route_after_po,
-        {"fan_out": "fan_out", "deep": "story_writer"},
+        {"split": "split", "deep": "story_writer"},
     )
-    builder.add_edge("fan_out", END)
+    builder.add_edge("split", END)
     builder.add_edge("story_writer", "story_review_checkpoint")
     builder.add_edge("story_review_checkpoint", "ac_generator")
     builder.add_edge("ac_generator", "test_case_writer")
@@ -743,8 +743,8 @@ def build_stub_artifact_from_error(error: PipelineStepError) -> FinalUserStory:
 # can compare against the contract without reaching into agent modules.
 __all__ = [
     "deferred_implied_stories",
-    "fan_out_node",
-    "is_fanout_mode",
+    "split_node",
+    "is_split_mode",
     "picked_implied_story",
     "AcGeneratorOutput",
     "AcceptanceCriterion",

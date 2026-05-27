@@ -170,15 +170,15 @@ def test_export_deferred_jira_dry_run_uses_native_adf(client, runner_mock):
     assert first["content"][0]["text"] == "Story A"
 
 
-def test_export_deferred_dispatches_to_fanout_source_on_done_fanout(client, runner_mock):
-    """Phase 15.4 — when status is DONE_FANOUT, the endpoint sources stories
-    from get_fanout_stories_and_context, not get_deferred_stories_and_context."""
+def test_export_deferred_dispatches_to_split_source_on_done_split(client, runner_mock):
+    """Phase 15.4 — when status is DONE_SPLIT, the endpoint sources stories
+    from get_split_stories_and_context, not get_deferred_stories_and_context."""
     runner_mock.get_state.return_value = ThreadState(
         thread_id="tid",
-        status=ThreadStatus.DONE_FANOUT,
-        payload={"fan_out_stories": [{"title": "Story A", "summary": "a"}]},
+        status=ThreadStatus.DONE_SPLIT,
+        payload={"split_stories": [{"title": "Story A", "summary": "a"}]},
     )
-    runner_mock.get_fanout_stories_and_context.return_value = (
+    runner_mock.get_split_stories_and_context.return_value = (
         [ImpliedStory(title="Story A", summary="a")],
         "req",
     )
@@ -193,8 +193,8 @@ def test_export_deferred_dispatches_to_fanout_source_on_done_fanout(client, runn
     assert r.status_code == 200
     body = r.json()
     assert [r["payload"]["title"] for r in body["results"]] == ["Story A"]
-    # Confirm dispatch went through the fan-out branch.
-    runner_mock.get_fanout_stories_and_context.assert_called_once_with("tid")
+    # Confirm dispatch went through the split branch.
+    runner_mock.get_split_stories_and_context.assert_called_once_with("tid")
     runner_mock.get_deferred_stories_and_context.assert_not_called()
 
 
@@ -217,4 +217,4 @@ def test_export_deferred_uses_deferred_source_on_done_status(client, runner_mock
     )
     assert r.status_code == 200
     runner_mock.get_deferred_stories_and_context.assert_called_once_with("tid")
-    runner_mock.get_fanout_stories_and_context.assert_not_called()
+    runner_mock.get_split_stories_and_context.assert_not_called()

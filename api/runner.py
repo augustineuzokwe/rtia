@@ -99,17 +99,17 @@ class PipelineRunner:
             payload = interrupts[0].value
             return self._paused_state(thread_id, payload)
 
-        # Phase 15.4 — fan-out terminal state precedes the deep one because
-        # final_artifact is never populated in fan-out runs. Use key-presence
-        # not truthiness: a fan-out thread that filtered to zero matches still
-        # produced an empty fan_out_stories list, and that's still a fan-out
+        # Phase 15.4 — split terminal state precedes the deep one because
+        # final_artifact is never populated in split runs. Use key-presence
+        # not truthiness: a split thread that filtered to zero matches still
+        # produced an empty split_stories list, and that's still a split
         # terminal state — not a deep failure.
-        if "fan_out_stories" in values:
+        if "split_stories" in values:
             return ThreadState(
                 thread_id=thread_id,
-                status=ThreadStatus.DONE_FANOUT,
+                status=ThreadStatus.DONE_SPLIT,
                 payload={
-                    "fan_out_stories": [s.model_dump() for s in values["fan_out_stories"]],
+                    "split_stories": [s.model_dump() for s in values["split_stories"]],
                     "po_answers": dict(values.get("po_answers") or {}),
                 },
             )
@@ -152,21 +152,21 @@ class PipelineRunner:
             return None
         return artifact.as_markdown()
 
-    def get_fanout_stories_and_context(self, thread_id: str) -> tuple[list[Any], str] | None:
-        """Return ``(fan_out_stories, requirement_text)`` for fan-out threads.
+    def get_split_stories_and_context(self, thread_id: str) -> tuple[list[Any], str] | None:
+        """Return ``(split_stories, requirement_text)`` for split threads.
 
         Phase 15.4 sibling of :meth:`get_deferred_stories_and_context`.
         Returns ``None`` if no state at all, OR if the thread is not a
-        fan-out thread (key absent). Returns ``([], requirement_text)``
-        when the thread is fan-out but the PO filtered to zero stories
-        — distinct from "not a fan-out thread" so the endpoint can
+        split thread (key absent). Returns ``([], requirement_text)``
+        when the thread is split but the PO filtered to zero stories
+        — distinct from "not a split thread" so the endpoint can
         report the empty-result case cleanly.
         """
         snapshot = self._pipeline.get_state(self._config(thread_id))
         values: dict[str, Any] = snapshot.values or {}
-        if "fan_out_stories" not in values:
+        if "split_stories" not in values:
             return None
-        return list(values["fan_out_stories"]), values.get("requirement_text", "")
+        return list(values["split_stories"]), values.get("requirement_text", "")
 
     def get_deferred_stories_and_context(self, thread_id: str) -> tuple[list[Any], str] | None:
         """Return ``(deferred_stories, requirement_text)`` for the export-deferred endpoint.
@@ -213,15 +213,15 @@ class PipelineRunner:
 
     @staticmethod
     def _paused_state(thread_id: str, payload: dict) -> ThreadState:
-        # Phase 15.4 — fan-out PO checkpoint payload carries `mode == "fan_out"`
+        # Phase 15.4 — split PO checkpoint payload carries `mode == "split"`
         # plus the implied-stories list (for the CheckboxGroup) and any
         # remaining non-story critical questions (for text input).
-        if payload.get("mode") == "fan_out":
+        if payload.get("mode") == "split":
             return ThreadState(
                 thread_id=thread_id,
                 status=ThreadStatus.PAUSED_PO,
                 payload={
-                    "mode": "fan_out",
+                    "mode": "split",
                     "implied_stories": list(payload.get("implied_stories") or []),
                     "critical_ambiguities": list(payload.get("critical_ambiguities") or []),
                 },
@@ -250,16 +250,16 @@ class PipelineRunner:
 
     @staticmethod
     def _done_state(thread_id: str, result: dict) -> ThreadState:
-        # Phase 15.4 — fan-out branch terminates without producing a
-        # FinalUserStory. Translate that into a DONE_FANOUT state. Use
-        # key-presence not truthiness: empty list is still a fan-out
+        # Phase 15.4 — split branch terminates without producing a
+        # FinalUserStory. Translate that into a DONE_SPLIT state. Use
+        # key-presence not truthiness: empty list is still a split
         # terminal state (filtered to zero matches), not a deep failure.
-        if "fan_out_stories" in result:
+        if "split_stories" in result:
             return ThreadState(
                 thread_id=thread_id,
-                status=ThreadStatus.DONE_FANOUT,
+                status=ThreadStatus.DONE_SPLIT,
                 payload={
-                    "fan_out_stories": [s.model_dump() for s in result["fan_out_stories"]],
+                    "split_stories": [s.model_dump() for s in result["split_stories"]],
                     "po_answers": dict(result.get("po_answers") or {}),
                 },
             )

@@ -1,7 +1,7 @@
 """Tests for ``_state_to_panels`` visibility mapping.
 
 Regression cover for issue #175 — the deep-flow "Push to backlog" form
-was visible on ``DONE_FANOUT`` threads, where it makes no sense (no deep
+was visible on ``DONE_SPLIT`` threads, where it makes no sense (no deep
 artifact exists). These tests pin the contract: ``deep_export_visible``
 is True only on ``DONE``, hidden everywhere else; ``deferred_visible``
 remains correctly populated for both terminal states.
@@ -38,14 +38,14 @@ def test_deep_export_visible_on_done():
     assert _visible(panels["deep_export_visible"]) is True
 
 
-def test_deep_export_hidden_on_done_fanout():
-    """The core bug fix from #175 — fan-out threads must NOT show the
+def test_deep_export_hidden_on_done_split():
+    """The core bug fix from #175 — split threads must NOT show the
     single-artifact 'Push to backlog' form."""
     state = ThreadState(
         thread_id="tid",
-        status=ThreadStatus.DONE_FANOUT,
+        status=ThreadStatus.DONE_SPLIT,
         payload={
-            "fan_out_stories": [
+            "split_stories": [
                 {"title": "Story A", "summary": "a"},
                 {"title": "Story B", "summary": "b"},
             ]
@@ -54,20 +54,20 @@ def test_deep_export_hidden_on_done_fanout():
 
     panels = _state_to_panels(state)
 
-    # Result panel still visible so the user can see the stub list.
+    # Result panel still visible so the user can see the placeholder list.
     assert _visible(panels["result_visible"]) is True
     # But the deep-flow export form must be hidden.
     assert _visible(panels["deep_export_visible"]) is False
 
 
-def test_fanout_result_text_points_at_correct_button():
-    """The fan-out result body should direct the user to 'Create
+def test_split_result_text_points_at_correct_button():
+    """The split result body should direct the user to 'Create
     follow-up issues', not the deep-flow 'Push to backlog' button.
     Misdirected copy was part of issue #175."""
     state = ThreadState(
         thread_id="tid",
-        status=ThreadStatus.DONE_FANOUT,
-        payload={"fan_out_stories": [{"title": "X", "summary": "x"}]},
+        status=ThreadStatus.DONE_SPLIT,
+        payload={"split_stories": [{"title": "X", "summary": "x"}]},
     )
 
     panels = _state_to_panels(state)
@@ -91,16 +91,16 @@ def test_deep_export_hidden_in_non_terminal_states():
 
 def test_result_panel_visible_on_both_done_states():
     """Regression guard for #177 — ``result_panel`` must be visible on
-    BOTH ``DONE`` and ``DONE_FANOUT`` because it now holds the shared
+    BOTH ``DONE`` and ``DONE_SPLIT`` because it now holds the shared
     export config fields (backend, target, dry_run) that both export
     handlers read from. If a future refactor accidentally hides
-    ``result_panel`` on either terminal state, the fan-out user loses
+    ``result_panel`` on either terminal state, the split user loses
     the ability to toggle dry-run and the push silently no-ops."""
     for status, payload in [
         (ThreadStatus.DONE, {"rendered_artifact": "# x\n", "deferred_stories": []}),
         (
-            ThreadStatus.DONE_FANOUT,
-            {"fan_out_stories": [{"title": "X", "summary": "x"}]},
+            ThreadStatus.DONE_SPLIT,
+            {"split_stories": [{"title": "X", "summary": "x"}]},
         ),
     ]:
         state = ThreadState(thread_id="tid", status=status, payload=payload)
@@ -127,8 +127,8 @@ def test_state_to_panels_returns_stable_key_set():
         "thread_id_state",
         "po_visible",
         "po_questions",
-        "po_fanout_rows",
-        "po_fanout_originals",
+        "po_split_rows",
+        "po_split_originals",
         "po_answers_visible",
         "po_paused_payload",
         "review_visible",
@@ -212,13 +212,13 @@ def test_error_state_with_no_message_still_renders_recovery_copy():
 
 def test_backlog_visible_on_both_terminal_success_states():
     """The shared Backlog target form drives BOTH the deep export
-    button and the fan-out follow-up button; it must be reachable on
-    DONE and DONE_FANOUT (#186 §R3)."""
+    button and the split follow-up button; it must be reachable on
+    DONE and DONE_SPLIT (#186 §R3)."""
     for status, payload in [
         (ThreadStatus.DONE, {"rendered_artifact": "# x\n", "deferred_stories": []}),
         (
-            ThreadStatus.DONE_FANOUT,
-            {"fan_out_stories": [{"title": "X", "summary": "x"}]},
+            ThreadStatus.DONE_SPLIT,
+            {"split_stories": [{"title": "X", "summary": "x"}]},
         ),
     ]:
         state = ThreadState(thread_id="tid", status=status, payload=payload)
@@ -268,8 +268,8 @@ def test_run_button_enabled_on_terminal_states():
     for status, payload in [
         (ThreadStatus.DONE, {"rendered_artifact": "# x\n", "deferred_stories": []}),
         (
-            ThreadStatus.DONE_FANOUT,
-            {"fan_out_stories": [{"title": "X", "summary": "x"}]},
+            ThreadStatus.DONE_SPLIT,
+            {"split_stories": [{"title": "X", "summary": "x"}]},
         ),
         (ThreadStatus.ERROR, {}),
     ]:
@@ -280,14 +280,14 @@ def test_run_button_enabled_on_terminal_states():
         )
 
 
-def test_deferred_panel_still_works_on_done_fanout():
+def test_deferred_panel_still_works_on_done_split():
     """Regression guard for #170 — the follow-up panel must still be
-    visible on DONE_FANOUT so the user can push the stubs."""
+    visible on DONE_SPLIT so the user can push the placeholders."""
     state = ThreadState(
         thread_id="tid",
-        status=ThreadStatus.DONE_FANOUT,
+        status=ThreadStatus.DONE_SPLIT,
         payload={
-            "fan_out_stories": [{"title": "X", "summary": "x"}],
+            "split_stories": [{"title": "X", "summary": "x"}],
         },
     )
 
@@ -296,8 +296,8 @@ def test_deferred_panel_still_works_on_done_fanout():
     assert _visible(panels["deferred_visible"]) is True
 
 
-def test_fanout_row_checkboxes_have_no_visible_label():
-    """Issue #213 — every pre-built fan-out row checkbox must be built
+def test_split_row_checkboxes_have_no_visible_label():
+    """Issue #213 — every pre-built split row checkbox must be built
     with ``show_label=False`` so Gradio doesn't fall back to its default
     literal "Checkbox" label. The neighbouring Textbox already labels
     the story; the checkbox is implicit "keep"."""
@@ -306,7 +306,7 @@ def test_fanout_row_checkboxes_have_no_visible_label():
     import gradio as gr
     from fastapi import FastAPI
 
-    from ui.gradio_app import _MAX_FANOUT_ROWS, build_blocks
+    from ui.gradio_app import _MAX_SPLIT_ROWS, build_blocks
 
     app = FastAPI()
     app.state.runner = MagicMock()
@@ -320,15 +320,15 @@ def test_fanout_row_checkboxes_have_no_visible_label():
                 yield from _walk(child)
 
     checkboxes = list(_walk(blocks))
-    # First N checkboxes are the fan-out row checkboxes (declaration
+    # First N checkboxes are the split row checkboxes (declaration
     # order); the "Dry run" checkbox sits after them.
-    fanout_chks = checkboxes[:_MAX_FANOUT_ROWS]
-    assert len(fanout_chks) == _MAX_FANOUT_ROWS, (
-        f"expected {_MAX_FANOUT_ROWS} fan-out checkboxes, found {len(fanout_chks)}"
+    split_chks = checkboxes[:_MAX_SPLIT_ROWS]
+    assert len(split_chks) == _MAX_SPLIT_ROWS, (
+        f"expected {_MAX_SPLIT_ROWS} split checkboxes, found {len(split_chks)}"
     )
-    for i, chk in enumerate(fanout_chks):
+    for i, chk in enumerate(split_chks):
         assert chk.show_label is False, (
-            f"fan-out checkbox row {i} must have show_label=False "
+            f"split checkbox row {i} must have show_label=False "
             f"(got show_label={chk.show_label!r}, label={chk.label!r})"
         )
 
@@ -339,17 +339,17 @@ def _checkboxes_visible(update_obj) -> bool:
     return getattr(update_obj, "visible", False)
 
 
-def test_deferred_checkboxgroup_hidden_on_done_fanout():
-    """Issue #214 — on DONE_FANOUT the PO already picked/renamed/dropped
+def test_deferred_checkboxgroup_hidden_on_done_split():
+    """Issue #214 — on DONE_SPLIT the PO already picked/renamed/dropped
     at the editable PO checkpoint (#207). Re-surfacing a second
     CheckboxGroup with the same titles is redundant and looks like the
     upstream selection didn't take. The panel + button stay visible so
     the PO can trigger the push; the redundant title list is suppressed."""
     state = ThreadState(
         thread_id="tid",
-        status=ThreadStatus.DONE_FANOUT,
+        status=ThreadStatus.DONE_SPLIT,
         payload={
-            "fan_out_stories": [
+            "split_stories": [
                 {"title": "Story A", "summary": "a"},
                 {"title": "Story B", "summary": "b"},
             ]

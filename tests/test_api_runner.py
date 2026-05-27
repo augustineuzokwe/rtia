@@ -154,12 +154,12 @@ def test_runner_render_markdown_returns_none_before_composer():
         assert runner.render_markdown(paused.thread_id) is None
 
 
-def test_runner_done_fanout_payload_includes_selected_stories():
-    """Phase 15.4 — multi-story → DONE_FANOUT with fan_out_stories payload.
+def test_runner_done_split_payload_includes_selected_stories():
+    """Phase 15.4 — multi-story → DONE_SPLIT with split_stories payload.
 
-    Analyst returns 3 implied stories. Runner pauses with fan-out shape.
-    PO resumes selecting 2 of 3 → fan_out_node filters → DONE_FANOUT
-    terminal state with exactly those 2 stubs in the payload. No
+    Analyst returns 3 implied stories. Runner pauses with split shape.
+    PO resumes selecting 2 of 3 → split_node filters → DONE_SPLIT
+    terminal state with exactly those 2 placeholder stories in the payload. No
     final_artifact / review_report is produced.
     """
     analyst = {
@@ -185,7 +185,7 @@ def test_runner_done_fanout_payload_includes_selected_stories():
         runner = PipelineRunner(pipeline)
         paused = runner.start("requirement")
         assert paused.status == ThreadStatus.PAUSED_PO
-        assert paused.payload["mode"] == "fan_out"
+        assert paused.payload["mode"] == "split"
         assert len(paused.payload["implied_stories"]) == 3
 
         done = runner.resume(
@@ -196,21 +196,21 @@ def test_runner_done_fanout_payload_includes_selected_stories():
             },
         )
 
-    assert done.status == ThreadStatus.DONE_FANOUT
-    titles = [s["title"] for s in done.payload["fan_out_stories"]]
+    assert done.status == ThreadStatus.DONE_SPLIT
+    titles = [s["title"] for s in done.payload["split_stories"]]
     assert titles == ["Story A", "Story C"]
     # Deep-flow fields must NOT be present.
     assert "final_artifact" not in done.payload
     assert "review_report" not in done.payload
 
 
-def test_runner_done_fanout_with_no_matching_selection_returns_empty_done_fanout():
+def test_runner_done_split_with_no_matching_selection_returns_empty_done_split():
     """Phase 15.4 regression — when the PO's selection doesn't match any
-    implied-story title, fan_out_node writes ``fan_out_stories=[]`` and
-    the runner must still return DONE_FANOUT (not fall through to the
+    implied-story title, split_node writes ``split_stories=[]`` and
+    the runner must still return DONE_SPLIT (not fall through to the
     deep-state path and KeyError on the missing final_artifact).
 
-    Earlier draft of the runner used ``if result.get(\"fan_out_stories\"):``
+    Earlier draft of the runner used ``if result.get(\"split_stories\"):``
     which is falsy for an empty list — that bug was caught live.
     """
     analyst = {
@@ -231,11 +231,11 @@ def test_runner_done_fanout_with_no_matching_selection_returns_empty_done_fanout
             {"selected_story_titles": ["Unrelated Title"], "answers": {}},
         )
 
-    assert done.status == ThreadStatus.DONE_FANOUT
-    assert done.payload["fan_out_stories"] == []
+    assert done.status == ThreadStatus.DONE_SPLIT
+    assert done.payload["split_stories"] == []
 
 
-def test_runner_done_fanout_empty_selection_keeps_all_stories():
+def test_runner_done_split_empty_selection_keeps_all_stories():
     """Phase 15.4 / Q2 — empty selected_story_titles ⇒ fan out everything."""
     analyst = {
         "intent": "multi-story req",
@@ -255,8 +255,8 @@ def test_runner_done_fanout_empty_selection_keeps_all_stories():
             {"selected_story_titles": [], "answers": {}},
         )
 
-    assert done.status == ThreadStatus.DONE_FANOUT
-    titles = [s["title"] for s in done.payload["fan_out_stories"]]
+    assert done.status == ThreadStatus.DONE_SPLIT
+    titles = [s["title"] for s in done.payload["split_stories"]]
     assert titles == ["Story A", "Story B"]
 
 

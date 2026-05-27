@@ -92,8 +92,8 @@ def collect_po_answers(critical_questions: list[str]) -> dict[str, str]:
     return answers
 
 
-def collect_fanout_selection(payload: dict) -> dict:
-    """Phase 15.4 — CLI prompt for the fan-out PO checkpoint.
+def collect_split_selection(payload: dict) -> dict:
+    """Phase 15.4 — CLI prompt for the split PO checkpoint.
 
     Mirrors the Gradio CheckboxGroup. Default behaviour (empty input)
     keeps every implied story — matches Q2's "fan out everything"
@@ -104,7 +104,7 @@ def collect_fanout_selection(payload: dict) -> dict:
     for i, s in enumerate(stories, 1):
         print(f"  {i}. {s['title']} — {s['summary']}")
     print(
-        "\nRTIA will fan these out as lightweight backlog stubs (no deep "
+        "\nRTIA will split these into lightweight placeholder stories (no deep "
         "artifact this session).\nEnter the numbers to KEEP, comma-separated, "
         "or press Enter to keep all:"
     )
@@ -274,14 +274,13 @@ def main() -> None:
     # fired, dispatching on the interrupt payload's shape.
     while "__interrupt__" in result:
         payload = result["__interrupt__"][0].value
-        if payload.get("mode") == "fan_out":
+        if payload.get("mode") == "split":
             # Phase 15.4 — multi-story branch. CheckboxGroup-equivalent
             # in the CLI is a comma-separated list of indices.
             banner(
-                f"PO CHECKPOINT (fan-out) — {len(payload.get('implied_stories', []))} "
-                "IMPLIED STORIES"
+                f"PO CHECKPOINT (split) — {len(payload.get('implied_stories', []))} IMPLIED STORIES"
             )
-            resume_value: object = collect_fanout_selection(payload)
+            resume_value: object = collect_split_selection(payload)
         elif "critical_ambiguities" in payload:
             critical = payload["critical_ambiguities"]
             banner(f"PO CHECKPOINT — {len(critical)} CRITICAL AMBIGUITY/IES")
@@ -329,12 +328,12 @@ def main() -> None:
             print(f"Q: {question}")
             print(f"A: {answer}\n")
 
-    # Phase 15.4 — fan-out terminal state: no final_artifact, no Reviewer.
-    # Print the lightweight stub list and exit successfully.
-    if "fan_out_stories" in result:
-        stubs = result["fan_out_stories"]
-        banner(f"FAN-OUT RESULT — {len(stubs)} BACKLOG STUBS")
-        for s in stubs:
+    # Phase 15.4 — split terminal state: no final_artifact, no Reviewer.
+    # Print the lightweight placeholder list and exit successfully.
+    if "split_stories" in result:
+        placeholders = result["split_stories"]
+        banner(f"SPLIT RESULT — {len(placeholders)} PLACEHOLDER STORIES")
+        for s in placeholders:
             print(f"- {s.title}\n    {s.summary}\n")
         print(
             "Re-run RTIA on any individual title above to get the deep "

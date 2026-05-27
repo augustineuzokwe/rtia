@@ -100,24 +100,24 @@ def _resume_value_from(
     - PO checkpoint, **deep mode** (Analyst found ≤ 1 implied story):
       LangGraph expects ``dict[question, answer]`` — pass ``request.answers``
       through.
-    - PO checkpoint, **fan-out mode** (Phase 15.4): LangGraph expects
+    - PO checkpoint, **split mode** (Phase 15.4): LangGraph expects
       ``{"selected_story_titles": [...], "answers": {...}}``. Empty
       ``selected_story_titles`` is the Q2 default — graph treats it as
       "keep every implied story".
     - Story Review checkpoint: ``{"accepted": bool, ...}``.
 
     ``paused_payload`` carries the current paused state's payload so we
-    can discriminate fan-out vs deep at the PO checkpoint without
+    can discriminate split vs deep at the PO checkpoint without
     inferring from the body shape.
     """
     if current_status == ThreadStatus.PAUSED_PO:
         mode = (paused_payload or {}).get("mode", "deep")
-        if mode == "fan_out":
-            # Fan-out: structured selection. None / empty list signals
+        if mode == "split":
+            # Split: structured selection. None / empty list signals
             # "fan out everything" — pass-through, graph fills the default.
             # Issue #207 — prefer the editable ``selected_stories`` shape
             # (title+summary+original_title) when supplied so PO edits to
-            # titles flow into ``fan_out_stories``; legacy callers may
+            # titles flow into ``split_stories``; legacy callers may
             # still send plain ``selected_story_titles``.
             resume: dict[str, object] = {"answers": dict(request.answers or {})}
             if request.selected_stories is not None:
@@ -325,9 +325,9 @@ def _register_routes(app: FastAPI) -> None:
             exporter = make_exporter(body.target.backend)
             # Issue #208 — when ``update_issue_id`` is supplied, replace
             # the existing issue instead of creating a duplicate. The
-            # common flow: PO copies a fan-out stub's issue number,
+            # common flow: PO copies a split placeholder's issue number,
             # re-runs RTIA on the title, sets ``update_issue_id`` to
-            # collapse the deep artifact onto the stub.
+            # collapse the deep artifact onto the placeholder.
             if body.update_issue_id:
                 return exporter.update_issue(
                     body.update_issue_id,
@@ -358,8 +358,8 @@ def _register_routes(app: FastAPI) -> None:
         issue for each so they land on the backlog instead of being lost.
         """
         runner: PipelineRunner = request.app.state.runner
-        # Phase 15.4 — dispatch to the fan-out source on DONE_FANOUT threads.
-        # Fan-out stories are the same shape (ImpliedStory) as deferred, so
+        # Phase 15.4 — dispatch to the split source on DONE_SPLIT threads.
+        # Split stories are the same shape (ImpliedStory) as deferred, so
         # the rest of the loop body is identical. The shared helper picks
         # which state field to read; the UI's "Create follow-up issues"
         # button uses the same call.
