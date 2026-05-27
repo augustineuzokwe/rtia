@@ -11,27 +11,29 @@ graph TD
     start([requirements: free text, PDF, or markdown]) --> analyst[Requirements Analyst<br/>extracts intent + actors + ambiguities<br/>flags 'critical' vs 'normal' + counts implied stories]
     analyst --> po{PO checkpoint<br/>pause if critical ambiguities OR implied_stories ≥ 2}
     po -- "deep path<br/>(single story)" --> writer[User Story Writer<br/>Description + Objective + assumptions]
-    po -. "fan-out<br/>(multi-story)" .-> fanout[fan_out<br/>emit lightweight backlog stubs<br/>no LLM call]
+    po -. "split<br/>(multi-story)" .-> split[split<br/>emit lightweight placeholder stories<br/>no LLM call]
     writer --> review{Story Review checkpoint<br/>PO/QA edits the draft story}
     review --> ac[AC Generator<br/>Given/When/Then]
     ac --> tc[Test Case Writer<br/>happy + edge + negative paths]
     tc --> composer[Composer<br/>assemble FinalUserStory]
     composer --> reviewer[Reviewer<br/>coverage gaps + weak ACs]
     reviewer --> done([FinalUserStory<br/>Description / Objective / ACs / Test Cases / Review notes])
-    fanout --> stubs([backlog stubs<br/>re-run RTIA on any stub to deep-dive])
+    split --> placeholders([placeholder stories<br/>re-run RTIA on any placeholder to deep-dive])
 ```
 
 **Two paths, one PO decision.** At the PO checkpoint, RTIA picks the path based on how many distinct user stories the Analyst inferred:
 
 - **Deep path** (`implied_stories ≤ 1`) - produces a full four-section artifact: Description, Objective, Acceptance Criteria, Test Cases.
-- **Fan-out path** (`implied_stories ≥ 2`) - produces lightweight backlog stubs only. The PO picks a stub later and re-runs RTIA on it to deep-dive. See [PR #162](https://github.com/augustineuzokwe/rtia/pull/162) for the topology rationale.
+- **Split path** (`implied_stories ≥ 2`) - produces lightweight placeholder stories only. The PO picks a placeholder later and re-runs RTIA on it to deep-dive. See [PR #162](https://github.com/augustineuzokwe/rtia/pull/162) for the topology rationale.
 
 **Why two checkpoints on the deep path?** They do different work that the other can't:
 
 - The **PO checkpoint** resolves missing information *before* the system makes assumptions. The Analyst classifies each ambiguity by severity so the PO only pauses for genuinely blocking questions, not every detail.
 - The **Story Review checkpoint** verifies the *output* - catching cases where the Story Writer's interpretation of the resolved inputs doesn't match what the PO actually meant.
 
-**Where the artifact goes.** The composed `FinalUserStory` is downloadable as JSON from the API, viewable in the Gradio UI, and exportable to Jira (REST v3 + ADF) or GitHub Issues (with optional Projects v2 placement) via `POST /pipeline/{thread_id}/export`. Fan-out stubs export via `/export-deferred`.
+**Where the artifact goes.** The composed `FinalUserStory` is downloadable as JSON from the API, viewable in the Gradio UI, and exportable to Jira (REST v3 + ADF) or GitHub Issues (with optional Projects v2 placement) via `POST /pipeline/{thread_id}/export`. Split placeholders export via `/export-deferred`.
+
+> **Glossary (docs vs code mapping):** docs call this "split path" + "placeholder stories" because that reads naturally in product/PM language. The code uses the same vocabulary - LangGraph node `split`, state field `split_stories`, JSON values `"mode": "split"` / `"status": "done_split"`. See [docs/glossary.md](docs/glossary.md) for the full vocabulary reference.
 
 ## Use Case
 

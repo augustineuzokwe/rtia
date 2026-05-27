@@ -82,7 +82,7 @@ Out of scope **and not on any current Task** (would need a new issue first):
 - [ADR-0006 - provider switch (Claude → Gemini)](adr-0006-provider-switch.md) - one provider, one consumer per import site; no abstraction factory until a 3rd provider lands.
 - [ADR-0007 - Gemini 3.5 Flash switch](adr-0007-gemini-3-5-flash-switch.md) - the model the v1 default is pinned to; live-probing methodology that backs the choice.
 - [ADR-0008 - PII vs LangSmith](adr-0008-pii-langsmith.md) - production-tracing guard (`RTIA_ENV=production` + `LANGSMITH_TRACING=true` refuses to start); informs the "single-user with operator-supplied keys" decision because the operator owns the trace-storage policy.
-- [ADR-0010 - multi-story fan-out](adr-0010-multi-story-fan-out.md) - the conditional LangGraph edge that bumped `PIPELINE_STATE_VERSION` 1→2; v1 ships with version 2.
+- [ADR-0010 - multi-story split](adr-0010-multi-story-split.md) - the conditional LangGraph edge that bumped `PIPELINE_STATE_VERSION` 1→2; v1 ships with version 2.
 
 ## References - supporting artifacts
 

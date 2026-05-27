@@ -17,8 +17,8 @@ In RTIA, a single LLM-driven step in the pipeline with a focused responsibility:
 ### Checkpoint / checkpointer
 A point where the pipeline's full state is saved to disk so execution can pause + resume across process restarts. RTIA uses LangGraph's [`SqliteSaver`](https://langchain-ai.github.io/langgraph/concepts/#checkpointer) writing to `~/.rtia/state.db`. See [ADR-0002](adr-0002-durable-checkpointer.md).
 
-### Fan-out
-RTIA's pattern for handling requirement text that implies several independent stories at once. The Analyst flags the multi-story shape; the PO picks at the checkpoint; the graph branches via a [conditional edge](../agents/graph.py) to either deep-dive one story OR produce lightweight backlog stubs for all. See [ADR-0010](adr-0010-multi-story-fan-out.md).
+### Split
+RTIA's pattern for handling requirement text that implies several independent stories at once. The Analyst flags the multi-story shape; the PO picks at the checkpoint; the graph branches via a [conditional edge](../agents/graph.py) to either deep-dive one story OR produce lightweight placeholder stories for all. See [ADR-0010](adr-0010-multi-story-split.md).
 
 ### HITL (Human-in-the-Loop)
 Any pipeline step where the system pauses and waits for a human decision before continuing. RTIA has two: the PO Checkpoint (resolves critical ambiguities) and the Story Review Checkpoint (verifies the draft). Both implemented with LangGraph's [`interrupt()`](https://langchain-ai.github.io/langgraph/concepts/) primitive.
@@ -36,7 +36,7 @@ The compiled directed graph of nodes (agents + checkpoints) that processes a req
 The role mapping for who owns vs. who needs to know about each stage in a software process. RTIA's blog uses this format to map the Miro QA process to AI-feature additions. "Driver" = who does the work; "Informed" = who must know the work is happening.
 
 ### Schema versioning
-Marking a data shape with an explicit version number so changes can be detected and migrated. RTIA uses `PIPELINE_STATE_VERSION` in [`agents/graph.py`](../agents/graph.py) - currently version 2 after the fan-out fields were added. Bumping it forces a migration ADR.
+Marking a data shape with an explicit version number so changes can be detected and migrated. RTIA uses `PIPELINE_STATE_VERSION` in [`agents/graph.py`](../agents/graph.py) - currently version 3 after the split-mode rename. Bumping it forces a migration ADR.
 
 ---
 

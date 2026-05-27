@@ -28,7 +28,7 @@ The single source of truth for pipeline status is
         │              │                              └──> │  ERROR     │  any stage can fail
         │              ▼                                   └────────────┘
         │        ┌──────────────┐
-        │        │ DONE_FANOUT  │  fan-out terminal (multi-story branch)
+        │        │ DONE_SPLIT  │  split terminal (multi-story branch)
         │        └──────────────┘
         ▼
    ┌────────┐
@@ -39,10 +39,10 @@ The single source of truth for pipeline status is
 | Value | Trigger | Terminal? |
 |---|---|---|
 | `RUNNING` | A node is executing. Transient - never displayed long. | No |
-| `PAUSED_PO` | Pipeline hit the PO checkpoint. Payload carries `critical_ambiguities` (deep) or `implied_stories` (fan-out). | No |
+| `PAUSED_PO` | Pipeline hit the PO checkpoint. Payload carries `critical_ambiguities` (deep) or `implied_stories` (split). | No |
 | `PAUSED_REVIEW` | Pipeline hit the story-review checkpoint (deep flow only). | No |
 | `DONE` | Deep flow completed. Payload carries `rendered_artifact` + optional `deferred_stories`. | Yes |
-| `DONE_FANOUT` | Fan-out flow completed. Payload carries `fan_out_stories`. | Yes |
+| `DONE_SPLIT` | Split flow completed. Payload carries `split_stories`. | Yes |
 | `ERROR` | A node raised. Payload may carry `rendered_artifact` (the error message). | Yes |
 
 There is **no `IDLE` status.** The "no pipeline run yet" view is
@@ -58,7 +58,7 @@ This table is the contract. Code in
 [`tests/test_ui_state_panels.py`](../tests/test_ui_state_panels.py)
 pin it.
 
-| Panel / control | (idle) | `RUNNING` | `PAUSED_PO` | `PAUSED_REVIEW` | `DONE` | `DONE_FANOUT` | `ERROR` |
+| Panel / control | (idle) | `RUNNING` | `PAUSED_PO` | `PAUSED_REVIEW` | `DONE` | `DONE_SPLIT` | `ERROR` |
 |---|---|---|---|---|---|---|---|
 | `input_panel` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `run_btn` interactive | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
@@ -71,7 +71,7 @@ pin it.
 | `error_panel` | - | - | - | - | - | - | ✅ |
 
 ¹ Visible only when the matching story list (`deferred_stories` or
-`fan_out_stories`) is non-empty.
+`split_stories`) is non-empty.
 
 ### Invariants
 
@@ -80,7 +80,7 @@ pin it.
   nest them.
 - **`backlog_target_panel` is independent of `deep_export_panel`.**
   The shared form (backend / target / extra / dry-run) feeds both the
-  deep export button AND the fan-out follow-up button, so its
+  deep export button AND the split follow-up button, so its
   visibility is its own flag (`backlog_visible`).
 - **`run_btn` is disabled - not hidden - when a thread is active.**
   Hiding would leave the input panel looking incomplete; disabling

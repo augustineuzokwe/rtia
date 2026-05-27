@@ -22,7 +22,7 @@ A single user-story artifact with four sections:
 
 This is the **deep flow**. When you paste a requirement that secretly
 contains several distinct features, RTIA detects that and switches to a
-different shape - see the [fan-out path](#5-fan-out-when-your-input-has-multiple-stories) below.
+different shape - see the [split path](#5-split-when-your-input-has-multiple-stories) below.
 
 ## 2. Starting a run
 
@@ -82,7 +82,7 @@ The artifact is meant to be the *first draft* for a backlog story -
 not the final word. Reviewing the ACs and Test Cases before grooming is
 the expected workflow.
 
-## 5. Fan-out: when your input has multiple stories
+## 5. Split: when your input has multiple stories
 
 Some requirements describe several distinct features that each deserve
 their own backlog item. Example: *"We need a flaky-test quarantine
@@ -92,18 +92,18 @@ four stories, not one.
 When the Analyst sees this pattern, RTIA pauses at the PO checkpoint
 with a checkbox list of the stories it detected. You can:
 
-- **Submit with all checked** - RTIA creates a lightweight backlog stub
+- **Submit with all checked** - RTIA creates a lightweight placeholder story
   for each (title + one-line summary), then stops.
-- **Uncheck the ones you don't want** - only the remaining stubs are
+- **Uncheck the ones you don't want** - only the remaining placeholders are
   produced.
 
-The fan-out path **does not** produce the deep four-section artifact.
-The reasoning: each stub deserves its own RTIA run later, with its own
+The split path **does not** produce the deep four-section artifact.
+The reasoning: each placeholder deserves its own RTIA run later, with its own
 PO checkpoint and Story Review checkpoint. Trying to deep-dive four
 stories in one session would tangle the checkpoints.
 
-To get the full artifact for one of the stubs, just re-run RTIA on that
-stub's title and a short description of its scope.
+To get the full artifact for one of the placeholders, just re-run RTIA on that
+placeholder's title and a short description of its scope.
 
 ## 6. Pushing to Jira or GitHub
 
@@ -113,7 +113,7 @@ different things.
 | Control | Use it when |
 |---|---|
 | **Push to backlog** | Deep flow only. Pushes the single four-section artifact to one Jira issue or one GitHub issue. |
-| **Create follow-up issues** | Fan-out flow (or deep flow with leftover implied stories). Pushes one lightweight stub per story. |
+| **Create follow-up issues** | Split flow (or deep flow with leftover implied stories). Pushes one lightweight placeholder per story. |
 
 Both have the same configuration:
 
@@ -137,12 +137,12 @@ Things to try, in order:
 2. **Use the Story Review override.** If the Description is right but
    the Objective is off, edit just the Objective in the override box;
    the downstream agents will work from your text.
-3. **For multi-feature requirements, use the fan-out path** and then
-   re-run RTIA on each stub individually. Trying to force a deep run on
+3. **For multi-feature requirements, use the split path** and then
+   re-run RTIA on each placeholder individually. Trying to force a deep run on
    a four-feature input tends to mash the ACs and Test Cases together.
-4. **Re-run on a single stub.** If the fan-out produced a stub whose
+4. **Re-run on a single placeholder.** If the split produced a placeholder whose
    title is right but whose one-liner is wrong, re-run RTIA with the
-   stub's title as the requirement plus a sentence of your own scope
+   placeholder's title as the requirement plus a sentence of your own scope
    notes.
 
 If a pattern repeats - same agent producing the same kind of
