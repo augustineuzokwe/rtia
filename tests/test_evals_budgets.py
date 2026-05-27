@@ -2,10 +2,10 @@
 
 Covers two surfaces:
 
-1. ``evals/check_budgets.py`` — the post-processing gate against a
+1. ``evals/check_budgets.py`` - the post-processing gate against a
    minimal synthetic report. Confirms ok/over-limit detection,
    per-sample vs aggregate scoping, and the exit-code contract.
-2. ``evals/_telemetry_capture.py`` — the logging-handler-based bag that
+2. ``evals/_telemetry_capture.py`` - the logging-handler-based bag that
    collects ``agent_invocation_end`` records. Confirms it picks up
    real records emitted by ``log_agent_invocation`` and that the
    handler is removed cleanly on exit (no leakage into subsequent tests).
@@ -108,7 +108,7 @@ def test_capture_nested_contexts_each_get_their_own_bag():
 
 
 # ---------------------------------------------------------------------------
-# check_budgets.py — gate behaviour against synthetic reports
+# check_budgets.py - gate behaviour against synthetic reports
 # ---------------------------------------------------------------------------
 
 _GENEROUS_PYPROJECT = """\
@@ -208,7 +208,7 @@ def test_check_budgets_raises_when_pyproject_lacks_budgets(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Direct API — TelemetryCapture aggregate properties
+# Direct API - TelemetryCapture aggregate properties
 # ---------------------------------------------------------------------------
 
 

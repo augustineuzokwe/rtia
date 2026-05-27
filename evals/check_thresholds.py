@@ -9,14 +9,14 @@ Usage:
     uv run python evals/check_thresholds.py <report.json>
     uv run python evals/check_thresholds.py <report.json> --thresholds <path>
 
-The script never invokes the LLM — it's pure post-processing on the
+The script never invokes the LLM - it's pure post-processing on the
 report. This means a failing CI run does not retry-and-burn cost; the
 fix is to regenerate the report (or fix the agent).
 
 Design choices:
 
 - **Mean-across-samples gate, not per-sample.** Per-sample gating would
-  amplify single-run variance — one stochastic dip on sample-02 would
+  amplify single-run variance - one stochastic dip on sample-02 would
   fail the gate even when the overall pipeline is healthy. Mean is the
   right granularity for the "did this PR regress?" question, matching
   the way baselines.md is written.
@@ -24,7 +24,7 @@ Design choices:
   file lists what we gate on; if the report lacks a gated metric, the
   pipeline silently dropped it and the gate should yell.
 - **Unknown metrics in the report are ignored.** New metrics can be
-  added to the runner before they're added to thresholds.yaml — useful
+  added to the runner before they're added to thresholds.yaml - useful
   for the "land the metric first, calibrate the floor in a follow-up PR"
   workflow that's already been used twice (Phase 9.3, #102).
 """
@@ -60,7 +60,7 @@ def _load_thresholds(path: Path) -> dict[str, float]:
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     floors = data.get("metric_floors") or {}
     if not isinstance(floors, dict) or not floors:
-        raise SystemExit(f"{path} has no 'metric_floors' map — the gate has nothing to enforce.")
+        raise SystemExit(f"{path} has no 'metric_floors' map - the gate has nothing to enforce.")
     # Cast values up-front so a string-vs-float mistake fails loudly here,
     # not later inside the comparison.
     return {str(name): float(score) for name, score in floors.items()}
@@ -70,7 +70,7 @@ def _load_report(path: Path) -> dict[str, float]:
     """Return the report's per-metric mean scores.
 
     Pulls from ``aggregate.mean_scores`` because the runner already
-    computes that — recomputing here would couple the gate to the
+    computes that - recomputing here would couple the gate to the
     per-sample structure and risk drift.
     """
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -78,7 +78,7 @@ def _load_report(path: Path) -> dict[str, float]:
     means = aggregate.get("mean_scores") or {}
     if not means:
         raise SystemExit(
-            f"{path} has no 'aggregate.mean_scores' — re-run evals/run_evals.py to "
+            f"{path} has no 'aggregate.mean_scores' - re-run evals/run_evals.py to "
             f"generate a current-format report."
         )
     return {str(name): float(score) for name, score in means.items()}
@@ -92,7 +92,7 @@ def evaluate(
 
     Missing metrics surface as a floor-vs-nan-style failure (mean_score
     set to -1 so the result clearly fails). Callers should print the
-    full list — successes inform "what passed" telemetry, failures
+    full list - successes inform "what passed" telemetry, failures
     drive the non-zero exit.
     """
     results: list[_GateResult] = []

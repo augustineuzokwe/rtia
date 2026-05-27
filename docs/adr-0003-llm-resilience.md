@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-05-19)
 **Author:** augustineuzokwe
-**Decision driver:** Phase 2.3 of the prod-readiness roadmap. The Plan-agent's pre-implementation critique flagged "LangChain defaults are not production-safe." Verification before implementation showed this was partially aspirational — the Anthropic SDK has prod-grade retry behavior already — but the patience window needed tuning and the policy was undocumented.
+**Decision driver:** Phase 2.3 of the prod-readiness roadmap. The Plan-agent's pre-implementation critique flagged "LangChain defaults are not production-safe." Verification before implementation showed this was partially aspirational - the Anthropic SDK has prod-grade retry behavior already - but the patience window needed tuning and the policy was undocumented.
 
 ## Verified facts (2026-05-19)
 
@@ -13,7 +13,7 @@ Checked `anthropic._base_client.BaseClient._should_retry` and `_calculate_retry_
 | 408         | Request timeout |
 | 409         | Lock timeout    |
 | 429         | Rate limit      |
-| ≥500        | Server errors — includes **529 Overloaded** that Claude Opus 4.7 emits periodically |
+| ≥500        | Server errors - includes **529 Overloaded** that Claude Opus 4.7 emits periodically |
 
 Plus: any response with header `x-should-retry: true` (server explicitly requests retry). Backoff:
 

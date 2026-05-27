@@ -93,16 +93,16 @@ def collect_po_answers(critical_questions: list[str]) -> dict[str, str]:
 
 
 def collect_split_selection(payload: dict) -> dict:
-    """Phase 15.4 — CLI prompt for the split PO checkpoint.
+    """Phase 15.4 - CLI prompt for the split PO checkpoint.
 
     Mirrors the Gradio CheckboxGroup. Default behaviour (empty input)
-    keeps every implied story — matches Q2's "fan out everything"
+    keeps every implied story - matches Q2's "fan out everything"
     default and the graph's empty-selection contract.
     """
     stories = payload.get("implied_stories", [])
     print(f"\nThis requirement implies {len(stories)} independent stories:")
     for i, s in enumerate(stories, 1):
-        print(f"  {i}. {s['title']} — {s['summary']}")
+        print(f"  {i}. {s['title']} - {s['summary']}")
     print(
         "\nRTIA will split these into lightweight placeholder stories (no deep "
         "artifact this session).\nEnter the numbers to KEEP, comma-separated, "
@@ -121,7 +121,7 @@ def collect_split_selection(payload: dict) -> dict:
                     keep_indices.add(idx)
         selected_titles = [s["title"] for i, s in enumerate(stories) if i in keep_indices]
         if not selected_titles:
-            # Fall back to "keep all" rather than nothing — same as Q2 default.
+            # Fall back to "keep all" rather than nothing - same as Q2 default.
             selected_titles = [s["title"] for s in stories]
 
     # Any non-story critical questions still need text input.
@@ -134,7 +134,7 @@ def collect_story_review_response(payload: dict) -> dict:
     """Show the rendered story preview; collect accept-or-override.
 
     Empty input (default in non-interactive mode like `yes ""`) is
-    treated as accept — so smoke runs don't get stuck. To override,
+    treated as accept - so smoke runs don't get stuck. To override,
     answer 'n' and the demo prompts for new description / objective.
     """
     print(payload["rendered_artifact"])
@@ -155,7 +155,7 @@ _COST_DISCLOSURE = (
     "Cost disclosure: this demo makes 5 Gemini 3.5 Flash calls "
     "(Analyst + Story Writer + AC Generator + Test Case Writer + Reviewer). "
     "Estimated paid-tier spend ≈$0.007 per run on AI Studio's standard "
-    "pricing. Free-tier accounts: 20 RPD per project per model — see "
+    "pricing. Free-tier accounts: 20 RPD per project per model - see "
     "docs/adr-0006-provider-switch.md for the rationale."
 )
 
@@ -163,13 +163,13 @@ _COST_DISCLOSURE = (
 def main() -> None:
     load_dotenv()
 
-    # Phase 13.2 — install the JSON log handler before any agent runs.
+    # Phase 13.2 - install the JSON log handler before any agent runs.
     # Logs go to stderr by default so the rendered artifact on stdout
     # remains paste-ready. RTIA_LOG_DESTINATION=stdout, RTIA_LOG_LEVEL,
     # and friends are the operator-facing knobs (see agents/_logging.py).
     configure_logging()
 
-    # Phase 12.4 — refuse to start with RTIA_ENV=production AND
+    # Phase 12.4 - refuse to start with RTIA_ENV=production AND
     # LANGSMITH_TRACING truthy. See docs/adr-0008-pii-langsmith.md.
     # Asserted BEFORE the cost banner so a misconfigured prod
     # deployment fails fast without printing anything that implies the
@@ -216,7 +216,7 @@ def main() -> None:
     raw_markdown = sample_path.read_text(encoding="utf-8")
     requirement_text = extract_section(raw_markdown, "Raw Requirement")
 
-    # Phase 12.3 — refuse to invoke the pipeline if the input contains a
+    # Phase 12.3 - refuse to invoke the pipeline if the input contains a
     # high-confidence secret pattern. The scanner runs BEFORE any LLM
     # call or LangSmith trace, so a detected credential never leaves the
     # local process. See agents/_secret_scan.py and issue #124 for the
@@ -241,7 +241,7 @@ def main() -> None:
         )
         sys.exit(2)
 
-    banner(f"INPUT REQUIREMENT — {sample_path.name}")
+    banner(f"INPUT REQUIREMENT - {sample_path.name}")
     print(requirement_text)
 
     pipeline = build_pipeline()
@@ -249,7 +249,7 @@ def main() -> None:
 
     banner("INVOKING PIPELINE")
     print("Calling Gemini (Analyst)…")
-    # Phase 12.5 — when an LLM call exhausts its retry budget, an agent
+    # Phase 12.5 - when an LLM call exhausts its retry budget, an agent
     # raises LLMPipelineError. Catch it here, build a stub artifact with
     # structured error metadata, render it so the user sees the failure
     # context, and exit 3 (distinct from 0 success / 2 security block).
@@ -257,42 +257,42 @@ def main() -> None:
     try:
         result = pipeline.invoke({"requirement_text": requirement_text}, config=config)
     except PipelineStepError as exc:
-        # Phase 13.4 — catches both the narrower LLMPipelineError
+        # Phase 13.4 - catches both the narrower LLMPipelineError
         # (Gemini retry budget exhausted) and any other unexpected node
         # failure that graph.py has wrapped (Pydantic validation, JSON
         # parse, programmer errors). The stub artifact carries the
         # structured detail in metadata['error'] regardless of which
         # subclass fired.
         stub = build_stub_artifact_from_error(exc)
-        banner("PIPELINE FAILURE — aborted")
+        banner("PIPELINE FAILURE - aborted")
         print(stub.as_markdown())
         print(f"\n{exc}", file=sys.stderr)
         sys.exit(3)
 
     # The pipeline has two interrupts (PO Checkpoint + Story Review Checkpoint).
-    # Loop until the run completes — each iteration handles whichever checkpoint
+    # Loop until the run completes - each iteration handles whichever checkpoint
     # fired, dispatching on the interrupt payload's shape.
     while "__interrupt__" in result:
         payload = result["__interrupt__"][0].value
         if payload.get("mode") == "split":
-            # Phase 15.4 — multi-story branch. CheckboxGroup-equivalent
+            # Phase 15.4 - multi-story branch. CheckboxGroup-equivalent
             # in the CLI is a comma-separated list of indices.
             banner(
-                f"PO CHECKPOINT (split) — {len(payload.get('implied_stories', []))} IMPLIED STORIES"
+                f"PO CHECKPOINT (split) - {len(payload.get('implied_stories', []))} IMPLIED STORIES"
             )
             resume_value: object = collect_split_selection(payload)
         elif "critical_ambiguities" in payload:
             critical = payload["critical_ambiguities"]
-            banner(f"PO CHECKPOINT — {len(critical)} CRITICAL AMBIGUITY/IES")
+            banner(f"PO CHECKPOINT - {len(critical)} CRITICAL AMBIGUITY/IES")
             print("The graph has paused. Please answer the critical questions below.")
             resume_value = collect_po_answers(critical)
         elif "rendered_artifact" in payload:
-            banner("STORY REVIEW CHECKPOINT — review the rendered story below")
+            banner("STORY REVIEW CHECKPOINT - review the rendered story below")
             resume_value = collect_story_review_response(payload)
         else:
             raise RuntimeError(f"Unknown interrupt payload shape: {sorted(payload)}")
         banner("RESUMING PIPELINE")
-        # Same Phase 12.5 + 13.4 catch as the first invoke — downstream
+        # Same Phase 12.5 + 13.4 catch as the first invoke - downstream
         # agents (AC Generator, Test Case Writer, Reviewer) can also raise
         # LLMPipelineError, and any node can raise PipelineStepError for
         # unexpected non-LLM failures (Pydantic validation, JSON parse).
@@ -300,7 +300,7 @@ def main() -> None:
             result = pipeline.invoke(Command(resume=resume_value), config=config)
         except PipelineStepError as exc:
             stub = build_stub_artifact_from_error(exc)
-            banner("PIPELINE FAILURE — aborted")
+            banner("PIPELINE FAILURE - aborted")
             print(stub.as_markdown())
             print(f"\n{exc}", file=sys.stderr)
             sys.exit(3)
@@ -317,7 +317,7 @@ def main() -> None:
         print(f"  - [{amb.severity}] {amb.question}")
 
     if analyst.implied_stories:
-        print(f"\nImplied stories ({len(analyst.implied_stories)}) — PO must pick one:")
+        print(f"\nImplied stories ({len(analyst.implied_stories)}) - PO must pick one:")
         for s in analyst.implied_stories:
             print(f"  - {s.title}: {s.summary}")
 
@@ -328,11 +328,11 @@ def main() -> None:
             print(f"Q: {question}")
             print(f"A: {answer}\n")
 
-    # Phase 15.4 — split terminal state: no final_artifact, no Reviewer.
+    # Phase 15.4 - split terminal state: no final_artifact, no Reviewer.
     # Print the lightweight placeholder list and exit successfully.
     if "split_stories" in result:
         placeholders = result["split_stories"]
-        banner(f"SPLIT RESULT — {len(placeholders)} PLACEHOLDER STORIES")
+        banner(f"SPLIT RESULT - {len(placeholders)} PLACEHOLDER STORIES")
         for s in placeholders:
             print(f"- {s.title}\n    {s.summary}\n")
         print(
@@ -372,7 +372,7 @@ def main() -> None:
                 report.recommendations,
             ]
         ):
-            print("No issues found — artifact looks solid.")
+            print("No issues found - artifact looks solid.")
 
 
 if __name__ == "__main__":

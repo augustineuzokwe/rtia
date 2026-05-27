@@ -5,7 +5,7 @@ Test Case Writer). Consumes the User Story + the generated Acceptance
 Criteria and emits the concrete test cases that fill the fourth section
 of the FinalUserStory artifact.
 
-Schema-wise it produces ``list[TestCase]`` — the same ``TestCase`` model
+Schema-wise it produces ``list[TestCase]`` - the same ``TestCase`` model
 already declared on the FinalUserStory contract, so the composer just
 slots the list straight into the artifact.
 
@@ -45,7 +45,7 @@ _PROMPT_HASH = prompt_hash(SYSTEM_PROMPT, USER_PROMPT_TEMPLATE)
 class TestCaseWriterOutput(BaseModel):
     """Structured output of the Test Case Writer agent."""
 
-    # Tell pytest not to collect this as a test class — its name starts with
+    # Tell pytest not to collect this as a test class - its name starts with
     # "Test" but it's a Pydantic schema, not a fixture.
     __test__ = False
 
@@ -78,7 +78,7 @@ def write_test_cases(
 ) -> TestCaseWriterOutput:
     """Run the Test Case Writer on a user story + its acceptance criteria.
 
-    Inputs come from prior pipeline state, not raw text — the Test Case
+    Inputs come from prior pipeline state, not raw text - the Test Case
     Writer never sees the original requirement or the Analyst output. Its
     sole sources of truth are the validated user story and the ACs the
     AC Generator already produced. Same contract pattern as upstream agents.
@@ -120,7 +120,7 @@ def write_test_cases(
         HumanMessage(content=user_prompt),
     ]
     config = {"metadata": {"agent": "test_case_writer", "prompt_hash": _PROMPT_HASH}}
-    # Phase 12.5 — see analyze_requirement for the rationale.
+    # Phase 12.5 - see analyze_requirement for the rationale.
     with log_agent_invocation("test_case_writer", prompt_hash=_PROMPT_HASH) as rec:
         try:
             response = cached_invoke(

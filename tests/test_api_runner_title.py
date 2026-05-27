@@ -11,14 +11,14 @@ from api.runner import _derive_title
 
 
 def test_classic_short_user_story_keeps_clean():
-    """The base case — short 'As a/an … I want X' yields just X with
+    """The base case - short 'As a/an … I want X' yields just X with
     article stripped + first letter capitalised."""
     out = _derive_title("As a user, I want a dark-mode toggle.")
     assert out == "Dark-mode toggle"
 
 
 def test_long_description_cuts_at_subordinate_clause():
-    """Verbose round-2 case from KAN-4 / #219 — the 'I want …' clause
+    """Verbose round-2 case from KAN-4 / #219 - the 'I want …' clause
     has a 'located' sub-clause that should be cut so the title becomes
     the bare noun phrase before it."""
     desc = (
@@ -90,18 +90,18 @@ def test_collapses_internal_whitespace():
 
 def test_only_cut_when_at_least_two_words_remain():
     """If cutting at a subordinate marker leaves only one word, keep
-    the longer form — a 1-word title is usually less informative than
+    the longer form - a 1-word title is usually less informative than
     the verbose original."""
     desc = "As a user, I want X that does something useful."
     out = _derive_title(desc)
-    # 'X' alone would be useless — should keep more.
+    # 'X' alone would be useless - should keep more.
     assert "X" in out
     # And shouldn't truncate to just 'X'.
     assert out != "X"
 
 
 def test_hard_cap_protects_pathological_single_word():
-    """Single 200-char 'word' with no spaces — soft cap can't find a
+    """Single 200-char 'word' with no spaces - soft cap can't find a
     word boundary; hard cap must still kick in."""
     desc = "I want " + ("x" * 200)
     out = _derive_title(desc)

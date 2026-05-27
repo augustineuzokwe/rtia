@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-05-26)
 **Author:** augustineuzokwe
-**Decision driver:** Phase 16 of the road-to-production plan is closing; before drafting the public README + blog launch, the project needs an explicit, citeable definition of what "v1" includes and — critically — what it deliberately does not. Without this ADR, post-v1 scope creep happens silently.
+**Decision driver:** Phase 16 of the road-to-production plan is closing; before drafting the public README + blog launch, the project needs an explicit, citeable definition of what "v1" includes and - critically - what it deliberately does not. Without this ADR, post-v1 scope creep happens silently.
 
 ## Context
 
@@ -45,13 +45,13 @@ These are intentional omissions, not gaps. Promoting any of them into scope requ
 
 Out of scope **but already in flight** as separate Tasks:
 
-- LLM response cache with prompt-hash key and short TTL — tracked at [Issue #230](https://github.com/augustineuzokwe/rtia/issues/230). Implementation-ready; lands as its own PR.
-- Stochastic AC validation (`--n-runs` flag, pass-rate thresholds) — tracked at [Issue #233](https://github.com/augustineuzokwe/rtia/issues/233), depends on #230 landing first.
+- LLM response cache with prompt-hash key and short TTL - tracked at [Issue #230](https://github.com/augustineuzokwe/rtia/issues/230). Implementation-ready; lands as its own PR.
+- Stochastic AC validation (`--n-runs` flag, pass-rate thresholds) - tracked at [Issue #233](https://github.com/augustineuzokwe/rtia/issues/233), depends on #230 landing first.
 
 Out of scope **and not on any current Task** (would need a new issue first):
 
-- `rtia doctor` end-to-end install verifier (per plan §6.5 — "polish, not load-bearing").
-- Provider-abstraction factory `build_chat_llm()` — only justified by a third LLM provider per [ADR-0006](adr-0006-provider-switch.md).
+- `rtia doctor` end-to-end install verifier (per plan §6.5 - "polish, not load-bearing").
+- Provider-abstraction factory `build_chat_llm()` - only justified by a third LLM provider per [ADR-0006](adr-0006-provider-switch.md).
 - `scripts/threads.py` CLI for `list / show / clear / prune` over `~/.rtia/state.db` (per plan §2 followup task).
 
 ## Consequences
@@ -74,18 +74,18 @@ Out of scope **and not on any current Task** (would need a new issue first):
 
 - README v1 calls out the supported workflow (clone → `uv sync` → `.env` → run) and links here for the "what's not supported" detail.
 - Blog Section 9 ("Try it yourself") follows the same recipe.
-- Any future contributor PR that touches scope (adds an auth flow, attempts containerisation, etc.) should be challenged against this ADR — either it's an amendment to the ADR, or it's out of scope.
+- Any future contributor PR that touches scope (adds an auth flow, attempts containerisation, etc.) should be challenged against this ADR - either it's an amendment to the ADR, or it's out of scope.
 
-## References — the in-codebase decisions this ADR depends on
+## References - the in-codebase decisions this ADR depends on
 
-- [ADR-0002 — durable checkpointer](adr-0002-durable-checkpointer.md) — SQLite for v1; Postgres path preserved at the `build_pipeline(checkpointer=…)` seam.
-- [ADR-0006 — provider switch (Claude → Gemini)](adr-0006-provider-switch.md) — one provider, one consumer per import site; no abstraction factory until a 3rd provider lands.
-- [ADR-0007 — Gemini 3.5 Flash switch](adr-0007-gemini-3-5-flash-switch.md) — the model the v1 default is pinned to; live-probing methodology that backs the choice.
-- [ADR-0008 — PII vs LangSmith](adr-0008-pii-langsmith.md) — production-tracing guard (`RTIA_ENV=production` + `LANGSMITH_TRACING=true` refuses to start); informs the "single-user with operator-supplied keys" decision because the operator owns the trace-storage policy.
-- [ADR-0010 — multi-story fan-out](adr-0010-multi-story-fan-out.md) — the conditional LangGraph edge that bumped `PIPELINE_STATE_VERSION` 1→2; v1 ships with version 2.
+- [ADR-0002 - durable checkpointer](adr-0002-durable-checkpointer.md) - SQLite for v1; Postgres path preserved at the `build_pipeline(checkpointer=…)` seam.
+- [ADR-0006 - provider switch (Claude → Gemini)](adr-0006-provider-switch.md) - one provider, one consumer per import site; no abstraction factory until a 3rd provider lands.
+- [ADR-0007 - Gemini 3.5 Flash switch](adr-0007-gemini-3-5-flash-switch.md) - the model the v1 default is pinned to; live-probing methodology that backs the choice.
+- [ADR-0008 - PII vs LangSmith](adr-0008-pii-langsmith.md) - production-tracing guard (`RTIA_ENV=production` + `LANGSMITH_TRACING=true` refuses to start); informs the "single-user with operator-supplied keys" decision because the operator owns the trace-storage policy.
+- [ADR-0010 - multi-story fan-out](adr-0010-multi-story-fan-out.md) - the conditional LangGraph edge that bumped `PIPELINE_STATE_VERSION` 1→2; v1 ships with version 2.
 
-## References — supporting artifacts
+## References - supporting artifacts
 
-- [pipeline-baseline-2026-05-26.md](pipeline-baseline-2026-05-26.md) — the calibrated quality + cost numbers the v1 README will cite.
-- [ollama-probe-2026-05-26.md](ollama-probe-2026-05-26.md) — the local-model fallback evaluation that justifies "Gemini stays default" in v1.
-- Plan at `/Users/auzokwe/.claude/plans/before-we-draft-adr-declarative-leaf.md` — the working document this ADR codifies.
+- [pipeline-baseline-2026-05-26.md](pipeline-baseline-2026-05-26.md) - the calibrated quality + cost numbers the v1 README will cite.
+- [ollama-probe-2026-05-26.md](ollama-probe-2026-05-26.md) - the local-model fallback evaluation that justifies "Gemini stays default" in v1.
+- Plan at `/Users/auzokwe/.claude/plans/before-we-draft-adr-declarative-leaf.md` - the working document this ADR codifies.

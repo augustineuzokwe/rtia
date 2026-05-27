@@ -7,7 +7,7 @@ budget so a regression that 2xes spend fails CI loudly instead of
 silently burning credit.
 
 The graph itself (`agents/graph.py`) pauses at the PO checkpoint when
-the Analyst emits critical ambiguities — that interactivity is the
+the Analyst emits critical ambiguities - that interactivity is the
 right call for the demo but wrong for an unattended nightly run. This
 script bypasses the checkpoint by calling the agents directly and
 auto-answering critical ambiguities with a fixed string the Story
@@ -29,7 +29,7 @@ Exit codes:
 
 from __future__ import annotations
 
-# All imports below the sys.path mutation are E402 by design — the path
+# All imports below the sys.path mutation are E402 by design - the path
 # tweak is what lets `uv run python scripts/run_integration_smoke.py`
 # work from the repo root without `pip install -e .`. Disabling E402
 # for the file is cleaner than tagging every import.
@@ -71,13 +71,13 @@ DEFAULT_INTEGRATION_MODEL = "claude-haiku-4-5-20251001"
 # Token budget for a single nightly run across all samples. Calibrated to be
 # roughly 2x the observed Phase 6 baseline (input≈6.9k, output≈0.9k on Opus
 # for Analyst alone; adding Story Writer ≈ doubles it). The budget is a
-# regression tripwire, not a SLO — bump it deliberately when a real prompt
+# regression tripwire, not a SLO - bump it deliberately when a real prompt
 # change moves the floor.
 DEFAULT_BUDGET_INPUT_TOKENS = 50_000
 DEFAULT_BUDGET_OUTPUT_TOKENS = 5_000
 
 # Stand-in answer for any CRITICAL ambiguity the Analyst raises. The Story
-# Writer just needs *something* to absorb — story quality is judged by the
+# Writer just needs *something* to absorb - story quality is judged by the
 # evals job, not this smoke job.
 _AUTO_PO_ANSWER = (
     "Auto-resolved by integration smoke: pick the first reasonable interpretation "
@@ -167,7 +167,7 @@ def _auto_po_answers(analyst_output: AnalystOutput) -> dict[str, str]:
     """Answer every CRITICAL ambiguity with the same canned response.
 
     Normal-severity ambiguities flow through as Story Writer assumptions
-    without needing an answer — same behaviour as the graph's PO checkpoint.
+    without needing an answer - same behaviour as the graph's PO checkpoint.
     """
     return {
         a.question: _AUTO_PO_ANSWER for a in analyst_output.ambiguities if a.severity == "critical"
@@ -203,7 +203,7 @@ def _run_story_writer(
 def _build_final_story(story: UserStory) -> FinalUserStory:
     """Assemble the FinalUserStory contract from the Story Writer output.
 
-    Acceptance criteria + test cases stay empty — those agents land in
+    Acceptance criteria + test cases stay empty - those agents land in
     Phases 8/9. The smoke job's invariant is "description + objective
     populated", not "full artifact ready".
     """
@@ -221,7 +221,7 @@ def _check_invariants(sample_name: str, final_story: FinalUserStory) -> list[str
         failures.append("description is empty")
     if not final_story.objective.strip():
         failures.append("objective is empty")
-    # Cheap shape sanity — the Story Writer prompt enforces this format, so
+    # Cheap shape sanity - the Story Writer prompt enforces this format, so
     # missing it indicates a real regression worth failing on.
     desc_lower = final_story.description.lower()
     if not desc_lower.startswith(("as a ", "as an ")):
@@ -232,7 +232,7 @@ def _check_invariants(sample_name: str, final_story: FinalUserStory) -> list[str
         # sample-01 has no Analyst-flagged ambiguities so assumptions can be
         # legitimately empty there. The other two should accumulate at least
         # one assumption from the normal-severity ambiguities flowing through.
-        # Soft signal — recorded as a failure but the budget check still runs.
+        # Soft signal - recorded as a failure but the budget check still runs.
         failures.append("expected at least one assumption from normal-severity ambiguities")
     return failures
 
@@ -247,7 +247,7 @@ def evaluate_sample(name: str, requirement_text: str, model: str) -> SampleResul
         result.usage.add(writer_usage)
         result.final_story = _build_final_story(story)
         result.failures.extend(_check_invariants(name, result.final_story))
-    except Exception as exc:  # noqa: BLE001 — we want to surface ANY exception as a smoke failure
+    except Exception as exc:  # noqa: BLE001 - we want to surface ANY exception as a smoke failure
         result.failures.append(f"unexpected exception: {type(exc).__name__}: {exc}")
     return result
 
@@ -296,7 +296,7 @@ def main(argv: list[str] | None = None) -> int:
     over_output = total_usage.output_tokens > args.budget_output_tokens
     if over_input or over_output:
         print(
-            f"\nBUDGET EXCEEDED — input={total_usage.input_tokens}/{args.budget_input_tokens} "
+            f"\nBUDGET EXCEEDED - input={total_usage.input_tokens}/{args.budget_input_tokens} "
             f"output={total_usage.output_tokens}/{args.budget_output_tokens}",
             file=sys.stderr,
         )

@@ -1,4 +1,4 @@
-# ADR-0005: Story Review Checkpoint — direct overrides, no re-run
+# ADR-0005: Story Review Checkpoint - direct overrides, no re-run
 
 **Status:** Accepted (2026-05-19)
 **Author:** augustineuzokwe
@@ -12,8 +12,8 @@ Earlier discussion (planning session 2026-05-19) explicitly chose **scan-and-ove
 
 That phrasing left open two possible interpretations:
 
-1. **Direct override** — the PO provides the new description / objective text directly; pipeline writes those values straight into state.
-2. **Re-run with hints** — the PO provides a hint like "make it shorter" or "focus on the manager"; the Story Writer re-runs with that hint as additional input.
+1. **Direct override** - the PO provides the new description / objective text directly; pipeline writes those values straight into state.
+2. **Re-run with hints** - the PO provides a hint like "make it shorter" or "focus on the manager"; the Story Writer re-runs with that hint as additional input.
 
 ADR-0004 (FinalUserStory artifact contract) deferred this choice; this ADR closes it.
 
@@ -50,7 +50,7 @@ Resume payload shape:
 
 3. **Smaller surface area.** Direct override needs zero prompt engineering and zero new tests of Story Writer behavior under hint-style input. Re-run-with-hints would need both, plus tests for "what if the hint contradicts the original requirement."
 
-4. **Single pass.** Without re-run, this is genuinely one round-trip per PO review. The plan text "single retry, not iterative" — direct override is the strongest form of that constraint.
+4. **Single pass.** Without re-run, this is genuinely one round-trip per PO review. The plan text "single retry, not iterative" - direct override is the strongest form of that constraint.
 
 ## Trade-offs explicitly accepted
 
@@ -81,7 +81,7 @@ Distinguishability from the PO Checkpoint at the demo/API layer: the interrupt p
 
 ## Out of scope (deferred to later phases)
 
-- **PO can edit `assumptions`.** Not in Phase 4 — assumptions are the Story Writer's record of normal-ambiguity defaults. If the PO disagrees, the override path is to fix `description` / `objective`. Phase 4 doesn't expose `assumptions` editing; revisit if PO friction shows up.
+- **PO can edit `assumptions`.** Not in Phase 4 - assumptions are the Story Writer's record of normal-ambiguity defaults. If the PO disagrees, the override path is to fix `description` / `objective`. Phase 4 doesn't expose `assumptions` editing; revisit if PO friction shows up.
 - **Hint-style re-run.** If real PO usage suggests vague-preference overrides are common (and the typed-text-only friction is too high), introduce a third resume mode that DOES pass a hint to a re-run of Story Writer. Until evidence supports it, the simpler design wins.
 - **Multi-round review.** A second override pass in the same pipeline run isn't supported. New thread_id required.
 

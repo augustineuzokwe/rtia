@@ -1,7 +1,7 @@
 """Tests for the LangSmith observability env-var contract.
 
 These tests pin down exactly when tracing is considered ON. Wrong
-detection is silently expensive — a CI run that thinks tracing is on but
+detection is silently expensive - a CI run that thinks tracing is on but
 isn't loses observability for that run; a local run that thinks it's off
 when it isn't can leak data to the wrong LangSmith project.
 
@@ -79,7 +79,7 @@ def test_falsy_flag_values_keep_tracing_off(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Phase 12.4 — production guard (ADR-0008)
+# Phase 12.4 - production guard (ADR-0008)
 # ---------------------------------------------------------------------------
 
 
@@ -101,7 +101,7 @@ def test_dev_env_does_not_force_tracing_off(monkeypatch):
 
 
 def test_ci_env_does_not_force_tracing_off(monkeypatch):
-    """RTIA_ENV=ci is treated like development for tracing — CI runs may trace."""
+    """RTIA_ENV=ci is treated like development for tracing - CI runs may trace."""
     monkeypatch.setenv("RTIA_ENV", "ci")
     monkeypatch.setenv("LANGSMITH_TRACING", "true")
     monkeypatch.setenv("LANGSMITH_API_KEY", "lsv_xyz")
@@ -160,12 +160,12 @@ def test_env_value_is_case_insensitive(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# assert_safe_for_env — hard assert at process startup
+# assert_safe_for_env - hard assert at process startup
 # ---------------------------------------------------------------------------
 
 
 def test_assert_safe_no_op_when_no_env_vars_set():
-    """Unset RTIA_ENV + unset LANGSMITH_TRACING is the dev default — no raise."""
+    """Unset RTIA_ENV + unset LANGSMITH_TRACING is the dev default - no raise."""
     assert_safe_for_env()  # should not raise
 
 
@@ -184,7 +184,7 @@ def test_assert_safe_no_op_in_ci(monkeypatch):
 
 
 def test_assert_safe_raises_on_prod_with_tracing_truthy(monkeypatch):
-    """The defining failure mode — operator left LANGSMITH_TRACING on in prod."""
+    """The defining failure mode - operator left LANGSMITH_TRACING on in prod."""
     monkeypatch.setenv("RTIA_ENV", "production")
     monkeypatch.setenv("LANGSMITH_TRACING", "true")
 
@@ -206,7 +206,7 @@ def test_assert_safe_raises_on_all_truthy_tracing_variants(monkeypatch, truthy):
 
 
 def test_assert_safe_no_op_in_prod_when_tracing_false(monkeypatch):
-    """The correct prod config — no raise."""
+    """The correct prod config - no raise."""
     monkeypatch.setenv("RTIA_ENV", "production")
     monkeypatch.setenv("LANGSMITH_TRACING", "false")
     assert_safe_for_env()  # should not raise
@@ -227,10 +227,10 @@ def test_assert_safe_raises_even_when_api_key_missing(monkeypatch):
 
 
 def test_assert_safe_no_op_on_typo_env_value(monkeypatch):
-    """A typo'd RTIA_ENV does NOT count as production — falls back to dev."""
+    """A typo'd RTIA_ENV does NOT count as production - falls back to dev."""
     monkeypatch.setenv("RTIA_ENV", "produciton")  # typo
     monkeypatch.setenv("LANGSMITH_TRACING", "true")
-    assert_safe_for_env()  # should not raise — dev fallback
+    assert_safe_for_env()  # should not raise - dev fallback
 
 
 def test_status_line_shows_env_tag(monkeypatch):

@@ -1,11 +1,11 @@
-# Pipeline timing baseline — 2026-05-24 (issue #163)
+# Pipeline timing baseline - 2026-05-24 (issue #163)
 
 Captured before the speed-up changes landed. Numbers are local-laptop
 runs against the paid Gemini 3.5 Flash tier; CI numbers track but are
 typically slower due to runner-pool variability.
 
 Full report: [`evals/reports/baseline-2026-05-24.json`](../evals/reports/baseline-2026-05-24.json).
-Post-change report: [`evals/reports/postchange-2026-05-24.json`](../evals/reports/postchange-2026-05-24.json) — see the PR body for the diff.
+Post-change report: [`evals/reports/postchange-2026-05-24.json`](../evals/reports/postchange-2026-05-24.json) - see the PR body for the diff.
 
 ## Aggregate (7 samples, production agents only, excludes judge time)
 
@@ -15,15 +15,15 @@ Post-change report: [`evals/reports/postchange-2026-05-24.json`](../evals/report
 | Per-sample p50 | ~22 s | ~21 s | flat |
 | Per-sample max | 25.4 s (sample-02) | 23.5 s (sample-05) | -7 % |
 | Total tokens (in+out) | 98 008 | 98 062 | flat |
-| Budget gate | PASS | PASS | — |
+| Budget gate | PASS | PASS | - |
 
-Production-agent wall-clock is essentially unchanged — `max_output_tokens`
+Production-agent wall-clock is essentially unchanged - `max_output_tokens`
 caps only kick in on truncation, and the retry trim only helps on
 transient errors (neither run hit any). The speed-up payoff lives in
 the **judge phase**, which the eval report doesn't currently surface as
 a separate timer. With `ThreadPoolExecutor(max_workers=4)` running the
 3 judge LLM calls concurrently per sample, each sample's judge
-wall-clock drops from `~sum(3 judges)` to `~max(3 judges)` — roughly
+wall-clock drops from `~sum(3 judges)` to `~max(3 judges)` - roughly
 6–10 s saved per sample, ~45–70 s aggregate over the 7-sample suite.
 The win is most visible in CI workflow duration, not in the JSON report.
 
@@ -31,7 +31,7 @@ The win is most visible in CI workflow duration, not in the JSON report.
 
 | Agent | Aggregate duration | Per-sample mean | Per-sample max |
 |---|---|---|---|
-| Analyst | not in per_agent_duration_ms¹ | — | — |
+| Analyst | not in per_agent_duration_ms¹ | - | - |
 | User Story Writer | 31.7 s | 4.5 s | 6.3 s |
 | AC Generator | 48.7 s | 7.0 s | 9.3 s |
 | Test Case Writer | 70.2 s | 10.0 s | 13.2 s |
@@ -40,7 +40,7 @@ The win is most visible in CI workflow duration, not in the JSON report.
 `_run_analyst_capturing_usage` (pre-Phase 13.2 path) and surfaces in
 the JSON under `samples[].usage` rather than under
 `per_agent_duration_ms`. Both per-sample tokens and per-sample timing
-are available — the analyst takes ~3-8 s/sample.
+are available - the analyst takes ~3-8 s/sample.
 
 ## Per-agent output tokens (max observed across 7 samples)
 
@@ -72,7 +72,7 @@ The small dips on `ambiguity_discipline`, `ac_coverage`, and
 `requirement_fidelity` are within run-to-run variance for a
 non-zero-temperature model (back-to-back runs on the same code can
 swing ±0.05 on judge-graded metrics). All scores remain comfortably
-above their floors — the tightest margin is `ambiguity_discipline`
+above their floors - the tightest margin is `ambiguity_discipline`
 at 0.71 vs 0.30 floor (still 2.4× the floor). The
 `check_thresholds.py` gate passes on both runs.
 
@@ -85,7 +85,7 @@ the eight base metrics are LLM-judge calls per sample
 ~3-10 s per judge call × 3 judges × 7 samples = **roughly 60-200 s of
 serial judge time**, on top of the 150 s of production-agent time.
 
-That puts the **total eval wall-clock at ~210-350 s** today — straddling
+That puts the **total eval wall-clock at ~210-350 s** today - straddling
 the Phase 13.1 budget ceiling (240 s aggregate, per
 `pyproject.toml [tool.rtia.budgets]`).
 
@@ -105,7 +105,7 @@ the Phase 13.1 budget ceiling (240 s aggregate, per
 ## Out of scope for the speed-up PR
 
 - **Cross-sample parallelism.** The current `capture_agent_telemetry`
-  installs a global logger handler — running multiple samples
+  installs a global logger handler - running multiple samples
   concurrently would cross-capture events between them. Fixing that
   needs a thread-local or ContextVar-scoped capture and is its own
   PR.

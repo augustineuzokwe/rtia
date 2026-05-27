@@ -9,7 +9,7 @@ Usage:
     uv run python evals/check_budgets.py <report.json>
     uv run python evals/check_budgets.py <report.json> --pyproject <path>
 
-Sibling of ``evals/check_thresholds.py`` — same post-processing pattern,
+Sibling of ``evals/check_thresholds.py`` - same post-processing pattern,
 same "don't burn LLM cost on a regenerate" rule. A failing budget gate
 means either (a) a real regression worth investigating or (b) the
 budget is stale and should be retuned per evals/baselines.md's
@@ -17,10 +17,10 @@ calibration workflow.
 
 Why this lives separately from check_thresholds.py:
 
-* Different signal — quality regression (thresholds) vs cost/latency
+* Different signal - quality regression (thresholds) vs cost/latency
   regression (budgets). Bundling them would force a single failure
   message even when one is the cause and the other is fine.
-* Different audit trail — budgets get tightened gradually as the
+* Different audit trail - budgets get tightened gradually as the
   pipeline matures; thresholds get ratcheted in baseline-update PRs.
   Keeping them apart makes each PR's intent legible.
 """
@@ -47,7 +47,7 @@ class _BudgetCheck:
     observed: int | float
     limit: int | float
     unit: str
-    """Display unit ('tokens', 'seconds') — used only in error messages."""
+    """Display unit ('tokens', 'seconds') - used only in error messages."""
     sample: str | None
     """Sample name when this is a per-sample check; None for aggregates."""
 
@@ -84,7 +84,7 @@ def _check_budgets(report: dict, budgets: dict) -> list[_BudgetCheck]:
     total_tokens_limit = budgets["total_tokens_max"]
     total_duration_limit_seconds = budgets["total_pipeline_duration_seconds_max"]
 
-    # Per-sample checks — catches a single outlier that doesn't move the aggregate.
+    # Per-sample checks - catches a single outlier that doesn't move the aggregate.
     for sample in report.get("samples", []):
         pipeline_usage = sample.get("pipeline_usage", {})
         sample_tokens = int(pipeline_usage.get("input_tokens", 0)) + int(
@@ -110,7 +110,7 @@ def _check_budgets(report: dict, budgets: dict) -> list[_BudgetCheck]:
             )
         )
 
-    # Aggregate checks — catches uniform drift across all samples.
+    # Aggregate checks - catches uniform drift across all samples.
     aggregate = report.get("aggregate", {})
     pipeline_usage = aggregate.get("pipeline_usage", {})
     total_tokens = int(pipeline_usage.get("input_tokens", 0)) + int(
@@ -156,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
 
     failed = [c for c in checks if not c.passed]
     if not failed:
-        print(f"Budgets — all {len(checks)} checks within limits:")
+        print(f"Budgets - all {len(checks)} checks within limits:")
         for c in checks:
             print(c.format())
         return 0
@@ -164,7 +164,7 @@ def main(argv: list[str] | None = None) -> int:
     # Print everything; failures stand out via the OVER marker. The full
     # list makes it obvious whether a single outlier or a fleet drift
     # is the problem.
-    print(f"Budgets — {len(failed)} of {len(checks)} checks OVER limit:", file=sys.stderr)
+    print(f"Budgets - {len(failed)} of {len(checks)} checks OVER limit:", file=sys.stderr)
     for c in checks:
         print(c.format(), file=sys.stderr)
     print(

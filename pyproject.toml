@@ -1,7 +1,7 @@
 [project]
 name = "rtia"
 version = "0.1.0"
-description = "Requirements & Test Intelligence Assistant — multi-agent pipeline for user stories, ACs, and test cases."
+description = "Requirements & Test Intelligence Assistant - multi-agent pipeline for user stories, ACs, and test cases."
 authors = [
     { name = "Augustine Uzokwe", email = "augustine.uzokwe@gmail.com" }
 ]
@@ -51,7 +51,7 @@ dev = [
     "ruff>=0.15.14",
 ]
 
-# Phase 13.1 — cost + latency budgets enforced in CI.
+# Phase 13.1 - cost + latency budgets enforced in CI.
 # Read by evals/check_budgets.py against the eval run report.
 #
 # Calibrated against a live eval run on the current 7-sample suite
@@ -60,7 +60,7 @@ dev = [
 #   per-sample duration: 23.4s (sample-03)
 #   aggregate tokens:   94,966
 #   aggregate duration: 147.6s
-# Ceilings are set ~40-60% above observed maxima — generous enough to
+# Ceilings are set ~40-60% above observed maxima - generous enough to
 # absorb prompt tweaks and Gemini latency variance, tight enough to
 # catch a real regression. Tighten in a follow-up PR after main
 # accumulates more baseline data (same workflow as evals/baselines.md).
@@ -71,14 +71,14 @@ dev = [
 #
 # When new samples are added to evals/sample-requirements/, the
 # AGGREGATE ceilings need a proportional bump. Per-sample ceilings
-# should stay stable — a new sample that blows the per-sample budget
+# should stay stable - a new sample that blows the per-sample budget
 # is either malformed or a real signal worth investigating.
 [tool.rtia.budgets]
-# Per-sample budgets — a single pipeline run end-to-end.
+# Per-sample budgets - a single pipeline run end-to-end.
 per_sample_total_tokens_max = 22000
 per_sample_pipeline_duration_seconds_max = 45
 
-# Aggregate budgets — full eval run across all samples currently in
+# Aggregate budgets - full eval run across all samples currently in
 # evals/sample-requirements/ (7 samples as of Phase 13.1 land).
 total_tokens_max = 135000
 total_pipeline_duration_seconds_max = 240

@@ -132,7 +132,7 @@ def test_full_artifact_round_trip_shape():
     assert "bulletList" in types
     assert "orderedList" in types
     assert "paragraph" in types
-    # No codeBlock — that was the legacy fallback shape.
+    # No codeBlock - that was the legacy fallback shape.
     assert "codeBlock" not in types
 
 
@@ -165,11 +165,11 @@ def test_empty_input_raises():
 
 def test_blank_lines_in_middle_are_skipped_not_emitted():
     """Blank separator lines between sections must not produce empty
-    paragraphs — they should just disappear."""
+    paragraphs - they should just disappear."""
     md = "## A\n\n\nfirst para\n\n\n## B"
     doc = markdown_to_adf(md)
     types = [n["type"] for n in doc["content"]]
-    # heading, paragraph, heading — no stray paragraph nodes for blanks.
+    # heading, paragraph, heading - no stray paragraph nodes for blanks.
     assert types == ["heading", "paragraph", "heading"]
 
 

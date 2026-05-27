@@ -68,7 +68,7 @@ def test_sample_01_well_structured_ground_truth() -> None:
     assert expected.actors == ["authenticated user", "unauthenticated user"]
     # Post-Phase-9.3 calibration (#101): the "project selection mechanism"
     # ambiguity is now expected. The requirement is silent on how
-    # selection happens — that's a legitimate scope-shape question and
+    # selection happens - that's a legitimate scope-shape question and
     # forcing the Analyst to suppress it would penalise legitimate inquiry.
     assert expected.ambiguity_categories == ["project selection mechanism"]
     assert expected.implied_story_titles == []
@@ -97,7 +97,7 @@ def test_sample_02_vague_ambiguity_categories_extracted() -> None:
     sample = load_sample(SAMPLES_DIR / "sample-02-vague-ambiguous.md")
     expected = sample.expected_analyst
     # Post-#102 calibration: relaxed from "QA team member" to just
-    # "team member" — see the sample file's Actors section note.
+    # "team member" - see the sample file's Actors section note.
     assert expected.actors == ["team member", "manager"]
     # Categories are derived from the bold prefix of each bullet.
     assert expected.ambiguity_categories == [
@@ -159,7 +159,7 @@ def test_sample_03_expected_ac_ground_truth_scoped_to_filtering() -> None:
         "filter persistence",
     ]
     assert acs.expected_count == 4
-    # Email alerting and CSV export belong to other implied stories — they MUST
+    # Email alerting and CSV export belong to other implied stories - they MUST
     # be listed as out-of-scope for this scoped story.
     out_text = " ".join(acs.out_of_scope).lower()
     assert "email alerting" in out_text

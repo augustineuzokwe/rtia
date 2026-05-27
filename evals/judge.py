@@ -1,4 +1,4 @@
-"""deepeval judge — Gemini by default, optionally Ollama for $0 stacks.
+"""deepeval judge - Gemini by default, optionally Ollama for $0 stacks.
 
 deepeval's default judge is OpenAI; this wrapper keeps the eval stack
 on the same provider as the production agents (Gemini 3.5 Flash by
@@ -8,7 +8,7 @@ metrics can call into it transparently.
 Post-cutover the only judge calls left in the suite are classification
 work (actor synonym tiebreak, ambiguity-category mapping, AC→category
 classification). The GEval-style "did the model invent scope?" judges
-were deleted along with their metrics — see ADR-0006 §"Dropped metrics".
+were deleted along with their metrics - see ADR-0006 §"Dropped metrics".
 
 **Two modes:**
 
@@ -22,7 +22,7 @@ were deleted along with their metrics — see ADR-0006 §"Dropped metrics".
   "how much does the generator alone degrade locally?"
 
 The two switches are deliberately *independent* so a probe can vary
-the generator without varying the judge — that was the §7.3 design
+the generator without varying the judge - that was the §7.3 design
 documented in ``docs/ollama-probe-2026-05-26.md``.
 """
 
@@ -49,7 +49,7 @@ from agents.config import (
 class GeminiJudge(DeepEvalBaseLLM):
     """Adapter so deepeval metrics can use Gemini (or Ollama) as their judge.
 
-    Class name is historical — the wrapper now handles both providers via
+    Class name is historical - the wrapper now handles both providers via
     :func:`load_model`. Kept ``GeminiJudge`` to avoid a churn-only rename
     across the call sites in ``evals/run_evals.py``.
 
@@ -73,7 +73,7 @@ class GeminiJudge(DeepEvalBaseLLM):
         # Ollama-generated artifacts against the Gemini-judged baseline,
         # so holding the judge constant is the methodological invariant.
         #
-        # Opting into ``RTIA_OLLAMA_JUDGE=1`` flips this — used when the
+        # Opting into ``RTIA_OLLAMA_JUDGE=1`` flips this - used when the
         # operator wants a strictly $0 eval run and accepts that two
         # variables (generator + judge) are now varying together.
         if use_ollama_judge():

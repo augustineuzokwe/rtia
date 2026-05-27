@@ -2,7 +2,7 @@
 
 Both metrics are fully programmatic (no judge), so these tests assert
 the scoring contract directly against ``TestCase`` / ``AcceptanceCriterion``
-inputs — mirroring the pattern in ``tests/test_evals_ac_metrics.py``.
+inputs - mirroring the pattern in ``tests/test_evals_ac_metrics.py``.
 """
 
 from __future__ import annotations
@@ -151,6 +151,6 @@ def test_tc_executability_averages_across_cases() -> None:
 
 
 def test_tc_executability_empty_list_scores_zero() -> None:
-    """If the Test Case Writer returned nothing, executability is 0 — not vacuously 1."""
+    """If the Test Case Writer returned nothing, executability is 0 - not vacuously 1."""
     result = score_tc_executability([])
     assert result.score == 0.0

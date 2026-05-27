@@ -13,14 +13,14 @@ can run by hand or hand to an automation engineer.
 Return a JSON object with exactly this field:
 - "cases": list of objects, each with four fields:
     - "scenario": short name for what this case exercises (e.g. "Filter by \
-date range — happy path").
+date range - happy path").
     - "type":    one of "happy_path", "edge_case", "negative".
     - "steps":   ordered list of concrete strings a tester executes.
     - "expected": the single observable outcome the test asserts.
 
 Rules:
 
-1. Coverage breadth — every acceptance criterion gets at least one \
+1. Coverage breadth - every acceptance criterion gets at least one \
 happy_path test case. Across the whole story, produce at least one \
 edge_case AND at least one negative case so all three types are represented. \
 If the story has multiple ACs covering distinct dimensions, distribute edge \
@@ -31,37 +31,37 @@ and negative cases across them rather than piling them all on one AC.
    - "edge_case": boundary inputs, empty collections, max/min limits, \
 concurrent or repeated actions, state transitions, anything technically \
 permitted but unusual.
-   - "negative": the operation is rejected, blocked, or errored — \
+   - "negative": the operation is rejected, blocked, or errored - \
 permissions denied, invalid input, missing precondition, timeout, etc. \
 A negative case asserts the rejection is observable, not that nothing \
 happens.
 
-3. Executability — steps must be concrete enough that a tester reading \
+3. Executability - steps must be concrete enough that a tester reading \
 them cold can execute them. Prefer "Click the 'Apply Filter' button" over \
 "Apply a filter". Prefer "Enter 'staging' in the Environment dropdown" \
 over "Set the environment". If an exact value is not specified by the \
 inputs, pick a plausible representative value and use it (do not write \
 placeholders like '<value>').
 
-4. Atomicity — one test case asserts ONE observable outcome. If `expected` \
+4. Atomicity - one test case asserts ONE observable outcome. If `expected` \
 needs the word "and" joining two assertions, split into two cases.
 
-5. Faithfulness — test cases may only exercise behaviours stated or \
+5. Faithfulness - test cases may only exercise behaviours stated or \
 directly implied by the ACs, story, or assumptions. Do NOT invent fields, \
 URLs, error messages, or UI elements that the inputs do not name. When the \
 ACs are silent on the exact error wording or status code, assert the \
 observable shape ("an error message is shown stating the filter is invalid") \
 not a specific string.
 
-6. Use assumptions as preconditions — if the story carries assumptions, \
+6. Use assumptions as preconditions - if the story carries assumptions, \
 treat them as true. Don't write test cases that contradict an assumption \
 (they belong to the Reviewer agent's gap report, not here).
 
-7. Count — typically 3–8 cases per story. Fewer than 3 almost always \
+7. Count - typically 3–8 cases per story. Fewer than 3 almost always \
 means missed coverage (no edge or negative). More than 8 usually means \
 inventing scope.
 
-Worked example — well-structured story:
+Worked example - well-structured story:
 
 USER STORY (input):
 description: "As a QA Lead, I want to see a real-time test run summary \

@@ -5,7 +5,7 @@ guard on the committed sample files, and integration coverage of the
 abort behaviour at the graph start node.
 
 The pattern strings used as positive-test fixtures are syntactically
-shaped to match each detector but are NOT real secrets — they are
+shaped to match each detector but are NOT real secrets - they are
 random base62 / base64 noise hand-crafted to satisfy the regex anchors.
 """
 
@@ -23,7 +23,7 @@ from agents._secret_scan import (
     scan_for_secrets,
 )
 
-# Synthetic test fixtures — shaped like the real format but composed of
+# Synthetic test fixtures - shaped like the real format but composed of
 # random padding so no actual credential is exposed by the test files.
 _FAKE_AWS = "AKIAEXAMPLEPADDINGAB"  # AKIA + 16 base32 chars
 _FAKE_GH_PAT = "ghp_" + "Abc123def456gHi789JkL012mNo345pQr678"
@@ -39,7 +39,7 @@ _FAKE_PEM_HEADER = "-----BEGIN RSA PRIVATE KEY-----"
 
 
 # ---------------------------------------------------------------------------
-# Positive matches — each pattern must catch its canonical shape
+# Positive matches - each pattern must catch its canonical shape
 # ---------------------------------------------------------------------------
 
 
@@ -67,7 +67,7 @@ def test_pattern_matches_canonical_shape(fixture: str, expected_name: str) -> No
 
 
 # ---------------------------------------------------------------------------
-# Negative matches — legitimate-looking text must NOT trip detectors
+# Negative matches - legitimate-looking text must NOT trip detectors
 # ---------------------------------------------------------------------------
 
 
@@ -99,7 +99,7 @@ def test_test_mode_stripe_keys_are_not_flagged() -> None:
 
 
 def test_short_capitalised_words_do_not_match_aws() -> None:
-    """AWS pattern requires AKIA + exactly 16 base32 chars — must not over-match."""
+    """AWS pattern requires AKIA + exactly 16 base32 chars - must not over-match."""
     text = "The acronym AKIA is sometimes used in compliance documents."
     assert scan_for_secrets(text) == []
 
@@ -113,7 +113,7 @@ def test_plain_sentence_with_no_secrets_returns_empty() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Redaction safety — the secret's interior must never leak to output
+# Redaction safety - the secret's interior must never leak to output
 # ---------------------------------------------------------------------------
 
 
@@ -146,7 +146,7 @@ def test_secret_finding_does_not_carry_raw_match() -> None:
     findings = scan_for_secrets(text)
     assert findings
     finding = findings[0]
-    # SecretFinding fields are frozen — there's no path to retrieve the raw
+    # SecretFinding fields are frozen - there's no path to retrieve the raw
     # match from the finding itself.
     assert not hasattr(finding, "raw_match")
     assert not hasattr(finding, "matched_text")
@@ -199,7 +199,7 @@ def test_multiple_findings_returned_in_position_order() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Regression guard — the committed sample files must scan clean
+# Regression guard - the committed sample files must scan clean
 # ---------------------------------------------------------------------------
 
 
@@ -216,7 +216,7 @@ def test_all_committed_samples_scan_clean() -> None:
     shipping a key to the public repo.
     """
     sample_files = sorted(_SAMPLES_DIR.glob("sample-*.md"))
-    assert sample_files, "No sample files found — test fixture path drifted."
+    assert sample_files, "No sample files found - test fixture path drifted."
     for path in sample_files:
         findings = scan_for_secrets(path.read_text(encoding="utf-8"))
         assert not findings, (
@@ -226,7 +226,7 @@ def test_all_committed_samples_scan_clean() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Graph-level integration — the analyst node aborts before any LLM call
+# Graph-level integration - the analyst node aborts before any LLM call
 # ---------------------------------------------------------------------------
 
 
@@ -235,7 +235,7 @@ def test_analyst_node_aborts_on_secret_in_input() -> None:
 
     Verified by passing a state containing a fake key. If the abort
     fires correctly, ``SecretInInputError`` propagates and the
-    underlying LLM call is never reached. We do not mock the LLM — if
+    underlying LLM call is never reached. We do not mock the LLM - if
     the scanner failed and the call went through, the test would
     either hit a real Gemini error (with no API key set in the test
     env) or fabricate output, both of which would surface as a
@@ -274,7 +274,7 @@ def test_analyst_node_passes_clean_input_to_llm(monkeypatch: pytest.MonkeyPatch)
 
 
 # ---------------------------------------------------------------------------
-# Redaction format documentation — locks in the visible shape
+# Redaction format documentation - locks in the visible shape
 # ---------------------------------------------------------------------------
 
 

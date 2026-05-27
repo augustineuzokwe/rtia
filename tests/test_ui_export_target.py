@@ -3,7 +3,7 @@
 Pins the mapping from the three Backlog-target Textbox values onto an
 ``ExportTarget``. The round-1 walk-through left this hop unverified
 because the operator (Claude) forgot to fill the project-number field
-during the live UI test — the wiring was always correct, but there was
+during the live UI test - the wiring was always correct, but there was
 no regression net. Issue #215.
 """
 
@@ -29,7 +29,7 @@ def test_github_project_number_empty_means_none():
 
 def test_github_project_number_non_digit_swallowed_as_none():
     """The Textbox accepts anything; only digit strings become a project
-    number. A non-digit value silently degrades to "no project add" —
+    number. A non-digit value silently degrades to "no project add" -
     matches the pre-extraction handler behaviour."""
     tgt = _build_export_target("github", "augustineuzokwe/rtia", "five")
     assert tgt.github_project_number is None

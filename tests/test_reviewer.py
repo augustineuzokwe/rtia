@@ -2,7 +2,7 @@
 
 Mocks the underlying LLM call so tests run offline and deterministically.
 Covers the public API (`review_artifact`) and the `ReviewReport` Pydantic
-schema — including empty-list responses (valid "no issues found" case).
+schema - including empty-list responses (valid "no issues found" case).
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def _minimal_artifact(**kwargs) -> FinalUserStory:
         ],
         test_cases=[
             TestCase(
-                scenario="Happy path — user does X",
+                scenario="Happy path - user does X",
                 type="happy_path",
                 steps=["Log in.", "Do X."],
                 expected="Outcome Y is visible.",
@@ -64,7 +64,7 @@ _STRONG_REPORT = {
 _WEAK_REPORT = {
     "coverage_gaps": ["No AC covers the 30-second auto-refresh cadence."],
     "weak_acs": [
-        "AC1 ('Then the data updates') — omits the 30-second cadence and "
+        "AC1 ('Then the data updates') - omits the 30-second cadence and "
         "'without full page reload' constraint."
     ],
     "untestable_criteria": [],
@@ -143,7 +143,7 @@ def test_review_artifact_with_no_acs_or_test_cases():
 
 
 def test_review_artifact_passes_deferred_stories_into_prompt():
-    """Phase 15.1 — the deferred-stories list must reach the user prompt verbatim.
+    """Phase 15.1 - the deferred-stories list must reach the user prompt verbatim.
 
     LEARNINGS #31: without this, the Reviewer flags every deferred
     story's behaviour as a coverage gap on multi-story requirements.
@@ -185,7 +185,7 @@ def test_review_artifact_passes_deferred_stories_into_prompt():
     assert "DEFERRED STORIES" in rendered
     assert "Quarantined tests dashboard" in rendered
     assert "Audit log for quarantine actions" in rendered
-    # Empty case must render as "(none)" — never as an empty section, so
+    # Empty case must render as "(none)" - never as an empty section, so
     # the LLM gets the same shape every run.
     seen_prompts.clear()
     with patch("agents.reviewer.ChatGoogleGenerativeAI", side_effect=_capture_factory):

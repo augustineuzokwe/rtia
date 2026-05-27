@@ -27,7 +27,7 @@ def _make_text_pdf(text: str) -> bytes:
     try:
         from reportlab.pdfgen import canvas
     except ImportError:
-        pytest.skip("reportlab not installed — needed only for PDF fixture generation")
+        pytest.skip("reportlab not installed - needed only for PDF fixture generation")
 
     buf = io.BytesIO()
     c = canvas.Canvas(buf)
@@ -41,7 +41,7 @@ def _make_text_pdf(text: str) -> bytes:
 
 
 def _make_blank_pdf() -> bytes:
-    """A blank PDF with no text layer — simulates a scanned/image-only PDF."""
+    """A blank PDF with no text layer - simulates a scanned/image-only PDF."""
     writer = PdfWriter()
     writer.add_blank_page(width=612, height=792)
     buf = io.BytesIO()
@@ -60,7 +60,7 @@ def test_extract_markdown_rejects_non_utf8():
 
 
 def test_extract_markdown_strips_utf8_bom():
-    """Epic #1 intake-soundness audit (#1) — Markdown files saved by
+    """Epic #1 intake-soundness audit (#1) - Markdown files saved by
     Windows editors or exported from Notion frequently carry a leading
     UTF-8 BOM (``\\xef\\xbb\\xbf``). Pre-fix, ``data.decode("utf-8")``
     accepted the BOM but left U+FEFF at the start of the text, which
@@ -75,7 +75,7 @@ def test_extract_markdown_strips_utf8_bom():
 
 
 def test_extract_markdown_bomless_unchanged():
-    """The BOM strip must not affect BOM-less files — their bytes are
+    """The BOM strip must not affect BOM-less files - their bytes are
     canonical UTF-8 and round-trip exactly."""
     text = "# No BOM here\n\nplain ascii."
     assert extract_markdown(text.encode("utf-8")) == text
@@ -88,7 +88,7 @@ def test_extract_pdf_blank_pdf_is_scanned():
 
 def test_extract_pdf_too_large():
     # Construct a byte string slightly larger than the cap without
-    # actually generating a real PDF — the size check runs first.
+    # actually generating a real PDF - the size check runs first.
     too_big = b"%PDF-" + b"x" * (MAX_PDF_BYTES + 1)
     with pytest.raises(FileTooLargeError):
         extract_pdf(too_big)
@@ -101,7 +101,7 @@ def test_extract_pdf_malformed_wraps_parse_error():
 
 def test_extract_pdf_with_text_content():
     # Skips if reportlab is not installed (CI installs it for this test).
-    sample = "RTIA requirement — as a user, I want to upload a PDF and see it parsed."
+    sample = "RTIA requirement - as a user, I want to upload a PDF and see it parsed."
     pdf_bytes = _make_text_pdf(sample)
     extracted = extract_pdf(pdf_bytes)
     # pypdf's extraction is approximate; key tokens should survive.

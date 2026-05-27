@@ -3,7 +3,7 @@
 When an LLM call exhausts the retry budget (ADR-0003: 5 retries on
 5xx / 429 with exponential backoff), the underlying Gemini exception
 propagates out of LangChain. Today's code treats that as an uncaught
-exception and the pipeline crashes — the caller gets a stack trace
+exception and the pipeline crashes - the caller gets a stack trace
 rather than an artifact.
 
 This module replaces the crash with a structured failure:
@@ -52,7 +52,7 @@ class LLMFailureDetail:
     http_status: int | None
     """HTTP status from the Gemini API response, or None for transport-level failures."""
     message: str
-    """Human-readable failure message. Bounded — see _MAX_MESSAGE_CHARS."""
+    """Human-readable failure message. Bounded - see _MAX_MESSAGE_CHARS."""
     retries_attempted: int
     """How many retries were attempted before giving up. Pulled from ``agents.config``."""
     occurred_at: str
@@ -65,7 +65,7 @@ class LLMFailureDetail:
 
 # Cap the stored message so a chatty server response cannot blow up the
 # artifact size (which is also bounded by ``agents/_sanitize.py``'s
-# DEFAULT_MAX_CHARS, but defence in depth — bounding here keeps the
+# DEFAULT_MAX_CHARS, but defence in depth - bounding here keeps the
 # JSON payload predictably small).
 _MAX_MESSAGE_CHARS = 500
 
@@ -88,7 +88,7 @@ class PipelineStepError(RuntimeError):
 
     Detail shape: a ``LLMFailureDetail`` with ``http_status=None`` and
     ``retries_attempted=0`` for the non-LLM case. Keeping one detail
-    type — rather than introducing a sibling — means the artifact
+    type - rather than introducing a sibling - means the artifact
     metadata schema stays stable for downstream consumers.
     """
 
@@ -125,7 +125,7 @@ class LLMPipelineError(PipelineStepError):
 
     Never silently fall back to a different model on this exception.
     The whole point of structuring the failure is to surface it clearly
-    to the operator — a transparent retry to a different model would
+    to the operator - a transparent retry to a different model would
     defeat the policy. See ADR-0009.
     """
 
@@ -141,7 +141,7 @@ def _classify(exc: BaseException) -> tuple[int | None, str]:
     """Extract (http_status, message) from a Gemini or transport exception.
 
     Returns ``(None, str(exc))`` for any exception type we don't
-    specifically recognise — that keeps the wrapper safe for future
+    specifically recognise - that keeps the wrapper safe for future
     SDK changes without silently losing failure information.
     """
     if isinstance(exc, gemini_errors.APIError):
@@ -149,7 +149,7 @@ def _classify(exc: BaseException) -> tuple[int | None, str]:
         # always present per the SDK contract; treat them as the source
         # of truth even if str(exc) would format differently.
         return exc.code, _truncate(str(exc.message or "") or str(exc))
-    # TimeoutError / ConnectionError / socket.gaierror / etc. — no
+    # TimeoutError / ConnectionError / socket.gaierror / etc. - no
     # HTTP status, just the message.
     return None, _truncate(str(exc) or exc.__class__.__name__)
 
@@ -189,7 +189,7 @@ def wrap_step_exception(agent_name: str, exc: BaseException) -> PipelineStepErro
     """Convert any non-LLM exception inside a pipeline node into a structured failure.
 
     Phase 13.4. Sibling of :func:`wrap_llm_exception` for failures that
-    are NOT "Gemini retry budget exhausted" — Pydantic validation,
+    are NOT "Gemini retry budget exhausted" - Pydantic validation,
     JSON parse, programmer errors, anything else a node can raise. The
     resulting ``PipelineStepError`` carries the same
     ``LLMFailureDetail`` shape so the demo and the artifact metadata
@@ -197,7 +197,7 @@ def wrap_step_exception(agent_name: str, exc: BaseException) -> PipelineStepErro
 
     ``http_status`` is ``None`` because there is no API call involved;
     ``retries_attempted`` is ``0`` because non-LLM failures aren't
-    retried. Both are honest values, NOT placeholders — downstream
+    retried. Both are honest values, NOT placeholders - downstream
     consumers can rely on "status is None" meaning "this was not an
     API failure".
     """
@@ -213,7 +213,7 @@ def wrap_step_exception(agent_name: str, exc: BaseException) -> PipelineStepErro
 
 
 def is_retryable_llm_failure(exc: BaseException) -> bool:
-    """Heuristic — is this the kind of exception the SDK would retry?
+    """Heuristic - is this the kind of exception the SDK would retry?
 
     Useful for tests and for any caller that wants to know whether a
     given failure is the "the LLM is overloaded" class (which Phase

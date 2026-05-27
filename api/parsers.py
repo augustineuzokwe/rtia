@@ -14,7 +14,7 @@ Bounds:
   reaches the pipeline. This mirrors the artifact-side bound enforced by
   ``agents/_sanitize.py``. A 1 MB extracted requirement would blow past
   the eval/cost budgets in Phase 13.1 and is almost certainly an upload
-  mistake — fail fast.
+  mistake - fail fast.
 * The PDF size check is at the byte level so a 50 MB PDF never gets fed
   to ``pypdf`` in the first place.
 """
@@ -29,7 +29,7 @@ from pypdf import PdfReader
 # real PRD, tight enough to catch a runaway upload.
 MAX_INPUT_CHARS = 200_000
 
-# 10 MB max PDF — picked to mirror the text cap above with headroom for
+# 10 MB max PDF - picked to mirror the text cap above with headroom for
 # image content that won't contribute to the extracted text anyway.
 MAX_PDF_BYTES = 10 * 1024 * 1024
 
@@ -70,16 +70,16 @@ def extract_pdf(data: bytes) -> str:
     if len(text) < _SCANNED_THRESHOLD_CHARS:
         raise ScannedPdfError(
             "PDF appears to be scanned or image-only (no extractable text). "
-            "OCR is not supported in v1 — re-upload a text-based PDF."
+            "OCR is not supported in v1 - re-upload a text-based PDF."
         )
     return _cap(text)
 
 
 def extract_markdown(data: bytes) -> str:
-    """UTF-8 decode + cap. No structural parsing — markdown passes through.
+    """UTF-8 decode + cap. No structural parsing - markdown passes through.
 
-    Uses ``utf-8-sig`` so a leading byte-order mark (U+FEFF) — common on
-    Markdown files saved by Windows editors or exported from Notion — is
+    Uses ``utf-8-sig`` so a leading byte-order mark (U+FEFF) - common on
+    Markdown files saved by Windows editors or exported from Notion - is
     stripped instead of surviving into the analyst input as a stray
     character. Files without a BOM are decoded identically to plain
     UTF-8. Epic #1 intake-soundness audit (#1).
@@ -101,7 +101,7 @@ def _cap(text: str) -> str:
     if len(text) <= MAX_INPUT_CHARS:
         return text
     notice = (
-        f"\n\n[TRUNCATED — input exceeded {MAX_INPUT_CHARS} characters; "
+        f"\n\n[TRUNCATED - input exceeded {MAX_INPUT_CHARS} characters; "
         "tail dropped before extraction reached the pipeline.]"
     )
     return text[: MAX_INPUT_CHARS - len(notice)] + notice

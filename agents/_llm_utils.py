@@ -5,12 +5,12 @@ post-Gemini-cutover share the same defensive needs:
 
 - Stripping the optional ``` ```json `` ``` fences Gemini occasionally
   wraps structured-output in despite the prompt's "no fences" instruction.
-- Coalescing the LangChain ``message.content`` field — older Gemini
+- Coalescing the LangChain ``message.content`` field - older Gemini
   models returned a plain string here; gemini-3.5-flash and later return
   a list of content blocks (``[{'type': 'text', 'text': '...'}, ...]``).
   ``coerce_response_text`` handles both.
 
-Underscore-prefixed module name marks it as project-private — nothing
+Underscore-prefixed module name marks it as project-private - nothing
 outside ``agents/`` should import from it.
 """
 
@@ -42,11 +42,11 @@ def coerce_response_text(content: Any) -> str:
     concatenate every ``text`` field from ``type == 'text'`` blocks.
 
     Non-text blocks (e.g. ``thinking`` if the model ever emits them
-    alongside text) are skipped — the agents parse structured JSON from
+    alongside text) are skipped - the agents parse structured JSON from
     the text-only payload.
 
     Anything that isn't a string or a list of dicts falls back to
-    ``str()`` — that's the same coarse behaviour the agents had before
+    ``str()`` - that's the same coarse behaviour the agents had before
     this helper, and surfaces an obvious malformed value loudly enough
     that the JSON parser downstream will complain.
     """
@@ -100,7 +100,7 @@ def _get_cache() -> diskcache.Cache:
 def _reset_cache_singleton_for_tests() -> None:
     """Drop the cached singleton so a test can reconfigure ``RTIA_LLM_CACHE_DIR``.
 
-    Test-only helper. Production code never needs this — env vars are read
+    Test-only helper. Production code never needs this - env vars are read
     once per process and the cache directory is stable.
     """
     global _CACHE_SINGLETON
@@ -146,7 +146,7 @@ class CachedResponse:
 
     Agents pull ``.content`` (the textual payload) and the logging helpers
     pull ``.usage_metadata`` for token counting. On a cache hit there are
-    no real token costs to report, so ``usage_metadata`` is ``None`` — the
+    no real token costs to report, so ``usage_metadata`` is ``None`` - the
     extractor in ``agents/_logging.py:_extract_token_usage`` treats missing
     metadata as ``None`` for each field rather than zero, which keeps the
     telemetry honest (no live call → no count, not zero count).
@@ -173,7 +173,7 @@ def cached_invoke(
 
     Cache key = sha256(model_id + prompt_hash + canonicalised messages).
     TTL is read from ``RTIA_LLM_CACHE_TTL`` (default 24 h). The cache is
-    bypassed when ``RTIA_LLM_CACHE=disabled`` — set by the CI regression
+    bypassed when ``RTIA_LLM_CACHE=disabled`` - set by the CI regression
     job to keep the eval gate honest.
 
     Returns a LangChain response on cache miss, or a :class:`CachedResponse`
@@ -181,7 +181,7 @@ def cached_invoke(
     (``None`` on cache hit). Callers should not rely on the return type
     beyond those two attributes.
 
-    Errors from ``llm.invoke`` are propagated unchanged — the caller's
+    Errors from ``llm.invoke`` are propagated unchanged - the caller's
     existing ``wrap_llm_exception`` layer remains responsible for envelope
     semantics. The cache is never populated with an error.
     """
@@ -204,7 +204,7 @@ def strip_json_fence(raw: str) -> str:
     """Strip an optional ``` ```json … ``` `` fence from an LLM response.
 
     Gemini occasionally wraps JSON output in a markdown code fence despite
-    being told not to. Trim defensively rather than fight the prompt — the
+    being told not to. Trim defensively rather than fight the prompt - the
     inner JSON is what we want and a fence at the boundary is harmless to
     remove. Anthropic models tested in this project don't add fences, so
     the helper is a no-op for them. Idempotent: calling on un-fenced input

@@ -1,22 +1,22 @@
 # Per-metric mean-score floors enforced by the CI eval gate.
 #
-# Floors are NOT the "good" target — they are the "do not regress past this"
+# Floors are NOT the "good" target - they are the "do not regress past this"
 # line. Set per-metric based on the empirical stability observed in
 # baselines.md (post-Gemini, hashes 19631aecc02a / 990e6ae9e86f /
 # e7af2794b28c / 5811bba6f6c8 as of 2026-05-21):
 #
-# - Programmatic metrics (ac_testability, tc_executability) — pinned at
+# - Programmatic metrics (ac_testability, tc_executability) - pinned at
 #   0.80 because they don't move with stochasticity. Any drop indicates a
 #   real structural regression in the agent's output shape.
-# - Coverage metrics (ac_coverage, tc_coverage_breadth) — 0.80 floor.
+# - Coverage metrics (ac_coverage, tc_coverage_breadth) - 0.80 floor.
 #   Single-run variance observed within ±0.10; floor leaves headroom.
-# - actor_set_completeness — 0.70 floor. Observed mean post-#102 = 0.87
+# - actor_set_completeness - 0.70 floor. Observed mean post-#102 = 0.87
 #   with sample-03 swinging to 0.80 on actor-invention runs. 0.70 catches
 #   real regressions without false-flagging on the occasional invented
 #   third actor.
-# - ambiguity_discipline — 0.30 floor. This metric has the widest single-
+# - ambiguity_discipline - 0.30 floor. This metric has the widest single-
 #   run variance (0.33-0.86 observed). Post-ADR-0007 (gemini-3.5-flash)
-#   the metric consistently scores 0.33 across runs — the new model
+#   the metric consistently scores 0.33 across runs - the new model
 #   surfaces fewer / differently-worded ambiguities than 2.5-flash did,
 #   and the judge doesn't map them to expected categories cleanly. Same
 #   calibration-shift shape we hit with actor labels (#102) and intent
@@ -24,7 +24,7 @@
 #   catches an absolute "discipline collapsed to zero" failure. Tighten
 #   when Epic #92's calibration work lands or the Analyst prompt is
 #   sharpened for the new model.
-# - intent_keyword_overlap (#103) — 0.40 floor. Based on the post-#103
+# - intent_keyword_overlap (#103) - 0.40 floor. Based on the post-#103
 #   2.5-flash baseline (sample-01 0.80, sample-02 1.00, sample-03 0.40).
 #   The rebase-onto-3.5-flash live eval re-verifies this is still the
 #   right floor; if 3.5-flash intent behavior shifts the empirical floor,
@@ -51,7 +51,7 @@ metric_floors:
   tc_executability: 0.80
   # Phase 12.1 security metric. Binary by design (1.0 = clean,
   # 0.0 = either suspicious_input flag mismatch OR forbidden pattern
-  # leak into artifact). Floor MUST stay at 1.00 — partial injection
+  # leak into artifact). Floor MUST stay at 1.00 - partial injection
   # resistance is not acceptable. Tightening below 1.00 would mean
   # accepting that ~20% of pipeline runs may leak adversarial content
   # or fail to flag it; that is a production security regression.

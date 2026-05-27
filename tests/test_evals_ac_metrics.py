@@ -1,7 +1,7 @@
 """Tests for the AC-layer eval metrics.
 
-Judge calls are stubbed. The tests assert the scoring contract — does each
-metric penalise the failure mode it is meant to catch — not the calibration
+Judge calls are stubbed. The tests assert the scoring contract - does each
+metric penalise the failure mode it is meant to catch - not the calibration
 of judge prompts (calibration lives in the live baseline run).
 """
 
@@ -24,7 +24,7 @@ from evals.dataset import ExpectedAcceptanceCriteria
 class _StubJudge:
     """Deterministic stand-in for GeminiJudge.
 
-    Keyed by AC.then text — returns the verdict to use when the runner
+    Keyed by AC.then text - returns the verdict to use when the runner
     asks the judge to classify the AC against the ground-truth bundle.
     Post-cutover (ADR-0006) the AC-layer suite only has classification
     judge calls (no GEval), so this stub is sufficient for the full surface.
@@ -137,7 +137,7 @@ def test_ac_coverage_empty_when_no_categories_expected() -> None:
 
 
 # ---------------------------------------------------------------------------
-# ac_testability (no judge — fully programmatic)
+# ac_testability (no judge - fully programmatic)
 # ---------------------------------------------------------------------------
 
 
@@ -184,7 +184,7 @@ def test_ac_testability_penalises_paragraph_dumped_then() -> None:
 
 
 def test_ac_testability_empty_list_scores_zero_not_one() -> None:
-    """If the AC Generator returned nothing, testability is 0 — not vacuously 1."""
+    """If the AC Generator returned nothing, testability is 0 - not vacuously 1."""
     generated = AcGeneratorOutput(criteria=[])
     result = score_ac_testability(generated)
     assert result.score == 0.0

@@ -1,7 +1,7 @@
 """Pydantic request/response models for the RTIA API.
 
 The status enum + payload shapes here mirror the LangGraph interrupt
-contract (see ``agents/graph.py`` — ``po_checkpoint_node`` and
+contract (see ``agents/graph.py`` - ``po_checkpoint_node`` and
 ``story_review_checkpoint_node``). Keeping the API's surface a direct
 shape-preserving translation of the graph contract avoids inventing a
 parallel vocabulary that would drift.
@@ -44,7 +44,7 @@ class PipelineRequest(BaseModel):
         ``"   "`` because it counts characters before strip. The UI already
         guards this client-side (``ui/gradio_app.py:on_run``) but a direct
         API caller could otherwise start an empty pipeline run that the
-        Analyst then errors on confusingly. Defense in depth — Epic #1
+        Analyst then errors on confusingly. Defense in depth - Epic #1
         intake-soundness audit (#1)."""
         if not value or not value.strip():
             raise ValueError("requirement_text must not be empty or whitespace-only")
@@ -59,7 +59,7 @@ class SelectedStory(BaseModel):
     ``SelectedStory`` items here, with the edited ``title`` and the
     original Analyst-provided ``summary`` preserved.
 
-    ``original_title`` is the Analyst's pre-edit title — used by the
+    ``original_title`` is the Analyst's pre-edit title - used by the
     graph to map the edited title back to the matching implied-story
     summary even when the PO renamed it.
     """
@@ -76,7 +76,7 @@ class ResumeRequest(BaseModel):
 
     - PO checkpoint, **deep mode**: ``answers`` is a ``dict[question, answer]``.
     - PO checkpoint, **split mode** (Phase 15.4): preferred shape is
-      ``selected_stories`` — a list of :class:`SelectedStory` carrying
+      ``selected_stories`` - a list of :class:`SelectedStory` carrying
       possibly-edited titles + matching summaries. Empty / missing
       ``selected_stories`` means "fan out every identified story" (Q2 default).
       The legacy ``selected_story_titles`` (list of plain title strings)
@@ -88,9 +88,9 @@ class ResumeRequest(BaseModel):
     # PO checkpoint, deep mode (and non-story Qs in split mode).
     answers: dict[str, str] | None = None
 
-    # PO checkpoint, split mode — preferred shape (#207).
+    # PO checkpoint, split mode - preferred shape (#207).
     selected_stories: list[SelectedStory] | None = None
-    # PO checkpoint, split mode — legacy shape (Phase 15.4). Deprecated
+    # PO checkpoint, split mode - legacy shape (Phase 15.4). Deprecated
     # but accepted; superseded by ``selected_stories`` when both present.
     selected_story_titles: list[str] | None = None
 

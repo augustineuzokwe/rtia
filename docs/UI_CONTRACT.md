@@ -1,4 +1,4 @@
-# UI Contract — `ui/gradio_app.py`
+# UI Contract - `ui/gradio_app.py`
 
 **Audience:** anyone modifying the Gradio UI or adding a new
 `ThreadStatus`. Read [docs/USAGE.md](USAGE.md) first if you're an
@@ -38,7 +38,7 @@ The single source of truth for pipeline status is
 
 | Value | Trigger | Terminal? |
 |---|---|---|
-| `RUNNING` | A node is executing. Transient — never displayed long. | No |
+| `RUNNING` | A node is executing. Transient - never displayed long. | No |
 | `PAUSED_PO` | Pipeline hit the PO checkpoint. Payload carries `critical_ambiguities` (deep) or `implied_stories` (fan-out). | No |
 | `PAUSED_REVIEW` | Pipeline hit the story-review checkpoint (deep flow only). | No |
 | `DONE` | Deep flow completed. Payload carries `rendered_artifact` + optional `deferred_stories`. | Yes |
@@ -62,13 +62,13 @@ pin it.
 |---|---|---|---|---|---|---|---|
 | `input_panel` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `run_btn` interactive | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
-| `po_panel` | — | — | ✅ | — | — | — | — |
-| `review_panel` | — | — | — | ✅ | — | — | — |
-| `result_panel` | — | — | — | — | ✅ | ✅ | — |
-| `backlog_target_panel` | — | — | — | — | ✅ | ✅ | — |
-| `deep_export_panel` | — | — | — | — | ✅ | — | — |
-| `deferred_panel` | — | — | — | — | ✅¹ | ✅¹ | — |
-| `error_panel` | — | — | — | — | — | — | ✅ |
+| `po_panel` | - | - | ✅ | - | - | - | - |
+| `review_panel` | - | - | - | ✅ | - | - | - |
+| `result_panel` | - | - | - | - | ✅ | ✅ | - |
+| `backlog_target_panel` | - | - | - | - | ✅ | ✅ | - |
+| `deep_export_panel` | - | - | - | - | ✅ | - | - |
+| `deferred_panel` | - | - | - | - | ✅¹ | ✅¹ | - |
+| `error_panel` | - | - | - | - | - | - | ✅ |
 
 ¹ Visible only when the matching story list (`deferred_stories` or
 `fan_out_stories`) is non-empty.
@@ -82,7 +82,7 @@ pin it.
   The shared form (backend / target / extra / dry-run) feeds both the
   deep export button AND the fan-out follow-up button, so its
   visibility is its own flag (`backlog_visible`).
-- **`run_btn` is disabled — not hidden — when a thread is active.**
+- **`run_btn` is disabled - not hidden - when a thread is active.**
   Hiding would leave the input panel looking incomplete; disabling
   communicates "you can't act here until the pipeline finishes."
 
@@ -96,7 +96,7 @@ This is the single most-load-bearing pattern in the file. Skim
 
 ### How it works
 
-1. **`_state_to_panels(state)`** returns a `dict[str, Any]` — one key
+1. **`_state_to_panels(state)`** returns a `dict[str, Any]` - one key
    per Gradio update. Module-level, pure, easy to unit-test.
 2. **`_SPREAD_KEYS`** is a tuple of those keys in a fixed positional
    order. Lives inside `build_blocks` because it's UI-shape data, but
@@ -119,7 +119,7 @@ This is the single most-load-bearing pattern in the file. Skim
 Together they catch *length* and *key-rename* drift, but they
 **cannot** catch a wrong positional pairing (`_SPREAD_KEYS[i]`
 naming a different concept from `outputs[i]`). When you reorder or
-insert, rebuild both lists from the same source-of-truth — and run
+insert, rebuild both lists from the same source-of-truth - and run
 the live UI once to spot-check.
 
 ### Why three structures
@@ -143,33 +143,33 @@ the test layer construct Blocks (slow, brittle).
 
 1. Decide on the visibility flag name. Convention: `<panel>_visible`
    (a `gr.update(visible=…)` value).
-2. **`_state_to_panels`** — add the new key to `base` (default
+2. **`_state_to_panels`** - add the new key to `base` (default
    `gr.update(visible=False)`); set it to `visible=True` in whichever
    `if state.status == …` branch needs it.
-3. **`_SPREAD_KEYS`** — append the key.
-4. **`outputs`** — append the corresponding `gr.Group` (or whatever
+3. **`_SPREAD_KEYS`** - append the key.
+4. **`outputs`** - append the corresponding `gr.Group` (or whatever
    component you want toggled) at the same position. The build-time
    `assert` will catch a length mismatch.
-5. **`build_blocks`** — define the `gr.Group(visible=False) as <name>`
+5. **`build_blocks`** - define the `gr.Group(visible=False) as <name>`
    somewhere readable, ideally near the panel it relates to in flow
    order.
-6. **`tests/test_ui_state_panels.py`** — pin the new key in
+6. **`tests/test_ui_state_panels.py`** - pin the new key in
    `test_state_to_panels_returns_stable_key_set` *and* add at least
    one positive test (state X → panel visible) and one negative test
    (state Y → panel hidden).
 
 ### 4.2 Adding a new `ThreadStatus`
 
-1. **`api/models.py`** — add the enum value. Bump
+1. **`api/models.py`** - add the enum value. Bump
    `PIPELINE_STATE_VERSION` if the new status corresponds to a graph
    topology change (it usually does).
-2. **`_state_to_panels`** — add an explicit `elif state.status ==
+2. **`_state_to_panels`** - add an explicit `elif state.status ==
    ThreadStatus.NEW` branch. **Do not rely on the unknown-status
    fallback.** The fallback exists to fail loud, not to render new
    features.
-3. **Tests** — add a test that the new status produces the expected
+3. **Tests** - add a test that the new status produces the expected
    visibility pattern.
-4. **This file** — extend the §1 table and the §2 matrix.
+4. **This file** - extend the §1 table and the §2 matrix.
 
 ### 4.3 Adding a new entry point (handler) to the UI
 
@@ -182,7 +182,7 @@ def on_run(text):
 ```
 
 This is the in-process equivalent of `POST /pipeline`. It works
-because the UI is mounted on the same FastAPI app — the runner is
+because the UI is mounted on the same FastAPI app - the runner is
 shared via `app.state.runner`.
 
 **The rules:**
@@ -203,10 +203,10 @@ shared via `app.state.runner`.
 1. Implement it in `exporters/<name>.py` against the `Exporter`
    protocol (`exporters/base.py`).
 2. Register it in `make_exporter`.
-3. **API side** — no UI change required if the backend uses the
+3. **API side** - no UI change required if the backend uses the
    existing `ExportTarget` shape. If it needs a new field, add it to
    `ExportTarget` *and* extend the UI's `export_extra` parsing.
-4. **UI side** — extend `export_backend.choices`. The button handler
+4. **UI side** - extend `export_backend.choices`. The button handler
    already dispatches on `backend` and re-shapes `target`/`extra`,
    so a new backend usually only needs the dropdown entry + a
    target-string parser branch.
@@ -218,8 +218,8 @@ shared via `app.state.runner`.
 Every handler in `build_blocks` is a parallel implementation of an
 API endpoint. The shared bottom-of-stack helpers
 (`PipelineRunner`, `make_exporter`, `extract_pdf`, `extract_markdown`)
-are reused, plus — since issue
-[#194](https://github.com/augustineuzokwe/rtia/issues/194) — the
+are reused, plus - since issue
+[#194](https://github.com/augustineuzokwe/rtia/issues/194) - the
 follow-up-export dispatch helpers in
 [`api/_shared.py`](../api/_shared.py)
 (`build_followup_markdown`, `select_followup_source`,
@@ -235,7 +235,7 @@ follow-up-export dispatch helpers in
 | `on_export_deferred` | `POST /pipeline/{id}/export-deferred` | Per-story loop, `ExportTarget` construction (dispatch + body template now shared) |
 | `on_upload_pdf` / `on_upload_md` | `POST /uploads/{pdf,markdown}` | Parser invocation, error mapping |
 
-The follow-up-export dispatch is the only piece extracted so far —
+The follow-up-export dispatch is the only piece extracted so far -
 that addressed the largest cross-module duplication (the issue-body
 template was a literal copy-paste between files). The remaining rows
 above are smaller and less risky. If you change an API endpoint's

@@ -1,4 +1,4 @@
-"""GitHub issue exporter — REST API ``POST /repos/{owner}/{repo}/issues``.
+"""GitHub issue exporter - REST API ``POST /repos/{owner}/{repo}/issues``.
 
 Auth: ``GITHUB_TOKEN`` from the environment. A classic PAT with ``repo``
 scope works; a fine-grained PAT scoped to the target repo with
@@ -6,7 +6,7 @@ scope works; a fine-grained PAT scoped to the target repo with
 
 If ``target.github_project_number`` is set, the created issue is added
 to that GitHub Project (v2) board via the GraphQL ``addProjectV2ItemById``
-mutation. The two operations are NOT atomic — if issue-create succeeds
+mutation. The two operations are NOT atomic - if issue-create succeeds
 and project-add fails, the result reports the issue URL + an error noting
 the project-add failure. Better than swallowing it; better than rolling
 back a created issue.
@@ -142,7 +142,7 @@ class GitHubExporter:
         """PATCH an existing GitHub issue with the new title + body.
 
         Maps to ``PATCH /repos/{owner}/{repo}/issues/{number}``. Skips
-        the optional Project (v2) add — the existing issue is already
+        the optional Project (v2) add - the existing issue is already
         wherever it was originally created. Returns
         ``ExportResult(success=True, key=str(number), url=...)`` on
         success; for 404 / other 4xx, returns ``success=False`` with
@@ -231,7 +231,7 @@ def _add_to_project(
     """Add an issue node to a user-owned GitHub Project (v2) via GraphQL.
 
     Returns ``None`` on success, or a human-readable error string. The
-    error is reported on the otherwise-successful ExportResult — we
+    error is reported on the otherwise-successful ExportResult - we
     don't unwind issue creation just because the project-add failed.
     """
     lookup = client.post(

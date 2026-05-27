@@ -8,7 +8,7 @@
 
 po_directive: |
   Scope this user story to: a tester filtering test results on the dashboard
-  by date range, environment (dev/staging/prod), and test suite name — with
+  by date range, environment (dev/staging/prod), and test suite name - with
   the tester's applied filter selections remembered per user account across
   sessions. CSV export of results and email alerting on failure-rate
   threshold are out of scope here; raise them as separate backlog items.

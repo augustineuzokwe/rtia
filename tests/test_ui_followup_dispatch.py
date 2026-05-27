@@ -1,7 +1,7 @@
 """Tests for the shared follow-up-export dispatch helpers.
 
 Regression cover for the bug where the UI's "Create follow-up issues"
-button reported "No deferred stories — nothing to create." on a
+button reported "No deferred stories - nothing to create." on a
 ``DONE_SPLIT`` thread even when four split stories were visible in
 the panel directly above it.
 
@@ -96,18 +96,18 @@ def test_dispatch_uses_status_not_thread_id():
 
 def test_followup_empty_message_pivots_on_split():
     """The status-matched empty-state copy is the UI's only need for the
-    legacy ``(loaded, empty_msg)`` tuple — extracted into its own helper
+    legacy ``(loaded, empty_msg)`` tuple - extracted into its own helper
     so both wordings live next to the dispatch they're paired with."""
     assert "split" in followup_empty_message(ThreadStatus.DONE_SPLIT)
     assert "deferred" in followup_empty_message(ThreadStatus.DONE)
-    # Non-terminal statuses follow the "deferred" wording — the message
+    # Non-terminal statuses follow the "deferred" wording - the message
     # is rarely surfaced from those states, but the contract is
     # "anything not DONE_SPLIT" matches the dispatch.
     assert "deferred" in followup_empty_message(ThreadStatus.PAUSED_PO)
 
 
 def test_build_followup_markdown_basic_shape():
-    """Sanity check the body template — title heading, summary, provenance
+    """Sanity check the body template - title heading, summary, provenance
     block, and excerpt section. Pins the output so both surfaces produce
     byte-identical issue bodies."""
     md = build_followup_markdown(
@@ -125,7 +125,7 @@ def test_build_followup_markdown_basic_shape():
 def test_build_followup_markdown_truncates_long_excerpt():
     """Excerpts over the cap are truncated with an ellipsis so the issue
     body stays readable. The cap default (800) matches the legacy
-    pre-extraction value — must not silently change."""
+    pre-extraction value - must not silently change."""
     excerpt = "x" * 1200
     md = build_followup_markdown("T", "S", requirement_excerpt=excerpt)
     assert "…" in md

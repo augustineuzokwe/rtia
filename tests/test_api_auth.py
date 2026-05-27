@@ -69,7 +69,7 @@ def test_generate_token_falls_back_to_random(monkeypatch):
     monkeypatch.delenv("RTIA_API_TOKEN", raising=False)
     token = generate_token()
     assert len(token) >= 32
-    # Two consecutive generations differ — entropy is real, not a constant.
+    # Two consecutive generations differ - entropy is real, not a constant.
     assert token != generate_token()
 
 
@@ -77,7 +77,7 @@ def test_query_param_sets_session_cookie():
     """First navigation with ``?token=`` sets the ``rtia_token`` cookie.
 
     Without this, the browser's subsequent asset fetches under the
-    Gradio mount drop the query string and get 401'd — the page renders
+    Gradio mount drop the query string and get 401'd - the page renders
     blank. The cookie keeps in-browser auth sticky.
     """
     from api.models import ThreadState, ThreadStatus

@@ -49,7 +49,7 @@ class UserStory(BaseModel):
 
     description: str = Field(
         description=(
-            "What the role wants — 1-2 sentences starting with "
+            "What the role wants - 1-2 sentences starting with "
             "'As a/an {role}, I want {action}'. Article agreement is the writer's"
             " responsibility (use 'an' before a vowel-sound role)."
         )
@@ -85,7 +85,7 @@ def _format_po_answers(po_answers: dict[str, str]) -> str:
 def _format_picked_story(picked: ImpliedStory | None) -> str:
     """Render the "picked story" block for the user prompt.
 
-    ``(none)`` is the no-narrowing signal — the Writer falls back to its
+    ``(none)`` is the no-narrowing signal - the Writer falls back to its
     default behaviour of covering the full intent. Rendering the same
     placeholder for "no implied stories" and "PO didn't clearly pick"
     keeps the prompt shape stable across all four PO-answer scenarios.
@@ -108,7 +108,7 @@ def write_user_story(
 ) -> UserStory:
     """Run the User Story Writer agent.
 
-    Inputs come from prior pipeline state, not raw text — the writer never
+    Inputs come from prior pipeline state, not raw text - the writer never
     sees the original requirement, only the Analyst's structured read of it
     plus the PO's clarifications. This is intentional: it forces the Analyst
     to be the single source of truth about what was asked, and gives the
@@ -119,7 +119,7 @@ def write_user_story(
     the PO checkpoint, the caller passes the picked ``ImpliedStory``
     here so the Writer scopes the description + objective to ONLY that
     story. ``None`` (the default) preserves the original broad behaviour
-    — used for single-feature requirements and for multi-story
+    - used for single-feature requirements and for multi-story
     requirements where the PO's answer didn't cleanly identify one
     story. See :func:`agents.graph.picked_implied_story` for the
     matching logic and the cases that return ``None``.
@@ -162,7 +162,7 @@ def write_user_story(
         HumanMessage(content=user_prompt),
     ]
     config = {"metadata": {"agent": "user_story_writer", "prompt_hash": _PROMPT_HASH}}
-    # Phase 12.5 — see analyze_requirement for the rationale.
+    # Phase 12.5 - see analyze_requirement for the rationale.
     with log_agent_invocation("user_story_writer", prompt_hash=_PROMPT_HASH) as rec:
         try:
             response = cached_invoke(

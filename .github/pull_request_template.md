@@ -1,6 +1,6 @@
 <!--
 Thanks for opening a PR. The checklist below mirrors the hard rules in
-CLAUDE.md §4 — every PR in this repo follows them. Tick the boxes that
+CLAUDE.md §4 - every PR in this repo follows them. Tick the boxes that
 apply; explain any unchecked ones.
 -->
 

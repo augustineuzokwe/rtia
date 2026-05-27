@@ -1,12 +1,12 @@
 """Tests for the per-agent duration baseline added in support of issue #163.
 
-The eval report has long surfaced `pipeline_duration_ms` — the sum of every
+The eval report has long surfaced `pipeline_duration_ms` - the sum of every
 production agent's wall-clock. To prioritise the pipeline-speedup work
 (context caching vs. token caps vs. prompt compression), the runner now
 also exposes a per-agent breakdown lifted from the same telemetry capture
 that already feeds the token aggregates.
 
-These tests guard the serialisation contract — what the JSON report and the
+These tests guard the serialisation contract - what the JSON report and the
 human-readable summary expose. Live latency numbers come from real eval runs
 and aren't asserted here.
 """

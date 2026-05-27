@@ -3,7 +3,7 @@
 The cache exists to avoid two bugs:
 
 1. Repeated live LLM calls for inputs that haven't changed (cost + speed).
-2. The "false-green CI" trap — a stale cache that silently passes the
+2. The "false-green CI" trap - a stale cache that silently passes the
    eval gate while the model has actually drifted.
 
 These tests assert the design that prevents (2):
@@ -141,7 +141,7 @@ def test_disable_env_always_bypasses_cache(
 ) -> None:
     """``RTIA_LLM_CACHE=disabled`` must miss even when an entry exists.
 
-    This is the CI regression-job invariant — we cannot trust the cache
+    This is the CI regression-job invariant - we cannot trust the cache
     on the gate, period.
     """
     llm = _make_llm("first")

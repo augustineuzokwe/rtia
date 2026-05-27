@@ -2,13 +2,13 @@
 
 Two switches are involved and they are deliberately independent:
 
-- ``RTIA_LLM_PROVIDER`` — generator agents (5 production + eval analyst).
-- ``RTIA_OLLAMA_JUDGE`` — deepeval judge.
+- ``RTIA_LLM_PROVIDER`` - generator agents (5 production + eval analyst).
+- ``RTIA_OLLAMA_JUDGE`` - deepeval judge.
 
 These assertions defend the design that:
 
 1. The judge stays on Gemini by default, even when the generator is
-   swapped — that's the §7.3 apples-to-apples invariant.
+   swapped - that's the §7.3 apples-to-apples invariant.
 2. Opting into ``RTIA_OLLAMA_JUDGE=1`` returns a ``ChatOllama`` instance
    from ``GeminiJudge.load_model`` so the eval suite can run at strictly
    $0 API spend.

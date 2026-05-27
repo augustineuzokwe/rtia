@@ -1,12 +1,12 @@
 name: CI
 
 # Two-stage pipeline:
-#   1. quality    — lint, format, unit tests (always runs; fast; ~30s)
-#   2. regression — full eval suite against the 3 golden samples + gate
+#   1. quality    - lint, format, unit tests (always runs; fast; ~30s)
+#   2. regression - full eval suite against the 3 golden samples + gate
 #                   on per-metric thresholds (only runs when agent code,
 #                   prompts, evals, or this workflow itself changed; ~60-90s)
 #
-# regression `needs: quality` — if lint or unit tests fail, the eval
+# regression `needs: quality` - if lint or unit tests fail, the eval
 # never starts. No point spending Gemini API calls on a PR that has a
 # syntax error or a unit-test regression.
 #
@@ -21,7 +21,7 @@ on:
 permissions:
   contents: read
 
-# A new push to the same PR cancels the in-flight CI run — no point
+# A new push to the same PR cancels the in-flight CI run - no point
 # paying for a stale eval when the head has already moved on.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -62,7 +62,7 @@ jobs:
           # Need history to diff against base ref for the path filter.
           fetch-depth: 0
 
-      # Path filter — done with native git diff to avoid pulling in a
+      # Path filter - done with native git diff to avoid pulling in a
       # third-party action. We treat a `push` to main as always relevant
       # (the eval should run on every merge so baselines.md stays
       # honest). For PRs, we diff against the PR's base SHA.
@@ -72,7 +72,7 @@ jobs:
       # empty and the eval cannot run. Rather than hard-fail those PRs,
       # we skip the eval at the PR stage and rely on the
       # always-runs-on-push-to-main branch above as the safety net.
-      # Documented carve-out — see GUARDRAILS.md "eval gate coverage".
+      # Documented carve-out - see GUARDRAILS.md "eval gate coverage".
       # Risks accepted: a regression introduced by a major GH Action
       # bump is caught one step late (post-merge on main, requires a
       # revert) rather than pre-merge. Action-bump cadence is low and
@@ -82,25 +82,25 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "push" ]; then
-            echo "::notice::push to main — regression always runs."
+            echo "::notice::push to main - regression always runs."
             echo "run=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
-            echo "::notice::Dependabot PR — secrets are not exposed to this run; the eval cannot execute. Skipping at PR stage. Push-to-main will run the eval and catch any regression introduced by this dependency."
+            echo "::notice::Dependabot PR - secrets are not exposed to this run; the eval cannot execute. Skipping at PR stage. Push-to-main will run the eval and catch any regression introduced by this dependency."
             echo "run=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           BASE="${{ github.event.pull_request.base.sha }}"
           if git diff --quiet "$BASE" -- agents/ prompts/ evals/ .github/workflows/ci.yml; then
-            echo "::notice::No changes to agents/, prompts/, evals/, or this workflow — regression not applicable on this PR. Subsequent steps will skip."
+            echo "::notice::No changes to agents/, prompts/, evals/, or this workflow - regression not applicable on this PR. Subsequent steps will skip."
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
             echo "run=true" >> "$GITHUB_OUTPUT"
           fi
 
       # Key presence is mandatory whenever the eval is meant to run.
-      # A missing key always hard-fails — silently passing without the
+      # A missing key always hard-fails - silently passing without the
       # eval would defeat the gate's purpose. The previous fork-PR skip
       # branch was removed (#107 review): RTIA is a personal repo, no
       # fork PRs to handle, and the failure mode is sharper without it.
@@ -129,13 +129,13 @@ jobs:
         run: uv sync --all-groups
 
       # Wrapped in nick-fields/retry to ride out transient Gemini 503s
-      # (observed on PR #107 first live run — Gemini returned 503
+      # (observed on PR #107 first live run - Gemini returned 503
       # UNAVAILABLE during a high-demand spike and the in-library
       # tenacity retries exhausted before the spike cleared).
       #
       # 2 attempts × 30s wait. Worst-case cost: 2 × $0.03 = $0.06 per
       # CI run, and only on actually-flaky days. Median run still costs
-      # $0.03. Threshold enforcement does NOT retry — a metric below
+      # $0.03. Threshold enforcement does NOT retry - a metric below
       # floor is a real signal worth investigating, not transient noise.
       #
       # timeout_minutes bumped to 10 (was 5) on PR #162: Gemini latency
@@ -151,7 +151,7 @@ jobs:
         env:
           # Keep this in sync with the Verify Gemini API key step above.
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
-          # Issue #230 — the CI regression job MUST run with the LLM
+          # Issue #230 - the CI regression job MUST run with the LLM
           # response cache disabled. The cache exists to speed up local
           # iteration; on the gate we need a fresh live measurement on
           # every PR so a warm cache cannot mask model drift ("false-green
@@ -169,11 +169,11 @@ jobs:
         if: steps.should_run.outputs.run == 'true'
         run: uv run python evals/check_thresholds.py evals/reports/ci-run.json
 
-      # Phase 13.1 — cost + latency gate. Reads the same eval report
+      # Phase 13.1 - cost + latency gate. Reads the same eval report
       # check_thresholds.py just consumed, plus [tool.rtia.budgets] in
       # pyproject.toml. Separate step (not bundled with floors) so the
       # PR-status check name surfaces "budget regression" distinctly
-      # from "quality regression" — different signals, different fixes.
+      # from "quality regression" - different signals, different fixes.
       - name: Enforce cost + latency budgets
         if: steps.should_run.outputs.run == 'true'
         run: uv run python evals/check_budgets.py evals/reports/ci-run.json
