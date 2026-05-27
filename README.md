@@ -6,51 +6,39 @@ Two human-in-the-loop checkpoints keep a PO or QA Lead in control: one *before* 
 
 ## How It Works
 
-```
-Requirements input (free text or uploaded PDF/markdown)
-      │
-      ▼
-Requirements Analyst Agent  →  extracts intent, actors, and ambiguities
-                            →  each ambiguity tagged "critical" or "normal"
-      │
-      ▼
-⏸ PO CHECKPOINT             →  pauses ONLY if critical ambiguities exist
-                            →  PO answers critical questions; normal ones
-                            →  flow forward as story assumptions
-      │
-      ▼
-User Story Writer Agent     →  "As a [role], I want [feature], so that [benefit]"
-                            →  uses intent + actors + PO answers; records
-                            →  defaults picked for normal ambiguities as
-                            →  story assumptions for the next checkpoint
-      │
-      ▼
-⏸ STORY REVIEW CHECKPOINT  →  PO/QA reviews and edits the generated story
-      │
-      ▼
-AC Generator Agent          →  Given/When/Then acceptance criteria
-      │
-      ▼
-Test Case Agent             →  test cases (happy path + edge cases)
-      │
-      ▼
-Reviewer Agent              →  coverage gaps, weak ACs, untestable criteria
-      │
-      ▼
-Structured output           →  JSON / markdown export
+```mermaid
+graph TD
+    start([requirements: free text, PDF, or markdown]) --> analyst[Requirements Analyst<br/>extracts intent + actors + ambiguities<br/>flags 'critical' vs 'normal' + counts implied stories]
+    analyst --> po{PO checkpoint<br/>pause if critical ambiguities OR implied_stories ≥ 2}
+    po -- "deep path<br/>(single story)" --> writer[User Story Writer<br/>Description + Objective + assumptions]
+    po -. "fan-out<br/>(multi-story)" .-> fanout[fan_out<br/>emit lightweight backlog stubs<br/>no LLM call]
+    writer --> review{Story Review checkpoint<br/>PO/QA edits the draft story}
+    review --> ac[AC Generator<br/>Given/When/Then]
+    ac --> tc[Test Case Writer<br/>happy + edge + negative paths]
+    tc --> composer[Composer<br/>assemble FinalUserStory]
+    composer --> reviewer[Reviewer<br/>coverage gaps + weak ACs]
+    reviewer --> done([FinalUserStory<br/>Description / Objective / ACs / Test Cases / Review notes])
+    fanout --> stubs([backlog stubs<br/>re-run RTIA on any stub to deep-dive])
 ```
 
-**Why two checkpoints?** They do different work that the other can't:
+**Two paths, one PO decision.** At the PO checkpoint, RTIA picks the path based on how many distinct user stories the Analyst inferred:
+
+- **Deep path** (`implied_stories ≤ 1`) — produces a full four-section artifact: Description, Objective, Acceptance Criteria, Test Cases.
+- **Fan-out path** (`implied_stories ≥ 2`) — produces lightweight backlog stubs only. The PO picks a stub later and re-runs RTIA on it to deep-dive. See [PR #162](https://github.com/augustineuzokwe/rtia/pull/162) for the topology rationale.
+
+**Why two checkpoints on the deep path?** They do different work that the other can't:
 
 - The **PO checkpoint** resolves missing information *before* the system makes assumptions. The Analyst classifies each ambiguity by severity so the PO only pauses for genuinely blocking questions, not every detail.
 - The **Story Review checkpoint** verifies the *output* — catching cases where the Story Writer's interpretation of the resolved inputs doesn't match what the PO actually meant.
+
+**Where the artifact goes.** The composed `FinalUserStory` is downloadable as JSON from the API, viewable in the Gradio UI, and exportable to Jira (REST v3 + ADF) or GitHub Issues (with optional Projects v2 placement) via `POST /pipeline/{thread_id}/export`. Fan-out stubs export via `/export-deferred`.
 
 ## Use Case
 
 A PO or BA has raw requirements. Instead of manually writing user stories, ACs, and test cases from scratch, they paste the requirements into RTIA. The system generates a first draft at each stage. The PO answers a small number of critical clarifying questions up front and reviews the generated story before the pipeline continues to AC generation.
 
-**Input formats (v1):** Free text · PDF · Markdown
-**Input formats (v2):** Jira Epic via API
+**Input formats:** Free text · PDF · Markdown (uploaded through the UI or sent as JSON to the API).
+**Output destinations:** JSON download · Gradio UI render · push to a Jira project · push to a GitHub repository's Issues + Projects v2 board.
 
 > **End-user guide:** if you're a PO, BA, or QA lead using RTIA rather than building it, read [docs/USAGE.md](docs/USAGE.md) — it walks you from "I have a requirement" to "I have a backlog-ready artifact" without assuming any developer knowledge.
 
@@ -59,29 +47,32 @@ A PO or BA has raw requirements. Instead of manually writing user stories, ACs, 
 | Layer | Tool |
 |---|---|
 | Agent orchestration | LangGraph (Python) |
-| RAG / LLM abstraction | LangChain (Python) |
-| LLM provider | Anthropic Claude |
-| Vector store | Chroma |
+| LLM abstraction | LangChain (Python) |
+| LLM provider (default) | Google Gemini 3.5 Flash via `langchain-google-genai` |
+| LLM provider (full-local) | Ollama (Llama 3.1 8B) via `langchain-ollama` |
+| Durable state | SQLite checkpointer (`langgraph-checkpoint-sqlite`) |
 | LLM evaluation | DeepEval |
-| Tracing | LangSmith |
-| API | FastAPI |
-| UI | Streamlit |
+| Tracing | LangSmith (opt-in) |
+| API | FastAPI + bearer-token auth |
+| UI | Gradio Blocks (mounted at `/`) |
+| Exporters | Jira REST v3 (ADF) · GitHub Issues + Projects v2 (GraphQL) |
 | CI/CD | GitHub Actions |
-| Prompt regression | Promptfoo |
 
 ## Project Structure
 
 ```
 rtia/
-├── agents/          # LangGraph agent definitions
-├── api/             # FastAPI routes
-├── ui/              # Streamlit frontend
-├── evals/           # DeepEval evaluation datasets and tests
-├── prompts/         # Prompt templates
-├── tests/           # Unit and integration tests
-├── .github/
-│   └── workflows/   # GitHub Actions CI/CD
-└── docs/            # ADRs and QA adoption roadmap
+├── agents/          # LangGraph agent definitions (Analyst, Story Writer, AC Gen, Test Case, Reviewer, Composer)
+├── prompts/         # Prompt templates (one module per agent; versioned with code)
+├── api/             # FastAPI routes + bearer-token auth + exporter bridge
+├── ui/              # Gradio Blocks frontend (mounted at /)
+├── exporters/       # Jira + GitHub backends behind one Exporter Protocol
+├── evals/           # Golden samples + DeepEval suite + N-runs runner
+├── scripts/         # Demo + API entry points (run_pipeline_demo.py, run_api.py)
+├── tests/           # Mocked unit tests (see tests/README.md for the category map)
+├── docs/            # ADRs, USAGE.md, ci-and-testing.md, blog drafts
+└── .github/
+    └── workflows/   # CI (eval gate) + nightly safety regression
 ```
 
 ## Getting Started
@@ -90,8 +81,9 @@ rtia/
 
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/) for dependency + venv management
-- An Anthropic API key ([get one](https://console.anthropic.com/))
+- A Google AI Studio API key for Gemini ([get one](https://aistudio.google.com/app/apikey))
 - (Optional) A LangSmith API key for observability ([get one](https://smith.langchain.com))
+- (Optional) [Ollama](https://ollama.com/download) installed locally for the $0-API-spend full-local mode
 
 ### Setup
 
