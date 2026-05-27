@@ -29,7 +29,7 @@ from agents._llm_errors import (
 from agents.graph import build_stub_artifact_from_error
 
 # ---------------------------------------------------------------------------
-# LLMFailureDetail — JSON contract
+# LLMFailureDetail - JSON contract
 # ---------------------------------------------------------------------------
 
 
@@ -48,7 +48,7 @@ def _make_detail(**overrides: object) -> LLMFailureDetail:
 
 
 def test_detail_json_round_trips():
-    """JSON encoding is symmetric — no field is silently dropped."""
+    """JSON encoding is symmetric - no field is silently dropped."""
     detail = _make_detail()
     parsed = json.loads(detail.to_json())
     assert parsed == {
@@ -62,10 +62,10 @@ def test_detail_json_round_trips():
 
 
 def test_detail_json_is_compact():
-    """The structural separators have no whitespace — keeps the payload small.
+    """The structural separators have no whitespace - keeps the payload small.
 
     Checks the separators between FIELDS (``","`` and ``":"``) rather than
-    arbitrary text bytes — the human message field can legitimately
+    arbitrary text bytes - the human message field can legitimately
     contain ``", "`` ("Service unavailable, please retry later") and that
     is content, not formatting overhead. The compactness contract is
     about Python's ``json.dumps(separators=(",", ":"))`` mode being used.
@@ -87,7 +87,7 @@ def test_detail_allows_null_http_status():
 
 
 # ---------------------------------------------------------------------------
-# wrap_llm_exception — Gemini SDK class mapping
+# wrap_llm_exception - Gemini SDK class mapping
 # ---------------------------------------------------------------------------
 
 
@@ -123,7 +123,7 @@ def test_wrap_timeout_error_has_no_http_status():
 
 
 def test_wrap_connection_error_has_no_http_status():
-    """Network blips arrive as ConnectionError — also no HTTP status."""
+    """Network blips arrive as ConnectionError - also no HTTP status."""
     exc = ConnectionError("connection reset by peer")
     wrapped = wrap_llm_exception("story_writer", exc, retries_attempted=5)
     assert wrapped.detail.http_status is None
@@ -158,7 +158,7 @@ def test_pipeline_error_message_includes_attribution():
 
 
 # ---------------------------------------------------------------------------
-# is_retryable_llm_failure — mirrors SDK retry policy
+# is_retryable_llm_failure - mirrors SDK retry policy
 # ---------------------------------------------------------------------------
 
 
@@ -190,7 +190,7 @@ def test_not_retryable_for_value_error():
 
 
 # ---------------------------------------------------------------------------
-# build_stub_artifact_from_error — graph helper
+# build_stub_artifact_from_error - graph helper
 # ---------------------------------------------------------------------------
 
 
@@ -220,7 +220,7 @@ def test_stub_artifact_has_human_readable_review_summary():
 
 
 def test_stub_artifact_sections_are_placeholders():
-    """description / objective explicitly mark the abort — no empty strings."""
+    """description / objective explicitly mark the abort - no empty strings."""
     detail = _make_detail()
     error = LLMPipelineError(detail)
     artifact = build_stub_artifact_from_error(error)
@@ -244,7 +244,7 @@ def test_stub_artifact_renders_via_as_markdown():
 
 
 # ---------------------------------------------------------------------------
-# Agent integration — monkeypatch LangChain invoke to raise, assert wrap
+# Agent integration - monkeypatch LangChain invoke to raise, assert wrap
 # ---------------------------------------------------------------------------
 
 
@@ -331,7 +331,7 @@ def test_review_artifact_wraps_llm_exception(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Phase 13.4 — non-LLM step failures wrapped at node boundary
+# Phase 13.4 - non-LLM step failures wrapped at node boundary
 # ---------------------------------------------------------------------------
 
 
@@ -340,7 +340,7 @@ def test_wrap_step_exception_produces_pipeline_step_error_with_no_http_status():
     exc = ValueError("malformed JSON from upstream")
     wrapped = wrap_step_exception("ac_generator", exc)
     assert isinstance(wrapped, PipelineStepError)
-    # NOT an LLMPipelineError — the narrower subclass is for actual API calls.
+    # NOT an LLMPipelineError - the narrower subclass is for actual API calls.
     assert not isinstance(wrapped, LLMPipelineError)
     assert wrapped.detail.agent == "ac_generator"
     assert wrapped.detail.error_class == "ValueError"
@@ -350,7 +350,7 @@ def test_wrap_step_exception_produces_pipeline_step_error_with_no_http_status():
 
 
 def test_pipeline_step_error_message_omits_llm_specific_suffix_when_non_llm():
-    """Non-LLM detail prints a cleaner message — no '(status=None, retries=0)' noise."""
+    """Non-LLM detail prints a cleaner message - no '(status=None, retries=0)' noise."""
     wrapped = wrap_step_exception("composer", RuntimeError("boom"))
     msg = str(wrapped)
     assert "Pipeline step failed" in msg
@@ -363,7 +363,7 @@ def test_pipeline_step_error_message_omits_llm_specific_suffix_when_non_llm():
 
 
 def test_llm_pipeline_error_is_subclass_of_pipeline_step_error():
-    """One catch surface — callers can `except PipelineStepError` for both."""
+    """One catch surface - callers can `except PipelineStepError` for both."""
     detail = _make_detail()
     err = LLMPipelineError(detail)
     assert isinstance(err, PipelineStepError)
@@ -378,7 +378,7 @@ def test_build_stub_artifact_from_step_error_uses_step_summary_form():
     assert "Step failure" in summary
     assert "test_case_writer" in summary
     assert "ValueError" in summary
-    # Error JSON still parseable — same downstream contract as LLM path.
+    # Error JSON still parseable - same downstream contract as LLM path.
     detail_json = json.loads(artifact.metadata["error"])
     assert detail_json["agent"] == "test_case_writer"
     assert detail_json["http_status"] is None
@@ -398,7 +398,7 @@ def test_node_wrapper_converts_unexpected_exception_to_pipeline_step_error():
     assert excinfo.value.detail.agent == "ac_generator"
     assert excinfo.value.detail.error_class == "ValueError"
     assert "garbage" in excinfo.value.detail.message
-    # And it's NOT an LLMPipelineError — we did not lie about the source.
+    # And it's NOT an LLMPipelineError - we did not lie about the source.
     assert not isinstance(excinfo.value, LLMPipelineError)
 
 

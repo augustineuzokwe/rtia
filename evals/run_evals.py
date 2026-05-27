@@ -11,7 +11,7 @@ Usage:
 
 Requires ``GOOGLE_API_KEY`` in the environment (loaded via .env).
 
-History — pre-cutover this used a Claude judge with a split between
+History - pre-cutover this used a Claude judge with a split between
 "GEval judge" (stronger model for subtle reasoning) and "match judge"
 (cheaper model for classification). The GEval metrics were dropped in
 the cutover (ADR-0006); the remaining 4 metrics are all classification
@@ -30,7 +30,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 # Allow `uv run python evals/run_evals.py` from the repo root without
-# requiring `pip install -e .` first — mirrors scripts/run_pipeline_demo.py.
+# requiring `pip install -e .` first - mirrors scripts/run_pipeline_demo.py.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
@@ -80,7 +80,7 @@ _AUTO_PO_ANSWER = (
 )
 """Fallback PO answer when no per-sample directive fixture is present.
 
-The eval runner is unattended — we can't pause for PO input. When a sample
+The eval runner is unattended - we can't pause for PO input. When a sample
 has no fixture under ``evals/ground-truth/po-answers/``, every CRITICAL
 ambiguity gets this constant string. Multi-feature samples should ship a
 fixture so AC-layer metrics measure AC quality against a known scope
@@ -117,7 +117,7 @@ class SampleReport:
     story_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
     ac_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
     tc_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
-    # Phase 13.1 — wall-clock duration of the production agent chain
+    # Phase 13.1 - wall-clock duration of the production agent chain
     # (Analyst → Story Writer → AC Generator → Test Case Writer) for this
     # sample. Excludes judge calls because those are eval scaffolding,
     # not the pipeline being measured. Source: sum of Phase 13.2
@@ -126,7 +126,7 @@ class SampleReport:
     # Per-agent breakdown of the pipeline duration. Keys match the
     # ``agent`` field in ``agent_invocation_end`` records. Empty when
     # capture is unavailable; missing keys mean that agent didn't run.
-    # Added to support issue #163 (pipeline speedup) — without per-agent
+    # Added to support issue #163 (pipeline speedup) - without per-agent
     # baselines we can't tell which agent is the bottleneck.
     per_agent_duration_ms: dict[str, int] = field(default_factory=dict)
 
@@ -207,7 +207,7 @@ def _auto_po_answers(sample_name: str, analyst_output: AnalystOutput) -> dict[st
 
     Uses the per-sample directive fixture if present; otherwise falls back to
     the legacy constant ``_AUTO_PO_ANSWER``. The same answer is applied to
-    every critical question — the Analyst's exact wording is stochastic, so
+    every critical question - the Analyst's exact wording is stochastic, so
     matching per-question would be fragile; the directive carries the scope
     decision regardless of how the question was phrased.
     """
@@ -220,7 +220,7 @@ def _run_story_writer(
 ) -> tuple[UserStory, UsageTelemetry]:
     """Run the Story Writer via the library entry point.
 
-    Library entry returns parsed UserStory only — per-call token telemetry
+    Library entry returns parsed UserStory only - per-call token telemetry
     isn't available without restructuring the function. Return zero usage;
     the LangSmith trace remains the source of truth on cost for this layer.
     """
@@ -235,7 +235,7 @@ def _run_ac_generator(
 ) -> tuple[AcGeneratorOutput, UsageTelemetry]:
     """Run the AC Generator via the library entry point.
 
-    Same telemetry trade-off as ``_run_story_writer`` — see that docstring.
+    Same telemetry trade-off as ``_run_story_writer`` - see that docstring.
     AC_PROMPT_HASH is imported so the report's metadata can cite the AC
     Generator's prompt version even when token telemetry is unavailable.
     """
@@ -279,14 +279,14 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
     """Score one sample with a single Gemini judge.
 
     All four surviving metrics are either programmatic (``ac_testability``)
-    or short classification calls — uniform judge use is appropriate
+    or short classification calls - uniform judge use is appropriate
     post-cutover.
     """
-    # Phase 13.1 — capture per-agent telemetry (token counts +
+    # Phase 13.1 - capture per-agent telemetry (token counts +
     # duration_ms) by listening to the Phase 13.2 log stream. Wraps the
     # full production-agent chain so every ``agent_invocation_end``
     # record lands in the capture bag. Judge calls are NOT inside this
-    # block — they emit no telemetry and are excluded by design.
+    # block - they emit no telemetry and are excluded by design.
     with capture_agent_telemetry() as telemetry:
         analyst_output, analyst_usage = _run_analyst_capturing_usage(sample.raw_requirement)
         po_answers = _auto_po_answers(sample.name, analyst_output)
@@ -294,7 +294,7 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
         # Chain forward so AC-layer metrics score against what the AC Generator
         # actually produces. Couples AC scores to upstream agent quality; the
         # trade-off is documented in baselines.md. Failure here (e.g. Story
-        # Writer JSON parse) propagates as an exception — eval results for the
+        # Writer JSON parse) propagates as an exception - eval results for the
         # AC layer are explicitly unavailable rather than silently zero'd.
         story, _ = _run_story_writer(analyst_output, po_answers)
         ac_result, _ = _run_ac_generator(story, analyst_output, po_answers)
@@ -312,7 +312,7 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
     pipeline_duration_ms = telemetry.total_duration_ms
     per_agent_duration_ms = {obs.agent: obs.duration_ms for obs in telemetry.observations}
 
-    # Composite artifact text for the requirement_fidelity metric — the
+    # Composite artifact text for the requirement_fidelity metric - the
     # everything-a-junior-engineer-would-read concatenation across all
     # four agents' outputs. Keep this assembly local to the runner; it's
     # not a project-wide abstraction yet.
@@ -346,7 +346,7 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
         lambda: score_tc_executability(tc_result.cases),
         lambda: score_requirement_fidelity(artifact_text, sample.requirement_key_terms),
     ]
-    # Phase 12.1 — injection_resistance only runs on samples that ship an
+    # Phase 12.1 - injection_resistance only runs on samples that ship an
     # `## Injection Test` block. Mean aggregation in `_serialise` skips
     # metrics absent from a sample, so adding/removing adversarial samples
     # does not distort the headline averages of the other metrics.
@@ -357,7 +357,7 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
     with ThreadPoolExecutor(max_workers=4) as pool:
         # ``executor.map`` preserves input order, so the resulting
         # ``metrics`` list lines up with the ``metric_calls`` definitions
-        # above — the report and the metric-floor check both rely on
+        # above - the report and the metric-floor check both rely on
         # this ordering.
         metrics = list(pool.map(lambda call: call(), metric_calls))
 
@@ -479,7 +479,7 @@ _COST_DISCLOSURE = (
     "AC→category classification). The two TC-layer metrics are programmatic "
     "and add zero judge cost. Default scope is 3 samples ≈ 24–30 total "
     "Gemini 2.5 Flash calls. Estimated paid-tier spend ≈$0.03–0.04 per full "
-    "run. Free-tier accounts will hit the 20-RPD cap mid-run — use paid "
+    "run. Free-tier accounts will hit the 20-RPD cap mid-run - use paid "
     "tier for routine eval work. See docs/adr-0006-provider-switch.md."
 )
 
@@ -489,7 +489,7 @@ def main(argv: list[str] | None = None) -> int:
     # shell (common when running under sandboxed agent/CI environments)
     # doesn't shadow the value the user set in .env.
     load_dotenv(override=True)
-    # Phase 13.1 — install the JSON log handler so capture_agent_telemetry
+    # Phase 13.1 - install the JSON log handler so capture_agent_telemetry
     # has events to read. The runner is an entry point, same contract as
     # scripts/run_pipeline_demo.py.
     configure_logging()
@@ -568,7 +568,7 @@ def main(argv: list[str] | None = None) -> int:
         # disable here so callers don't have to remember --no-cache.
         os.environ["RTIA_LLM_CACHE"] = "disabled"
         print(
-            f"[n-runs] N = {args.n_runs} requested — forcing RTIA_LLM_CACHE=disabled "
+            f"[n-runs] N = {args.n_runs} requested - forcing RTIA_LLM_CACHE=disabled "
             "for this process. See evals/n_runs.py:assert_cache_disabled_for_n_runs."
         )
 

@@ -5,7 +5,7 @@ name: Integration smoke (manual)
 # regressions that mocked unit tests cannot see (prompt drift, schema
 # mismatches, missing assumptions, accidental cost blowups).
 #
-# **Manual trigger only.** The nightly cron was intentionally removed — RTIA
+# **Manual trigger only.** The nightly cron was intentionally removed - RTIA
 # is local-dev today, so the value of catching overnight drift does not yet
 # justify the recurring (small) API spend. Re-enable the cron when the
 # Phase 14 API endpoint lands and the pipeline starts serving real requests.

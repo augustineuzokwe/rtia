@@ -1,4 +1,4 @@
-# Nightly stochastic safety regression — N=10 on adversarial samples 04-07.
+# Nightly stochastic safety regression - N=10 on adversarial samples 04-07.
 #
 # Per [Issue #233](https://github.com/augustineuzokwe/rtia/issues/233): adversarial samples target the
 # tail of the model's distribution. A single-pass measurement (the PR
@@ -14,13 +14,13 @@
 # Failure handling: when a nightly run fails, the next morning's first PR
 # is informed via the workflow's failure notification (GitHub issue
 # auto-filed via a comment on the failing run). Production ship-cadence
-# is NOT blocked by overnight flakiness — engineers see the signal and
+# is NOT blocked by overnight flakiness - engineers see the signal and
 # decide whether to investigate.
 
 name: nightly-safety-regression
 
 on:
-  # 02:00 UTC daily — quiet hours for Western Europe and US-East.
+  # 02:00 UTC daily - quiet hours for Western Europe and US-East.
   schedule:
     - cron: "0 2 * * *"
   # Allow manual triggering from the Actions tab when investigating a
@@ -73,7 +73,7 @@ jobs:
       - name: Run N=10 stochastic adversarial regression
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
-          # Issue #230 + #233 — the N-run gate REQUIRES the cache off so the
+          # Issue #230 + #233 - the N-run gate REQUIRES the cache off so the
           # N draws actually come from N live model calls. Set explicitly
           # here AND the run_evals.py --n-runs > 1 path also force-sets it
           # in evals/n_runs.py:assert_cache_disabled_for_n_runs.

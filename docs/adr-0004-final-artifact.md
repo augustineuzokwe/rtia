@@ -8,10 +8,10 @@
 
 The user defined RTIA's output (planning session 2026-05-19) as a backlog-ready user story with four minimum sections:
 
-1. **Description** — what the role wants
-2. **Objective** — the value/outcome
-3. **Acceptance Criteria** — Given/When/Then
-4. **Test Cases** — happy path + edge cases + negatives
+1. **Description** - what the role wants
+2. **Objective** - the value/outcome
+3. **Acceptance Criteria** - Given/When/Then
+4. **Test Cases** - happy path + edge cases + negatives
 
 Without an artifact contract, each agent would shape its own output and the pipeline's final step would be a brittle "stitch these together somehow" function in the demo. The Plan-agent's pre-implementation critique specifically called out this risk and recommended the artifact-contract-first design pattern.
 
@@ -81,7 +81,7 @@ Phase 4 will insert a Story Review Checkpoint between Story Writer and the compo
 
 **Positive**
 - Future agent PRs are smaller: each agent populates a known section instead of negotiating with the rest of the pipeline.
-- The demo output IS the v1 production output — no separate "format for humans" step.
+- The demo output IS the v1 production output - no separate "format for humans" step.
 - `as_json()` is the natural API response shape if/when Phase 14's FastAPI surface lands.
 - LangGraph state versioning (ADR-0002) extends naturally: `final_artifact` is a v1 field.
 
@@ -96,4 +96,4 @@ Phase 4 will insert a Story Review Checkpoint between Story Writer and the compo
 - **Phase 8 (AC Generator)**: new node before composer; populates `acceptance_criteria`.
 - **Phase 9 (Test Case Agent)**: new node before composer; populates `test_cases`.
 - **Phase 10 (Reviewer Agent)**: new node before/after composer; populates `metadata.review_notes` (or similar).
-- **Phase 1.5 followup**: composer node could automatically populate `metadata['analyst_prompt_hash']` and `metadata['writer_prompt_hash']` from the existing `_PROMPT_HASH` module-level constants so the artifact carries the prompt versions that produced it. Not in this PR — keeps scope tight.
+- **Phase 1.5 followup**: composer node could automatically populate `metadata['analyst_prompt_hash']` and `metadata['writer_prompt_hash']` from the existing `_PROMPT_HASH` module-level constants so the artifact carries the prompt versions that produced it. Not in this PR - keeps scope tight.

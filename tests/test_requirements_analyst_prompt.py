@@ -1,6 +1,6 @@
 """Contract tests for the Requirements Analyst prompt.
 
-These tests guard the prompt's *shape* — specific rules and examples that
+These tests guard the prompt's *shape* - specific rules and examples that
 downstream behavior depends on. They don't validate Claude's compliance
 (that needs a live eval harness); they prevent silent removal of rules
 during future edits.
@@ -53,7 +53,7 @@ def test_prompt_includes_worked_example_with_empty_ambiguities():
     """A concrete input→output example is the strongest lever for LLM compliance.
 
     The example must show an empty ambiguities list as a *valid output*, so the
-    model learns that zero ambiguities is normal — not a failure mode. Without
+    model learns that zero ambiguities is normal - not a failure mode. Without
     this, the model defaults to padding the list to look thorough.
     """
     lower = SYSTEM_PROMPT.lower()
@@ -82,7 +82,7 @@ def test_prompt_includes_multi_feature_worked_example():
     """A worked example for the multi-feature case is the strongest lever.
 
     Without it, the model treats the rule as advisory and rarely populates
-    implied_stories — the very behavior we're trying to fix on sample-03.
+    implied_stories - the very behavior we're trying to fix on sample-03.
     """
     lower = SYSTEM_PROMPT.lower()
     assert "multi-feature case" in lower or "multi-feature rule" in lower

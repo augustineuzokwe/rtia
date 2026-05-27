@@ -1,8 +1,8 @@
-"""PipelineRunner — single-process wrapper around the compiled LangGraph.
+"""PipelineRunner - single-process wrapper around the compiled LangGraph.
 
 Each process holds one compiled pipeline (the SQLite checkpointer survives
-restarts; threads survive too via their persisted state). Three methods —
-``start``, ``resume``, ``get_state`` — map cleanly onto the demo's existing
+restarts; threads survive too via their persisted state). Three methods -
+``start``, ``resume``, ``get_state`` - map cleanly onto the demo's existing
 control flow in ``scripts/run_pipeline_demo.py``. The API endpoints and
 the Gradio UI both call these.
 
@@ -57,7 +57,7 @@ class PipelineRunner:
         """Kick off a new run. Blocks until first pause or completion.
 
         ``PipelineStepError`` is caught and surfaced as ``ThreadStatus.ERROR``
-        with a rendered stub artifact in the payload — symmetric with how
+        with a rendered stub artifact in the payload - symmetric with how
         the demo handles it.
         """
         tid = thread_id or self._new_thread_id()
@@ -83,7 +83,7 @@ class PipelineRunner:
         """Snapshot a thread's current state without advancing it.
 
         Useful for the GET endpoint and for the UI to reconnect after a
-        page reload. Reads the LangGraph checkpointer directly — no LLM
+        page reload. Reads the LangGraph checkpointer directly - no LLM
         call, free.
         """
         snapshot = self._pipeline.get_state(self._config(thread_id))
@@ -99,11 +99,11 @@ class PipelineRunner:
             payload = interrupts[0].value
             return self._paused_state(thread_id, payload)
 
-        # Phase 15.4 — split terminal state precedes the deep one because
+        # Phase 15.4 - split terminal state precedes the deep one because
         # final_artifact is never populated in split runs. Use key-presence
         # not truthiness: a split thread that filtered to zero matches still
         # produced an empty split_stories list, and that's still a split
-        # terminal state — not a deep failure.
+        # terminal state - not a deep failure.
         if "split_stories" in values:
             return ThreadState(
                 thread_id=thread_id,
@@ -138,7 +138,7 @@ class PipelineRunner:
                 },
             )
 
-        # No interrupts, no final artifact — either fresh thread we don't
+        # No interrupts, no final artifact - either fresh thread we don't
         # know about, or mid-run (shouldn't happen because invoke is
         # blocking, but exposed for completeness).
         return ThreadState(thread_id=thread_id, status=ThreadStatus.RUNNING, payload={})
@@ -159,7 +159,7 @@ class PipelineRunner:
         Returns ``None`` if no state at all, OR if the thread is not a
         split thread (key absent). Returns ``([], requirement_text)``
         when the thread is split but the PO filtered to zero stories
-        — distinct from "not a split thread" so the endpoint can
+        - distinct from "not a split thread" so the endpoint can
         report the empty-result case cleanly.
         """
         snapshot = self._pipeline.get_state(self._config(thread_id))
@@ -190,7 +190,7 @@ class PipelineRunner:
 
         The export endpoint needs both the markdown body AND a title.
         The title comes from the user story's description: typically
-        "As a <role>, I want <feature>…" — we trim to the "I want"
+        "As a <role>, I want <feature>…" - we trim to the "I want"
         clause for a punchier issue title (Jira/GitHub display long
         summaries truncated anyway).
         """
@@ -213,7 +213,7 @@ class PipelineRunner:
 
     @staticmethod
     def _paused_state(thread_id: str, payload: dict) -> ThreadState:
-        # Phase 15.4 — split PO checkpoint payload carries `mode == "split"`
+        # Phase 15.4 - split PO checkpoint payload carries `mode == "split"`
         # plus the implied-stories list (for the CheckboxGroup) and any
         # remaining non-story critical questions (for text input).
         if payload.get("mode") == "split":
@@ -250,7 +250,7 @@ class PipelineRunner:
 
     @staticmethod
     def _done_state(thread_id: str, result: dict) -> ThreadState:
-        # Phase 15.4 — split branch terminates without producing a
+        # Phase 15.4 - split branch terminates without producing a
         # FinalUserStory. Translate that into a DONE_SPLIT state. Use
         # key-presence not truthiness: empty list is still a split
         # terminal state (filtered to zero matches), not a deep failure.
@@ -292,7 +292,7 @@ class PipelineRunner:
 
 
 _TITLE_SOFT_CAP = 60
-"""Aim for backlog-issue titles around this length — fits Jira / GitHub
+"""Aim for backlog-issue titles around this length - fits Jira / GitHub
 list views without truncation."""
 
 _TITLE_HARD_CAP = 120
@@ -318,14 +318,14 @@ _TITLE_CUT_MARKERS: tuple[str, ...] = (
 def _derive_title(description: str) -> str:
     """Build a backlog-issue title from the user story description.
 
-    Heuristics (issue #222 — produces short, skimmable backlog titles):
+    Heuristics (issue #222 - produces short, skimmable backlog titles):
 
     1. Collapse whitespace; if the text contains "I want ", drop everything
        up to and including the marker (case-insensitive).
     2. Strip a leading article ("a ", "an ", "the ") so the title reads as
        a bare noun phrase.
     3. Cut at the first subordinate-clause opener (``_TITLE_CUT_MARKERS``)
-       — these usually introduce restrictive detail that belongs in the
+       - these usually introduce restrictive detail that belongs in the
        description, not the title.
     4. Strip the trailing period.
     5. If still over ``_TITLE_SOFT_CAP``, truncate at the last word
@@ -350,7 +350,7 @@ def _derive_title(description: str) -> str:
             text = text[len(article) :]
             break
 
-    # Cut at the first subordinate-clause opener — but only if cutting
+    # Cut at the first subordinate-clause opener - but only if cutting
     # leaves at least a few words, otherwise the cut produces a useless
     # 1-2 word stub.
     lower = text.lower()
@@ -370,7 +370,7 @@ def _derive_title(description: str) -> str:
         if truncated:
             text = truncated + "…"
     # Pathological single-word case where the soft cap couldn't fire on
-    # a word boundary — hard cap with the legacy "..." sentinel.
+    # a word boundary - hard cap with the legacy "..." sentinel.
     if len(text) > _TITLE_HARD_CAP:
         text = text[: _TITLE_HARD_CAP - 3] + "..."
 

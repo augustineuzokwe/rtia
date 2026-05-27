@@ -1,6 +1,6 @@
 """Markdown → ADF (Atlassian Document Format) converter for RTIA artifacts.
 
-**Scope** (intentionally narrow — see #223):
+**Scope** (intentionally narrow - see #223):
 
 Targets the deterministic Markdown shape produced by
 ``FinalUserStory.as_markdown()`` only:
@@ -14,7 +14,7 @@ Targets the deterministic Markdown shape produced by
 - Inline ``**bold**`` and ``_italic_`` spans
 
 Anything outside that shape (tables, nested lists, fenced code blocks,
-images, links, blockquotes) is NOT supported — RTIA's artifact doesn't
+images, links, blockquotes) is NOT supported - RTIA's artifact doesn't
 emit them, and adding handling speculatively would bloat the converter
 without proving worth its weight.
 
@@ -55,7 +55,7 @@ def markdown_to_adf(markdown: str) -> dict[str, Any]:
     Returns the full ``{"type": "doc", "version": 1, "content": [...]}``
     structure ready for ``fields.description`` on Jira's REST v3 API.
 
-    Raises ``ValueError`` only when the input is empty after trimming —
+    Raises ``ValueError`` only when the input is empty after trimming -
     that's a producer bug worth surfacing rather than silently turning
     into an empty Jira description.
     """
@@ -114,7 +114,7 @@ def markdown_to_adf(markdown: str) -> dict[str, Any]:
         i += 1
 
     if not content:
-        # Producer wrote whitespace-only sections — degrade to a single
+        # Producer wrote whitespace-only sections - degrade to a single
         # paragraph so Jira receives a valid (if empty-looking) doc.
         content = [_paragraph("")]
 

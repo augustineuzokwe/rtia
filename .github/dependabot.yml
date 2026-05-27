@@ -1,4 +1,4 @@
-# Dependabot — automated dependency updates.
+# Dependabot - automated dependency updates.
 # Docs: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 #
 # Phase 13.3 of the RTIA road-to-production plan: keep Python deps and GH Actions

@@ -2,7 +2,7 @@
 
 This document lists the behavioural policies that RTIA's agents must follow, and the agent / prompt / test that enforces each one. It is aimed at two audiences:
 
-1. **Future contributors** changing an agent prompt or graph node — read this before relaxing any rule.
+1. **Future contributors** changing an agent prompt or graph node - read this before relaxing any rule.
 2. **AI-QA learners** studying how a multi-agent pipeline is hardened against fabrication, injection, leakage, and silent failure.
 
 Each guardrail has the same shape: **Policy → Why → Enforced by**. If you change the enforcement site (rename a file, move a test), update the corresponding row here in the same PR.
@@ -13,7 +13,7 @@ For the disclosure / scope side of security see [SECURITY.md](SECURITY.md). For 
 
 ## 1. Never fabricate features not in the input
 
-**Policy.** The pipeline must only produce artifacts whose features, stories, and acceptance criteria are explicitly present in the user-supplied requirements text. Inventing scope — even plausible scope — is a defect, not a feature.
+**Policy.** The pipeline must only produce artifacts whose features, stories, and acceptance criteria are explicitly present in the user-supplied requirements text. Inventing scope - even plausible scope - is a defect, not a feature.
 
 **Why.** A requirements-to-artifact pipeline is a faithfulness machine. The moment it invents, downstream estimates, test plans, and roadmaps all bake in scope the user never asked for. The whole pipeline loses its value as a trustworthy bridge between stakeholder text and engineering plan.
 
@@ -50,7 +50,7 @@ For the disclosure / scope side of security see [SECURITY.md](SECURITY.md). For 
 
 ## 3. Reject implementation and UX details as ambiguities
 
-**Policy.** "What screen does this live on?", "Should the error toast be red or amber?", "How do we cache this?" — these are implementation and UX questions, not requirements ambiguities. The analyst must explicitly ignore them rather than dressing them up as clarifying questions. The reviewer must also refuse to flag them.
+**Policy.** "What screen does this live on?", "Should the error toast be red or amber?", "How do we cache this?" - these are implementation and UX questions, not requirements ambiguities. The analyst must explicitly ignore them rather than dressing them up as clarifying questions. The reviewer must also refuse to flag them.
 
 **Why.** Treating UX or implementation gaps as ambiguities forces the human-in-the-loop to answer questions that belong to a designer or engineer downstream. It pollutes the ambiguity queue with noise and trains stakeholders to disengage. The contract is: ambiguities are about *story shape* (who, what, why), not *delivery* (how, where, when, what colour).
 
@@ -72,10 +72,10 @@ PO checkpoints documented in [README.md:44](README.md) describe how ambiguities 
 
 **Policy.** Two separate boundaries enforce this:
 
-- **Render boundary** — every artifact is run through `sanitize_artifact` before it leaves the pipeline. This strips invisible / Trojan-Source characters, downgrades dangerous code-fence languages (mermaid, html, svg, js), and caps total length.
-- **Observability boundary** — when `RTIA_ENV=production`, LangSmith tracing must be off. The pipeline raises `ProductionTracingError` at startup if a misconfigured production deployment tries to ship intermediate state to an external trace store.
+- **Render boundary** - every artifact is run through `sanitize_artifact` before it leaves the pipeline. This strips invisible / Trojan-Source characters, downgrades dangerous code-fence languages (mermaid, html, svg, js), and caps total length.
+- **Observability boundary** - when `RTIA_ENV=production`, LangSmith tracing must be off. The pipeline raises `ProductionTracingError` at startup if a misconfigured production deployment tries to ship intermediate state to an external trace store.
 
-**Why.** PII or secrets that survive the agent loop must not leak by a second route: a Trojan-Source attack that re-introduces hidden text in the rendered Markdown, a `<script>` payload smuggled through a renderer that auto-executes HTML code blocks, or — most realistically — a production deployment that quietly streams every prompt and every intermediate model output to LangSmith because someone forgot to flip an env var. The render and observability boundaries are independent so a single misconfig can't bypass both.
+**Why.** PII or secrets that survive the agent loop must not leak by a second route: a Trojan-Source attack that re-introduces hidden text in the rendered Markdown, a `<script>` payload smuggled through a renderer that auto-executes HTML code blocks, or - most realistically - a production deployment that quietly streams every prompt and every intermediate model output to LangSmith because someone forgot to flip an env var. The render and observability boundaries are independent so a single misconfig can't bypass both.
 
 **Enforced by:**
 
@@ -96,7 +96,7 @@ PO checkpoints documented in [README.md:44](README.md) describe how ambiguities 
 
 ## 5. Fail loudly rather than silently degrade
 
-**Policy.** When an LLM call exhausts its retry budget, the pipeline must surface a structured `LLMFailureDetail` (agent name, error class, HTTP status, message, retries attempted, timestamp) and return a stub artifact carrying that error in its metadata. **Silent model fallback is forbidden** — the pipeline never quietly swaps to a smaller / older / cheaper model to "keep going."
+**Policy.** When an LLM call exhausts its retry budget, the pipeline must surface a structured `LLMFailureDetail` (agent name, error class, HTTP status, message, retries attempted, timestamp) and return a stub artifact carrying that error in its metadata. **Silent model fallback is forbidden** - the pipeline never quietly swaps to a smaller / older / cheaper model to "keep going."
 
 **Why.** A silent fallback is the worst failure mode for a generative pipeline: the user gets an answer they trust without any signal that the system degraded. The artifact looks correct but was produced by a different model with different capabilities, and the gap is invisible at runtime and in evals. Pipelines that silently degrade earn distrust slowly, then all at once. The structured-error route is louder up front but preserves trust.
 
@@ -127,10 +127,10 @@ These are explicit, documented gaps in guardrail enforcement. Each one trades a 
 
 **Why.** GitHub blocks repository secrets from Dependabot-triggered workflow runs as an anti-exfiltration measure. The eval needs `GOOGLE_API_KEY_CI` to call Gemini Flash; without it the step hard-fails on every Dependabot PR. Three choices: (a) expose the secret to Dependabot (real exfiltration risk via a malicious dep update), (b) hard-fail every Dependabot PR (operator must close-and-reopen each one from their account), (c) skip the eval at the PR stage and rely on the `push`-to-`main` branch of the workflow as the safety net. Option (c) was chosen.
 
-**Risks accepted.** A regression introduced by a major GH Action bump (e.g. `setup-uv@v5→v7` changing how `uv` is invoked) is caught one step late — by the post-merge eval on `main`, requiring a revert PR rather than a pre-merge block. The cadence of action bumps is low (monthly per Dependabot config), and the path filter already exempts Python-only dep bumps from the eval entirely.
+**Risks accepted.** A regression introduced by a major GH Action bump (e.g. `setup-uv@v5→v7` changing how `uv` is invoked) is caught one step late - by the post-merge eval on `main`, requiring a revert PR rather than a pre-merge block. The cadence of action bumps is low (monthly per Dependabot config), and the path filter already exempts Python-only dep bumps from the eval entirely.
 
 **Mitigations in place.**
-- `push` to `main` always runs the eval (workflow line: `push to main — regression always runs`). No Dependabot merge can land on main without the eval running on the merged result.
+- `push` to `main` always runs the eval (workflow line: `push to main - regression always runs`). No Dependabot merge can land on main without the eval running on the merged result.
 - The skip emits a `::notice::` in the workflow log explaining the carve-out, so reviewers reading the PR's check output see the reason rather than wondering where the eval went.
 - Do **not** enable Dependabot auto-merge for the `github-actions` ecosystem. Auto-merge for grouped patch updates is acceptable only for the `uv` ecosystem (which already path-filter-skips the eval).
 

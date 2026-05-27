@@ -99,7 +99,7 @@ def test_export_jira_dry_run_includes_project_key(client, runner_mock):
 
 
 def test_export_with_update_issue_id_routes_to_github_update(client, runner_mock, monkeypatch):
-    """Issue #208 — ``update_issue_id`` flips dispatch to ``update_issue``;
+    """Issue #208 - ``update_issue_id`` flips dispatch to ``update_issue``;
     dry-run payload reflects the update operation."""
     runner_mock.get_artifact_and_title.return_value = (_stub_artifact(), "do thing X")
     r = client.post(

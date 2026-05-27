@@ -1,14 +1,14 @@
 """Tests for the per-sample PO directive fixture loader in evals.run_evals.
 
 The fixtures themselves (``evals/ground-truth/po-answers/*.yaml``) carry
-scope decisions the eval runner pins to AC ground truth — these tests
+scope decisions the eval runner pins to AC ground truth - these tests
 guard the loader contract:
 
 - Present, well-formed fixture → returns the directive string.
 - Missing fixture → returns ``None`` (runner falls back to the constant).
 - Present-but-empty / malformed fixture → returns ``None`` (no silent half-state).
 - ``_auto_po_answers`` applies the resolved answer to every CRITICAL
-  ambiguity only — normal-severity ambiguities are not auto-answered.
+  ambiguity only - normal-severity ambiguities are not auto-answered.
 """
 
 from __future__ import annotations

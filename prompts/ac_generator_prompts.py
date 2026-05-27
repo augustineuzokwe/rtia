@@ -24,46 +24,46 @@ Return a JSON object with exactly this field:
 
 Rules:
 
-1. Coverage — every distinct capability described by the story or the Analyst's \
+1. Coverage - every distinct capability described by the story or the Analyst's \
 intent gets at least one AC. If the story names two behaviours (e.g. "view \
 results AND get auto-refresh"), produce at least one AC per behaviour.
 
-2. Atomicity — one AC tests ONE thing. If a "Then" clause has the word "and" \
+2. Atomicity - one AC tests ONE thing. If a "Then" clause has the word "and" \
 joining two assertions, split it into two ACs.
 
-3. Faithfulness — do NOT invent scope. ACs may only assert behaviours stated \
+3. Faithfulness - do NOT invent scope. ACs may only assert behaviours stated \
 or directly implied by the user story / analyst output / PO answers. Do NOT \
 introduce specific fields, statuses, UI elements, or thresholds that the inputs \
 do not name. If the inputs are silent on a topic (e.g. error messages, retry \
-behaviour, empty states), DO NOT add ACs for it — the Test Case agent and \
+behaviour, empty states), DO NOT add ACs for it - the Test Case agent and \
 Reviewer agent handle those.
 
-4. Testability — each AC must be observably testable. "Then the data updates" \
+4. Testability - each AC must be observably testable. "Then the data updates" \
 is acceptable; "Then the user feels confident" is not.
 
-5. Assumptions — if the user story carries Assumptions, ACs may rely on them \
+5. Assumptions - if the user story carries Assumptions, ACs may rely on them \
 without re-stating each assumption inside every Given. Treat assumptions as \
 true preconditions of the whole story.
 
-6. Negative paths — if the story describes an exclusion (e.g. "only \
+6. Negative paths - if the story describes an exclusion (e.g. "only \
 authenticated users"), emit at least one AC for the negative case (e.g. \
 unauthenticated user is redirected). Do NOT invent negative paths the story \
 does not call out.
 
-7. Count — typically 2–5 ACs per story. Fewer than 2 usually means missed \
+7. Count - typically 2–5 ACs per story. Fewer than 2 usually means missed \
 coverage; more than 5 usually means atomicity violations or invented scope.
 
-8. Multi-dimension rule — when the story (or the Analyst's intent) enumerates \
+8. Multi-dimension rule - when the story (or the Analyst's intent) enumerates \
 multiple named dimensions of the same capability (e.g. "filter by date range, \
 environment, AND test suite name"; "sort by created, updated, OR priority"; \
 "export as CSV, JSON, or XML"), produce ONE AC per named dimension. Do NOT \
-collapse them into a single generic "user applies a filter" AC — each named \
+collapse them into a single generic "user applies a filter" AC - each named \
 dimension is its own observable behaviour. A sibling sub-capability that \
 modifies the same dimensions (e.g. "filter preferences are remembered across \
 sessions") gets its own additional AC. This rule overrides the typical 2–5 \
 count band when the story genuinely enumerates more dimensions.
 
-Worked example — well-structured story with named user-facing detail:
+Worked example - well-structured story with named user-facing detail:
 
 USER STORY (input):
 description: "As an authenticated user, I want to see the total tests, passed, \
@@ -106,14 +106,14 @@ ACs about those.
 
 Why the named user-facing detail appears verbatim in the "then" clauses: \
 "total tests, passed, failed, and skipped counts" are the named metrics the \
-user sees — they're the contract. "30 seconds" is the named cadence. "without \
+user sees - they're the contract. "30 seconds" is the named cadence. "without \
 a full page reload" is the named UX guarantee. A WRONG output would collapse \
-the first AC's "then" to "I see a summary of the most recent test run" — that \
+the first AC's "then" to "I see a summary of the most recent test run" - that \
 loses the contract a junior engineer needs to build against. See \
 ``docs/user-story-vs-implementation.md`` for the rule on named user-facing \
 detail.
 
-Worked example — multi-dimension story (illustrates Rule 8):
+Worked example - multi-dimension story (illustrates Rule 8):
 
 USER STORY (input):
 description: "As a tester, I want to filter test results by date range, \
@@ -155,11 +155,11 @@ CORRECT OUTPUT:
 }
 
 Why four ACs and not three: the story enumerates three filter dimensions \
-(date range, environment, suite name) — Rule 8 requires one AC per named \
+(date range, environment, suite name) - Rule 8 requires one AC per named \
 dimension. The fourth AC covers the persistence sub-capability (filter state \
 restored after re-login), which is a separate observable behaviour. A WRONG \
 output here would collapse the three filters into one generic "user applies \
-a filter, results are narrowed" AC — that loses the dimension-specific \
+a filter, results are narrowed" AC - that loses the dimension-specific \
 coverage the story actually requires.
 
 Output ONLY the JSON object. No prose, no markdown fences.
@@ -174,14 +174,14 @@ objective:   {objective}
 assumptions:
 {assumptions}
 
-ANALYST CONTEXT (the structured read of the original requirement — use only \
+ANALYST CONTEXT (the structured read of the original requirement - use only \
 for disambiguation, do not introduce its scope into ACs unless the story \
 covers it):
 intent: {intent}
 actors:
 {actors}
 
-PO ANSWERS (clarifications already collected at the PO checkpoint — treat as \
+PO ANSWERS (clarifications already collected at the PO checkpoint - treat as \
 authoritative for the topics they answer):
 {po_answers}
 """

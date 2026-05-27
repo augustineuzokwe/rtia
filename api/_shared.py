@@ -1,14 +1,14 @@
 """Shared helpers used by both the FastAPI route layer (``api/main.py``)
 and the Gradio UI handlers (``ui/gradio_app.py``).
 
-Background — risk **R2** in
+Background - risk **R2** in
 [docs/ui_audit_2026-05-24.md](../docs/ui_audit_2026-05-24.md). Before
 this module existed, both surfaces re-implemented the same dispatch
 logic (deferred-follow-up markdown body, DONE / DONE_SPLIT story-list
 selection) against the same underlying ``PipelineRunner``. The shapes
 were identical; the prior docstrings called out the duplication and
-attributed it to a circular-import concern that this module — a
-neutral third file both can import — resolves.
+attributed it to a circular-import concern that this module - a
+neutral third file both can import - resolves.
 
 Anything added here should have **at least two callers**. Single-caller
 helpers belong in their owning module.
@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 
 from api.models import ThreadStatus
 
-if TYPE_CHECKING:  # pragma: no cover — typing only, avoids import at runtime
+if TYPE_CHECKING:  # pragma: no cover - typing only, avoids import at runtime
     from api.runner import PipelineRunner
 
 
@@ -33,7 +33,7 @@ def build_followup_markdown(
 ) -> str:
     """Compose a follow-up-issue body for a deferred/split implied story.
 
-    Intentionally lightweight — these are *placeholder* issues a PO
+    Intentionally lightweight - these are *placeholder* issues a PO
     triages later. They're not full RTIA artifacts. Each carries enough
     context (title, summary, originating-requirement excerpt) for the
     PO to re-run RTIA on the title once they want to flesh it out.
@@ -82,7 +82,7 @@ def select_followup_source(
 
     Returns ``(stories, requirement_text)`` or ``None`` if the thread
     has no state. The empty-list case (thread exists but produced no
-    follow-ups) returns ``([], "")`` — callers decide how to surface
+    follow-ups) returns ``([], "")`` - callers decide how to surface
     "nothing to do" since the wording differs between API and UI.
     """
     if status == ThreadStatus.DONE_SPLIT:
@@ -95,13 +95,13 @@ def followup_empty_message(status: ThreadStatus) -> str:
 
     UI-only today (the API returns an empty
     ``DeferredExportResponse``), but lives here so the wording matches
-    the source-selection dispatch above — both pivot on
+    the source-selection dispatch above - both pivot on
     ``DONE_SPLIT`` vs everything-else. If the API ever wants to
     surface a message field, it pulls from the same place.
     """
     if status == ThreadStatus.DONE_SPLIT:
-        return "_No split stories — nothing to create._"
-    return "_No deferred stories — nothing to create._"
+        return "_No split stories - nothing to create._"
+    return "_No deferred stories - nothing to create._"
 
 
 __all__ = [

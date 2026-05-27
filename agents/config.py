@@ -1,6 +1,6 @@
 """Shared agent configuration constants.
 
-Single source of truth for cross-agent defaults — primarily the model ID
+Single source of truth for cross-agent defaults - primarily the model ID
 and resilience knobs. Centralizing here means a model bump or a default
 timeout change happens in one place and propagates to every agent, instead
 of needing matching edits across agents/*.py.
@@ -33,7 +33,7 @@ third provider lands.
 OLLAMA_MODEL_ENV_VAR = "RTIA_OLLAMA_MODEL"
 """Env-var name that picks the Ollama model when the provider is ``ollama``.
 
-Defaults to ``llama3.1:8b`` — the model pulled in §7.1 of the same plan
+Defaults to ``llama3.1:8b`` - the model pulled in §7.1 of the same plan
 on a 24 GB M3 MacBook Air. Override at process start to compare other
 local models without code edits.
 """
@@ -52,7 +52,7 @@ against the ``docs/pipeline-baseline-2026-05-26.md`` baseline (see the
 inline comment in ``evals/judge.py:load_model``). Setting
 ``RTIA_OLLAMA_JUDGE=1`` additionally routes the judge through Ollama,
 making the eval suite cost zero API dollars at the price of varying
-both components at once — useful when answering "is RTIA usable
+both components at once - useful when answering "is RTIA usable
 end-to-end without any API spend?" rather than "how much does the
 generator alone degrade locally?"
 """
@@ -61,7 +61,7 @@ OLLAMA_JUDGE_MODEL_ENV_VAR = "RTIA_OLLAMA_JUDGE_MODEL"
 """Env-var that picks the Ollama judge model when ``RTIA_OLLAMA_JUDGE`` is on.
 
 Defaults to ``DEFAULT_OLLAMA_MODEL`` (same as the generator) when unset.
-Override if you want an asymmetric local stack — e.g. an 8B generator
+Override if you want an asymmetric local stack - e.g. an 8B generator
 plus a 14B judge to recover some judge precision without paying for
 Gemini.
 """
@@ -81,7 +81,7 @@ def use_ollama() -> bool:
 def use_ollama_judge() -> bool:
     """Return True when the deepeval judge should run through Ollama too.
 
-    Independent of :func:`use_ollama` — the generator and judge each have
+    Independent of :func:`use_ollama` - the generator and judge each have
     their own switch, and the judge default stays on Gemini regardless of
     the generator setting. Set ``RTIA_OLLAMA_JUDGE=1`` to flip the judge.
     """
@@ -94,7 +94,7 @@ LLM_CACHE_ENABLED_ENV_VAR = "RTIA_LLM_CACHE"
 
 Accepted values (case-insensitive): ``enabled`` (default) or ``disabled``.
 The CI regression job in ``.github/workflows/ci.yml`` sets this to
-``disabled`` so the eval gate always re-measures live behaviour — see
+``disabled`` so the eval gate always re-measures live behaviour - see
 [Issue #230](https://github.com/augustineuzokwe/rtia/issues/230) §"three-part fix" for the
 "false-green CI" trap this avoids.
 
@@ -105,7 +105,7 @@ the TTL bounds how long a stale cache can silently linger.
 LLM_CACHE_TTL_ENV_VAR = "RTIA_LLM_CACHE_TTL"
 """Cache TTL in seconds. Default 86 400 (24h) per [Issue #230](https://github.com/augustineuzokwe/rtia/issues/230).
 
-Deliberately shorter than Promptfoo's 14-day default — RTIA's faster
+Deliberately shorter than Promptfoo's 14-day default - RTIA's faster
 iteration cadence means a 14-day stale window would hide too much
 real model drift. 24 hours bounds the worst-case stale window to one
 workday.
@@ -126,14 +126,14 @@ DEFAULT_MODEL = "gemini-3.5-flash"
 Switched from ``gemini-2.5-flash`` on 2026-05-21 after the 2.5-flash
 alias hit repeated 503 UNAVAILABLE errors on GitHub-hosted CI runners
 (PRs #107, #109). Live probing showed ``gemini-3.5-flash`` routes to
-a separate, healthy backend pool — the 503s were not a global Google
+a separate, healthy backend pool - the 503s were not a global Google
 outage but a backend-specific congestion on whichever pool the
 2.5-flash alias mapped to. See ADR-0007 for the full rationale plus
 the live-probe data that motivated the choice.
 
 Still an alias (no dated 3.5-flash suffix exists at switch time).
 When Google publishes a dated suffix for the 3.5 line, bump this for
-reproducibility — same caveat that applied to 2.5-flash.
+reproducibility - same caveat that applied to 2.5-flash.
 """
 
 DEFAULT_TIMEOUT_SECONDS = 60.0
@@ -143,12 +143,12 @@ DEFAULT_MAX_RETRIES = 2
 """LangChain retry count for transient errors.
 
 The Gemini wrapper retries on rate limits and transient server errors with
-exponential backoff. Trimmed 5→2 in issue #163 (pipeline speedup) — the
+exponential backoff. Trimmed 5→2 in issue #163 (pipeline speedup) - the
 prior N=5 stacked badly with the workflow-level retry: a stuck call would
 burn 5 SDK attempts × exponential backoff, then ``nick-fields/retry@v4``
 (``.github/workflows/ci.yml``) would re-run the entire eval, for up to 10
 logical attempts at a single LLM call. With N=2 the layered worst case is
-2 SDK × 2 workflow = 4 attempts — still enough to ride out a single 503,
+2 SDK × 2 workflow = 4 attempts - still enough to ride out a single 503,
 but tail latency is bounded.
 
 Override per call when the agent runs in a different SLO context
@@ -174,7 +174,7 @@ MAX_OUTPUT_TOKENS_ANALYST = 4000  # observed max 1972 (sample-03)
 MAX_OUTPUT_TOKENS_STORY_WRITER = 3000  # observed max 1378 (sample-02)
 MAX_OUTPUT_TOKENS_AC_GENERATOR = 4500  # observed max 2042 (sample-06)
 MAX_OUTPUT_TOKENS_TEST_CASE_WRITER = 6500  # observed max 3012 (sample-05)
-MAX_OUTPUT_TOKENS_REVIEWER = 3000  # uncalibrated — match Story Writer
+MAX_OUTPUT_TOKENS_REVIEWER = 3000  # uncalibrated - match Story Writer
 
 
 def prompt_hash(*prompts: str) -> str:
@@ -183,7 +183,7 @@ def prompt_hash(*prompts: str) -> str:
     Used as `prompt_hash` in LangSmith trace metadata so every traced
     LLM call can be attributed to the exact prompt version that produced
     it. Editing any prompt content (system or user-template) changes the
-    hash; reordering arguments also changes it (deliberate — both
+    hash; reordering arguments also changes it (deliberate - both
     prompts contribute to model behavior).
 
     Returns the first 12 hex chars of sha256, which is plenty to avoid

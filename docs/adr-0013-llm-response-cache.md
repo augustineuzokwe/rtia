@@ -1,18 +1,18 @@
-# ADR-0013: LLM response cache — short TTL, CI no-cache, prompt-hash key
+# ADR-0013: LLM response cache - short TTL, CI no-cache, prompt-hash key
 
 **Status:** Accepted (2026-05-26)
 **Author:** augustineuzokwe
-**Decision driver:** Iteration on RTIA (UI/exporter changes, local refactors) re-runs the same inputs repeatedly; without a cache, each iteration pays Gemini Flash for output the user already saw. The cache is a real win — but if we ship the wrong cache defaults, we ship something worse than no cache: silent eval-gate dishonesty. This ADR captures the design that gets both the win and the honesty.
+**Decision driver:** Iteration on RTIA (UI/exporter changes, local refactors) re-runs the same inputs repeatedly; without a cache, each iteration pays Gemini Flash for output the user already saw. The cache is a real win - but if we ship the wrong cache defaults, we ship something worse than no cache: silent eval-gate dishonesty. This ADR captures the design that gets both the win and the honesty.
 
 ## Context
 
 Two real failure modes if we get this wrong:
 
-1. **"False-green CI" trap.** Someone runs the eval suite, gets a green result, the cache stores it. Days later they "verify" the eval still passes — the cache hits, CI is instant green. They ship the change. Reality: the model's behaviour has drifted in the interim, but the eval never re-measured because the cache was warm. The PR-status gate gave confidence it hadn't earned. *Worse than no eval gate because it actively misleads.*
+1. **"False-green CI" trap.** Someone runs the eval suite, gets a green result, the cache stores it. Days later they "verify" the eval still passes - the cache hits, CI is instant green. They ship the change. Reality: the model's behaviour has drifted in the interim, but the eval never re-measured because the cache was warm. The PR-status gate gave confidence it hadn't earned. *Worse than no eval gate because it actively misleads.*
 
 2. **Stale-prompt amplification.** A prompt edit lands; the cache key doesn't include the prompt; the cache replays the old prompt's output; the eval gate measures the old prompt's behaviour. The PR shows "no metric change" even though the prompt fundamentally changed. Identical end-result to (1) but triggered by a different mechanism.
 
-Promptfoo's cache design ([docs](https://www.promptfoo.dev/docs/configuration/caching/)) was the starting reference. RTIA adopts the *shape* but not the *defaults* — specifically, Promptfoo's 14-day TTL is too long for our iteration cadence.
+Promptfoo's cache design ([docs](https://www.promptfoo.dev/docs/configuration/caching/)) was the starting reference. RTIA adopts the *shape* but not the *defaults* - specifically, Promptfoo's 14-day TTL is too long for our iteration cadence.
 
 ## Decision
 
@@ -20,9 +20,9 @@ Promptfoo's cache design ([docs](https://www.promptfoo.dev/docs/configuration/ca
 
 | Defence | How it's enforced |
 |---|---|
-| **Prompt edits auto-invalidate** | `prompt_hash` from `agents/config.py:prompt_hash()` is part of the cache key. A one-character change to a prompt module changes the hash, the key, and the lookup — next call hits the model live. |
+| **Prompt edits auto-invalidate** | `prompt_hash` from `agents/config.py:prompt_hash()` is part of the cache key. A one-character change to a prompt module changes the hash, the key, and the lookup - next call hits the model live. |
 | **Provider/model swaps auto-invalidate** | `model_id` is part of the key, formatted as `"google:gemini-3.5-flash"` or `"ollama:llama3.1:8b"`. Cross-provider cache collisions are impossible. |
-| **Short TTL** | Default `RTIA_LLM_CACHE_TTL=86400` (24 h). Worst-case stale window is one workday — not Promptfoo's 14 days. |
+| **Short TTL** | Default `RTIA_LLM_CACHE_TTL=86400` (24 h). Worst-case stale window is one workday - not Promptfoo's 14 days. |
 | **CI always disables** | `.github/workflows/ci.yml` regression job sets `RTIA_LLM_CACHE=disabled` AND passes `--no-cache` to `evals/run_evals.py`. Belt and suspenders so the disable survives a future workflow refactor that might strip one of the two. |
 | **Re-baselining always disables** | Plan §7.0 pattern: re-baselining runs without `--no-cache` would defeat the whole purpose. The eval runner's `--no-cache` CLI flag is the documented escape hatch. |
 | **Integration smoke defaults to disabled** | `scripts/run_integration_smoke.py` exists to verify live behaviour; an `--use-cache` opt-in flag exists for the rare case where you want it. |
@@ -37,18 +37,18 @@ Promptfoo's cache design ([docs](https://www.promptfoo.dev/docs/configuration/ca
 | `evals/run_evals.py` from CI regression job | **OFF** | "False-green CI" trap. Non-negotiable. |
 | `scripts/run_integration_smoke.py` | **OFF** | Smoke exists for live verification, not replay. |
 | Re-baselining (manual, plan §7.0) | **OFF** | Whole point is fresh measurement. |
-| Adversarial / safety regression runs | **OFF** | Distribution matters — want N draws, not 1 cached draw. (Future `--n-runs` work, see Issue #233.) |
+| Adversarial / safety regression runs | **OFF** | Distribution matters - want N draws, not 1 cached draw. (Future `--n-runs` work, see Issue #233.) |
 
 ### Env-var contract
 
-- `RTIA_LLM_CACHE=enabled|disabled` — case-insensitive, default `enabled`.
-- `RTIA_LLM_CACHE_TTL=<seconds>` — positive integer, default 86400. Garbled values fall back to the default rather than crashing.
-- `RTIA_LLM_CACHE_DIR=<path>` — supports `~` expansion. Default `~/.rtia/cache`. Created on first use.
+- `RTIA_LLM_CACHE=enabled|disabled` - case-insensitive, default `enabled`.
+- `RTIA_LLM_CACHE_TTL=<seconds>` - positive integer, default 86400. Garbled values fall back to the default rather than crashing.
+- `RTIA_LLM_CACHE_DIR=<path>` - supports `~` expansion. Default `~/.rtia/cache`. Created on first use.
 
 ### CLI-flag contract
 
-- `--no-cache` on `scripts/run_pipeline_demo.py` and `evals/run_evals.py` — sugar for `RTIA_LLM_CACHE=disabled` for the lifetime of the process.
-- `--use-cache` on `scripts/run_integration_smoke.py` — inverted because the script defaults to disabled.
+- `--no-cache` on `scripts/run_pipeline_demo.py` and `evals/run_evals.py` - sugar for `RTIA_LLM_CACHE=disabled` for the lifetime of the process.
+- `--use-cache` on `scripts/run_integration_smoke.py` - inverted because the script defaults to disabled.
 
 ## Alternatives considered
 
@@ -64,8 +64,8 @@ Promptfoo's cache design ([docs](https://www.promptfoo.dev/docs/configuration/ca
 
 - Local iteration on UI/exporters/refactors costs ~$0 after first warm-up of a given input.
 - The "false-green CI" trap is eliminated by the env + CLI double-disable on the regression job.
-- A prompt edit cannot silently replay old behaviour — the `prompt_hash` is the load-bearing invariant.
-- Cross-provider cache collisions are impossible — model_id includes the provider prefix.
+- A prompt edit cannot silently replay old behaviour - the `prompt_hash` is the load-bearing invariant.
+- Cross-provider cache collisions are impossible - model_id includes the provider prefix.
 
 ### Trade-offs
 
@@ -83,7 +83,7 @@ Promptfoo's cache design ([docs](https://www.promptfoo.dev/docs/configuration/ca
 
 ## References
 
-- [Issue #230 — high-priority Task with full acceptance criteria](https://github.com/augustineuzokwe/rtia/issues/230) — this ADR codifies what that issue's "three-part fix" looked like in code.
-- [Promptfoo caching docs](https://www.promptfoo.dev/docs/configuration/caching/) — the reference design we adopted in shape and deliberately deviated from in TTL.
-- [`agents/config.py:prompt_hash`](../agents/config.py) — the existing utility this design builds on.
-- [`docs/pipeline-baseline-2026-05-26.md`](pipeline-baseline-2026-05-26.md) — fresh baseline created on the explicit assumption of a cache-free measurement; future re-baselines must continue that discipline.
+- [Issue #230 - high-priority Task with full acceptance criteria](https://github.com/augustineuzokwe/rtia/issues/230) - this ADR codifies what that issue's "three-part fix" looked like in code.
+- [Promptfoo caching docs](https://www.promptfoo.dev/docs/configuration/caching/) - the reference design we adopted in shape and deliberately deviated from in TTL.
+- [`agents/config.py:prompt_hash`](../agents/config.py) - the existing utility this design builds on.
+- [`docs/pipeline-baseline-2026-05-26.md`](pipeline-baseline-2026-05-26.md) - fresh baseline created on the explicit assumption of a cache-free measurement; future re-baselines must continue that discipline.

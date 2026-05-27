@@ -1,7 +1,7 @@
 """LangSmith observability helpers + production tracing guard.
 
 LangChain auto-instruments LLM calls when LangSmith environment variables
-are set — no agent code changes are required. This module exists for two
+are set - no agent code changes are required. This module exists for two
 reasons:
 
 1. Let callers (the demo, future UI, future eval harness) detect whether
@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 # Allowed values for the RTIA_ENV environment variable. Keep the set
-# small — an open string here invites typos that silently fall back to
+# small - an open string here invites typos that silently fall back to
 # the most-permissive default. See ADR-0008.
 RtiaEnv = Literal["development", "ci", "production"]
 _ALLOWED_ENVS: frozenset[str] = frozenset({"development", "ci", "production"})
@@ -46,7 +46,7 @@ def _current_env() -> RtiaEnv:
     An unrecognised value (typo, empty string, unset) is treated as
     ``development``. This is the safest default for the assertion path:
     a typo'd ``RTIA_ENV=produciton`` must NOT count as production for
-    permissioning purposes — the operator's misconfiguration there
+    permissioning purposes - the operator's misconfiguration there
     surfaces elsewhere (the deployment fails for other reasons), and
     granting the more-permissive development behaviour is harmless.
     """
@@ -82,7 +82,7 @@ def tracing_status() -> TracingStatus:
     Tracing is considered ON when ALL of the following hold:
 
     - ``RTIA_ENV`` is NOT ``production``. Phase 12.4 forces tracing off
-      in production regardless of the LangSmith vars — see ADR-0008.
+      in production regardless of the LangSmith vars - see ADR-0008.
     - ``LANGSMITH_TRACING`` is truthy.
     - ``LANGSMITH_API_KEY`` is present and non-empty.
 
@@ -132,7 +132,7 @@ def assert_safe_for_env() -> None:
     Called by every process entry point (demo script, future API
     handler) BEFORE any LLM call. Raises ``ProductionTracingError``
     if both ``RTIA_ENV=production`` and ``LANGSMITH_TRACING`` is
-    truthy — the misconfiguration that would otherwise exfiltrate
+    truthy - the misconfiguration that would otherwise exfiltrate
     customer requirement text to LangSmith.
 
     Per ADR-0008, this is a hard assert rather than a soft override:
@@ -143,7 +143,7 @@ def assert_safe_for_env() -> None:
 
     The check intentionally only inspects ``LANGSMITH_TRACING`` (not
     the full ``tracing_status().enabled``) so an incomplete config
-    — e.g. ``LANGSMITH_TRACING=true`` with no API key — still fails
+    - e.g. ``LANGSMITH_TRACING=true`` with no API key - still fails
     loudly in production. The operator's *intent* to trace is the
     misconfiguration we are catching, not the *successful* trace.
     """

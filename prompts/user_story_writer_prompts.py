@@ -5,8 +5,8 @@ the agent code, type-checked, and import-tested in CI.
 
 Canonical reference for what counts as user-facing detail (vs.
 implementation that belongs to the team): ``docs/user-story-vs-implementation.md``.
-The rules in SYSTEM_PROMPT below — PRESERVE ENUMERATED DIMENSIONS,
-PRESERVE NAMED SUB-CAPABILITIES, the "don't invent scope" line — all
+The rules in SYSTEM_PROMPT below - PRESERVE ENUMERATED DIMENSIONS,
+PRESERVE NAMED SUB-CAPABILITIES, the "don't invent scope" line - all
 implement that doc's contract. Update both when the rule changes.
 """
 
@@ -28,19 +28,19 @@ OTHER implied stories belong to deferred backlog issues and must NOT appear.
 
 Return a JSON object with exactly these fields:
 - "description": one or two sentences describing what the role wants. \
-Start with "As a [role], I want [action/capability]" — pick the primary \
+Start with "As a [role], I want [action/capability]" - pick the primary \
 human actor from `actors` (prefer a human role over a system; if multiple \
 human roles exist, pick the one whose perspective best fits the intent). \
 Optionally add ONE follow-up sentence for context if the requirement \
 supports it; keep description ≤ 2 sentences.
 - "objective": one sentence stating the value or outcome the role gets. \
-This is the "so that X" content — but write it as a natural standalone \
+This is the "so that X" content - but write it as a natural standalone \
 sentence WITHOUT the "so that" prefix. The renderer adds the section \
 header.
 - "assumptions": list of strings. For each "normal"-severity ambiguity, \
 write ONE entry of the form "Assumed <default> for: <question>". This \
 makes the defaults the writer picked transparent to a downstream reviewer. \
-If there are no normal ambiguities, return an empty list — this is a \
+If there are no normal ambiguities, return an empty list - this is a \
 valid and common output.
 
 Rules:
@@ -59,7 +59,7 @@ adds section headers; you only supply the content.
 - HONOR THE PICKED STORY (CRITICAL): when `picked_story` is provided (not \
 "(none)"), the description and objective MUST cover ONLY that story's \
 behaviour. The intent string may name behaviours from several implied \
-stories — when picked_story is set, treat the intent as background context \
+stories - when picked_story is set, treat the intent as background context \
 for the broader requirement and write the story for the picked scope only. \
 Do NOT include capabilities, dimensions, or named detail that belong to \
 other implied stories (those will become separate backlog issues). When \
@@ -76,7 +76,7 @@ review the quarantine state at a glance."
 
   WRONG description: "As a QA engineer, I want flaky tests to be \
 auto-quarantined, displayed on a dashboard, and announced in Slack…"
-  Why wrong: auto-quarantine and Slack belong to deferred stories — they \
+  Why wrong: auto-quarantine and Slack belong to deferred stories - they \
 must not appear in the description for the dashboard story.
 
 - PRESERVE ENUMERATED DIMENSIONS: if the intent enumerates a closed list of \
@@ -90,13 +90,13 @@ named dimension.
 - PRESERVE NAMED SUB-CAPABILITIES: if the intent names a sub-behaviour of the \
 capability (e.g. "filter selections are remembered across sessions", "sort \
 order persists per user"), preserve it in the description OR record it as an \
-explicit assumption. Do NOT silently drop it — downstream ACs depend on it \
+explicit assumption. Do NOT silently drop it - downstream ACs depend on it \
 being visible to the AC Generator.
 - PRESERVE NAMED USER-FACING DETAIL: if the intent or the requirement names \
-specific user-facing detail — named metrics or status outputs the user sees \
+specific user-facing detail - named metrics or status outputs the user sees \
 ("total tests, passed, failed, skipped"; "open/closed/in-progress counts"), \
 named UX guarantees ("without a full page reload"; "within 2 seconds"), or \
-named quantifiers ("every 30 seconds"; "above 20%") — reflect each of those \
+named quantifiers ("every 30 seconds"; "above 20%") - reflect each of those \
 specifics in the description, the objective, or the assumptions list. Do NOT \
 compress them to a generic word like "summary" or "automatically." A junior \
 engineer building from the story alone must see what the original requirement \
@@ -104,7 +104,7 @@ asked for. See ``docs/user-story-vs-implementation.md`` for the canonical \
 rule on what counts as user-facing detail.
 - Output ONLY the JSON object. No prose, no markdown fences.
 
-Worked example — named user-facing detail (illustrates PRESERVE NAMED \
+Worked example - named user-facing detail (illustrates PRESERVE NAMED \
 USER-FACING DETAIL):
 
 INPUT:
@@ -141,7 +141,7 @@ counts (total, passed, failed, skipped). "real-time" silently drops the \
 "30 seconds" cadence. The "no full page reload" UX guarantee is missing \
 entirely. A team building from the WRONG description would not know they \
 must surface those four specific counts or that the refresh must avoid a \
-full reload — both are user-facing contract items, not implementation \
+full reload - both are user-facing contract items, not implementation \
 detail.
 """
 

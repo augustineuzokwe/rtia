@@ -6,8 +6,8 @@ can open directly.
 
 Layered like the demo script:
 
-1. ``configure_logging()`` — structured JSON logs on stderr.
-2. ``assert_safe_for_env()`` — refuse to start if ``RTIA_ENV=production``
+1. ``configure_logging()`` - structured JSON logs on stderr.
+2. ``assert_safe_for_env()`` - refuse to start if ``RTIA_ENV=production``
    AND LangSmith tracing is on (Phase 12.4 guard).
 3. Mint the API token (or read ``RTIA_API_TOKEN``).
 4. Build the runner (one compiled pipeline per process).
@@ -60,7 +60,7 @@ _log = logging.getLogger("rtia.api")
 class DeferredExportRequest(BaseModel):
     """Body shape for ``POST /pipeline/{thread_id}/export-deferred``.
 
-    ``include`` is an optional case-insensitive title filter — when set,
+    ``include`` is an optional case-insensitive title filter - when set,
     only deferred stories whose title matches one of the entries are
     exported. Default is "export all".
     """
@@ -81,7 +81,7 @@ class DeferredExportResponse(BaseModel):
     )
 
 
-# Module-level singleton for the ``UploadFile`` default — keeps ruff's
+# Module-level singleton for the ``UploadFile`` default - keeps ruff's
 # B008 happy (no function call in argument defaults) and matches FastAPI's
 # documented pattern for sharing a default across endpoints.
 _UPLOAD_FILE: UploadFile = File(...)
@@ -98,11 +98,11 @@ def _resume_value_from(
     Three shapes:
 
     - PO checkpoint, **deep mode** (Analyst found ≤ 1 implied story):
-      LangGraph expects ``dict[question, answer]`` — pass ``request.answers``
+      LangGraph expects ``dict[question, answer]`` - pass ``request.answers``
       through.
     - PO checkpoint, **split mode** (Phase 15.4): LangGraph expects
       ``{"selected_story_titles": [...], "answers": {...}}``. Empty
-      ``selected_story_titles`` is the Q2 default — graph treats it as
+      ``selected_story_titles`` is the Q2 default - graph treats it as
       "keep every implied story".
     - Story Review checkpoint: ``{"accepted": bool, ...}``.
 
@@ -114,8 +114,8 @@ def _resume_value_from(
         mode = (paused_payload or {}).get("mode", "deep")
         if mode == "split":
             # Split: structured selection. None / empty list signals
-            # "fan out everything" — pass-through, graph fills the default.
-            # Issue #207 — prefer the editable ``selected_stories`` shape
+            # "fan out everything" - pass-through, graph fills the default.
+            # Issue #207 - prefer the editable ``selected_stories`` shape
             # (title+summary+original_title) when supplied so PO edits to
             # titles flow into ``split_stories``; legacy callers may
             # still send plain ``selected_story_titles``.
@@ -196,7 +196,7 @@ def _install_ui_auth_middleware(app: FastAPI) -> None:
     2. ``?token=…`` query param (one-click open from the printed URL).
     3. ``rtia_token`` cookie (auto-set after a successful #1 or #2,
        so the browser doesn't 401 itself on the absolute-path asset
-       fetches Gradio emits — ``/assets/index-*.js`` etc. — which the
+       fetches Gradio emits - ``/assets/index-*.js`` etc. - which the
        browser fires *without* the original query string).
 
     API routes ``/pipeline*`` / ``/uploads*`` skip the middleware (they
@@ -206,7 +206,7 @@ def _install_ui_auth_middleware(app: FastAPI) -> None:
     Gradio JS bundle to the API hits succeed without the JS needing to
     know the token.
 
-    Cookie is ``HttpOnly``, ``SameSite=Strict``, ``Path=/`` — adequate
+    Cookie is ``HttpOnly``, ``SameSite=Strict``, ``Path=/`` - adequate
     for a localhost-only dev tool. Set ``RTIA_API_COOKIE_SECURE=true``
     if you ever front this with TLS (post-v1 hardening).
     """
@@ -306,7 +306,7 @@ def _register_routes(app: FastAPI) -> None:
         """Push the thread's final artifact to Jira or GitHub.
 
         ``body.dry_run=true`` short-circuits the HTTP call and returns
-        the would-be payload — safe to call without credentials.
+        the would-be payload - safe to call without credentials.
         """
         runner: PipelineRunner = request.app.state.runner
         loaded = runner.get_artifact_and_title(thread_id)
@@ -323,7 +323,7 @@ def _register_routes(app: FastAPI) -> None:
 
         try:
             exporter = make_exporter(body.target.backend)
-            # Issue #208 — when ``update_issue_id`` is supplied, replace
+            # Issue #208 - when ``update_issue_id`` is supplied, replace
             # the existing issue instead of creating a duplicate. The
             # common flow: PO copies a split placeholder's issue number,
             # re-runs RTIA on the title, sets ``update_issue_id`` to
@@ -358,7 +358,7 @@ def _register_routes(app: FastAPI) -> None:
         issue for each so they land on the backlog instead of being lost.
         """
         runner: PipelineRunner = request.app.state.runner
-        # Phase 15.4 — dispatch to the split source on DONE_SPLIT threads.
+        # Phase 15.4 - dispatch to the split source on DONE_SPLIT threads.
         # Split stories are the same shape (ImpliedStory) as deferred, so
         # the rest of the loop body is identical. The shared helper picks
         # which state field to read; the UI's "Create follow-up issues"

@@ -1,6 +1,6 @@
-# CLAUDE.md — RTIA repo context for Claude Code
+# CLAUDE.md - RTIA repo context for Claude Code
 
-This file is read on every Claude Code session opening this repo. It compiles project-specific rules and operational knowledge so any session — fresh install, different machine, different developer — works to the same standard.
+This file is read on every Claude Code session opening this repo. It compiles project-specific rules and operational knowledge so any session - fresh install, different machine, different developer - works to the same standard.
 
 If you're a fresh Claude Code session reading this for the first time: **read top to bottom before making changes**. The rules below are not suggestions; they're how this project is run.
 
@@ -10,12 +10,12 @@ If you're a fresh Claude Code session reading this for the first time: **read to
 
 A multi-agent AI assistant that turns raw software requirements (feature requests, PRD snippets, meeting notes) into **one backlog-ready user-story artifact** with four sections:
 
-1. **Description** — what the role wants ("As a/an X, I want Y")
-2. **Objective** — the value/outcome the role gets
-3. **Acceptance Criteria** — Given/When/Then format
-4. **Test Cases** — happy path + edge cases + negative paths
+1. **Description** - what the role wants ("As a/an X, I want Y")
+2. **Objective** - the value/outcome the role gets
+3. **Acceptance Criteria** - Given/When/Then format
+4. **Test Cases** - happy path + edge cases + negative paths
 
-The artifact is designed to paste directly into a Jira Epic or stand alone on a GitHub Project backlog. Every agent in the pipeline contributes to one or more sections of this single artifact — there are no standalone outputs.
+The artifact is designed to paste directly into a Jira Epic or stand alone on a GitHub Project backlog. Every agent in the pipeline contributes to one or more sections of this single artifact - there are no standalone outputs.
 
 Pipeline today (since Phase 15.4) has two paths chosen by a LangGraph conditional edge at the PO checkpoint:
 
@@ -28,7 +28,7 @@ Fan-out path (multi-story requirements, implied_stories ≥ 2):
   START → Analyst → PO Checkpoint (CheckboxGroup UI) → fan_out_node → END
 ```
 
-The deep path produces a full `FinalUserStory` (Description / Objective / ACs / Test Cases). The fan-out path produces lightweight backlog stubs only — the PO re-runs RTIA on any individual stub title later to deep-dive that one. See `PR #162` for the topology shift rationale.
+The deep path produces a full `FinalUserStory` (Description / Objective / ACs / Test Cases). The fan-out path produces lightweight backlog stubs only - the PO re-runs RTIA on any individual stub title later to deep-dive that one. See `PR #162` for the topology shift rationale.
 
 ---
 
@@ -51,7 +51,7 @@ rtia/
 └── docs/                  # ADRs + USAGE.md (Phase 16)
 ```
 
-`agents/` and `prompts/` mirror 1:1 — each agent owns one prompts module.
+`agents/` and `prompts/` mirror 1:1 - each agent owns one prompts module.
 
 ---
 
@@ -72,16 +72,16 @@ uv run python scripts/run_pipeline_demo.py sample-03-multi-feature.md
 uv run python scripts/run_api.py                       # FastAPI + Gradio UI at http://127.0.0.1:8000/?token=…
 ```
 
-The demo requires `ANTHROPIC_API_KEY` in `.env` (see `.env.example`). LangSmith tracing is optional — set `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY=lsv2_pt_…` + `LANGSMITH_PROJECT=rtia` to enable.
+The demo requires `ANTHROPIC_API_KEY` in `.env` (see `.env.example`). LangSmith tracing is optional - set `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY=lsv2_pt_…` + `LANGSMITH_PROJECT=rtia` to enable.
 
-**Pre-commit secret scanner (`detect-secrets`, Phase 12.3.1 / #126):** committed alongside `.pre-commit-config.yaml`. Runs on every commit and in CI. New high-entropy strings (AWS keys, JWTs, private keys, base64 blobs above the default-entropy threshold) fail the hook. Legitimate fixtures live in `.secrets.baseline` — the file lists every flagged string the project already knows about (today: the test fixtures in `agents/_secret_scan.py` and `tests/test_secret_scan.py`). When a new finding is real, redact it; when it's an intentional fixture, refresh the baseline:
+**Pre-commit secret scanner (`detect-secrets`, Phase 12.3.1 / #126):** committed alongside `.pre-commit-config.yaml`. Runs on every commit and in CI. New high-entropy strings (AWS keys, JWTs, private keys, base64 blobs above the default-entropy threshold) fail the hook. Legitimate fixtures live in `.secrets.baseline` - the file lists every flagged string the project already knows about (today: the test fixtures in `agents/_secret_scan.py` and `tests/test_secret_scan.py`). When a new finding is real, redact it; when it's an intentional fixture, refresh the baseline:
 
 ```bash
 uv run detect-secrets scan > .secrets.baseline   # rebuild from scratch
 uv run pre-commit run detect-secrets --all-files # verify the hook is clean
 ```
 
-This is the *commit-time* layer; the runtime layer (`agents/_secret_scan.py`, #124) catches secrets pasted into requirements at invocation time. Both are needed — they cover different threat surfaces.
+This is the *commit-time* layer; the runtime layer (`agents/_secret_scan.py`, #124) catches secrets pasted into requirements at invocation time. Both are needed - they cover different threat surfaces.
 
 **API token (`RTIA_API_TOKEN`, Phase 14):** the `run_api.py` entrypoint mints a fresh URL-safe bearer token per process unless `RTIA_API_TOKEN` is set in `.env`. The token gates all `/pipeline*` and `/uploads/*` endpoints (`Authorization: Bearer <token>`) and the Gradio mount accepts it via `?token=…` so the printed startup URL is one-click. Set `RTIA_API_HOST` / `RTIA_API_PORT` to override the default `127.0.0.1:8000`.
 
@@ -89,9 +89,9 @@ This is the *commit-time* layer; the runtime layer (`agents/_secret_scan.py`, #1
 
 `agents.graph.picked_implied_story` (single picked story, used by Story Writer's scope-aware prompt block) and `agents.graph.deferred_implied_stories` (everything else, used by the Reviewer's scope-aware DEFERRED STORIES block) survive for the 1-implied-story deep case. Both degenerate cleanly when implied_stories is empty.
 
-**Exporters (Phase 15.2):** `POST /pipeline/{thread_id}/export` ships the full deep artifact to Jira (REST v3, ADF codeBlock body) or GitHub (Issues + optional Projects v2 via GraphQL). `POST /pipeline/{thread_id}/export-deferred` batch-creates one lightweight backlog stub per deferred/fan-out story. Both backends use `make_exporter("jira" | "github")` in `exporters/base.py`. `dry_run=true` returns the would-be payload — safe without credentials. Credentials: `JIRA_BASE_URL` / `JIRA_EMAIL` / `JIRA_API_TOKEN`, `GITHUB_TOKEN`.
+**Exporters (Phase 15.2):** `POST /pipeline/{thread_id}/export` ships the full deep artifact to Jira (REST v3, ADF codeBlock body) or GitHub (Issues + optional Projects v2 via GraphQL). `POST /pipeline/{thread_id}/export-deferred` batch-creates one lightweight backlog stub per deferred/fan-out story. Both backends use `make_exporter("jira" | "github")` in `exporters/base.py`. `dry_run=true` returns the would-be payload - safe without credentials. Credentials: `JIRA_BASE_URL` / `JIRA_EMAIL` / `JIRA_API_TOKEN`, `GITHUB_TOKEN`.
 
-**State schema version (`PIPELINE_STATE_VERSION`):** bumped 1 → 2 in Phase 15.4 (conditional edge + new state fields). **Clear `~/.rtia/state.db` after pulling 15.4** if any pre-15.4 paused threads existed locally — they're not auto-migrated.
+**State schema version (`PIPELINE_STATE_VERSION`):** bumped 1 → 2 in Phase 15.4 (conditional edge + new state fields). **Clear `~/.rtia/state.db` after pulling 15.4** if any pre-15.4 paused threads existed locally - they're not auto-migrated.
 
 **Environment mode (`RTIA_ENV`, Phase 12.4):** controls the production-tracing guard. Allowed values: `development` (default when unset), `ci`, `production`. When `RTIA_ENV=production` AND `LANGSMITH_TRACING=true`, the demo and any entry point calling `assert_safe_for_env()` refuse to start to prevent requirement text (potentially containing customer PII) from being persisted to LangSmith. See [docs/adr-0008-pii-langsmith.md](docs/adr-0008-pii-langsmith.md).
 
@@ -105,8 +105,8 @@ These are how every change ships in this repo. Follow them or the PR doesn't mer
 
 Unit tests with mocks validate the *contract*. They do not validate behavior. Before any commit:
 
-1. `uv run pytest -q` — necessary, not sufficient
-2. `uv run pre-commit run --all-files` — necessary, not sufficient
+1. `uv run pytest -q` - necessary, not sufficient
+2. `uv run pre-commit run --all-files` - necessary, not sufficient
 3. **Live exercise** of the change as a user would invoke it
 
 For agent or prompt changes specifically: **run the live demo on all 3 samples** (sample-01, sample-02, sample-03) and eyeball the output for the expected behavior shift. Mocked tests cannot detect prompt-level regressions.
@@ -117,7 +117,7 @@ If you don't have the API key needed for end-to-end verification: open the PR as
 
 ### 4.2 Branching
 
-- **Cut every new branch from latest `origin/main`** — `git fetch origin main && git checkout -b feat/<name> origin/main`.
+- **Cut every new branch from latest `origin/main`** - `git fetch origin main && git checkout -b feat/<name> origin/main`.
 - **Never use `claude/*` worktree branches** for the actual work. Worktrees auto-create those; we cut a real `feat/<name>` or `fix/<name>` branch on top of them.
 - Branch naming: `feat/<description>`, `fix/<description>`, `chore/<description>`, `docs/<description>`.
 
@@ -152,7 +152,7 @@ Never recommend APIs, libraries, model parameters, or CLI commands from training
 - Live docs
 - The repo's own code
 
-Confidently wrong is worse than uncertainly right. Flag uncertainty inline ("verified against installed v0.8.5", "best-guess — verify before using").
+Confidently wrong is worse than uncertainly right. Flag uncertainty inline ("verified against installed v0.8.5", "best-guess - verify before using").
 
 ### 4.6 Don't impose architecture
 
@@ -167,10 +167,10 @@ When in doubt, surface the choice to the user. Don't quietly pick.
 When tests need different LLM responses per agent, and multiple agents import the same class (e.g. `ChatGoogleGenerativeAI`):
 
 ```python
-# WRONG — bleeds across modules because the class is the same object everywhere
+# WRONG - bleeds across modules because the class is the same object everywhere
 patch("agents.requirements_analyst.ChatGoogleGenerativeAI.invoke", return_value=...)
 
-# RIGHT — patches each module's import symbol independently
+# RIGHT - patches each module's import symbol independently
 patch("agents.requirements_analyst.ChatGoogleGenerativeAI", side_effect=_factory(payload_a))
 patch("agents.user_story_writer.ChatGoogleGenerativeAI", side_effect=_factory(payload_b))
 ```
@@ -185,11 +185,11 @@ Before committing, audit your change for:
 - **Consistency**: does it match the patterns already used in adjacent files?
 - **No surprise side effects**: are you touching files outside the stated scope without callout?
 
-This complements 4.6 — review for these, not for "did I follow clean-architecture textbook patterns."
+This complements 4.6 - review for these, not for "did I follow clean-architecture textbook patterns."
 
 ### 4.9 Default model is paid Gemini Flash; other paid models require justification
 
-`agents.config.DEFAULT_MODEL = "gemini-3.5-flash"`. All four production agents and the eval-suite judge run on Gemini 3.5 Flash via `langchain-google-genai`. The default tier is **paid** Google AI Studio (a few cents per session) — the free tier exists but is capped at 20 requests per day per project per model and is too tight for routine demos + evals (see [ADR-0006](docs/adr-0006-provider-switch.md) for the original Anthropic-to-Gemini cost analysis, and [ADR-0007](docs/adr-0007-gemini-3-5-flash-switch.md) for the 2.5-flash → 3.5-flash switch driven by 503s on GitHub-hosted runners).
+`agents.config.DEFAULT_MODEL = "gemini-3.5-flash"`. All four production agents and the eval-suite judge run on Gemini 3.5 Flash via `langchain-google-genai`. The default tier is **paid** Google AI Studio (a few cents per session) - the free tier exists but is capped at 20 requests per day per project per model and is too tight for routine demos + evals (see [ADR-0006](docs/adr-0006-provider-switch.md) for the original Anthropic-to-Gemini cost analysis, and [ADR-0007](docs/adr-0007-gemini-3-5-flash-switch.md) for the 2.5-flash → 3.5-flash switch driven by 503s on GitHub-hosted runners).
 
 Cost expectations under the default stack:
 - Full pipeline demo: ≈$0.005
@@ -197,11 +197,11 @@ Cost expectations under the default stack:
 - ~10× cheaper than the prior Claude Opus 4.7 baseline (≈$0.30–0.50 per demo, ≈$1–2 per eval).
 
 Adding any *other* paid LLM call (Anthropic Claude, OpenAI, larger Gemini Pro) requires:
-1. A named reason `gemini-3.5-flash` cannot do the task — usually a specific benchmarked failure mode.
+1. A named reason `gemini-3.5-flash` cannot do the task - usually a specific benchmarked failure mode.
 2. PR-body justification of why the cost is worth paying.
 3. Explicit user cost approval per `feedback_cost_approval`.
 
-This rule exists because the workshop's cost target is "as close to $0 as quality allows" — not strict $0. The Gemini cutover proved RTIA's quality is fine on Flash; the paid tier removes the 20 RPD ceiling without meaningfully changing the cost target.
+This rule exists because the workshop's cost target is "as close to $0 as quality allows" - not strict $0. The Gemini cutover proved RTIA's quality is fine on Flash; the paid tier removes the 20 RPD ceiling without meaningfully changing the cost target.
 
 ---
 
@@ -233,22 +233,22 @@ Don't start work on a phase without first reading the relevant section of the pl
 
 ## 7. Things that have bitten us (read these before they bite again)
 
-- **Gemini's caching API ≠ Anthropic's `cache_control`** — Gemini uses a separate `client.caches.create()` call referenced via the `cached_content` kwarg. Anthropic-style inline `cache_control: ephemeral` blocks do not exist on Gemini and were removed in the ADR-0006 cutover. We currently use no caching (prompts are small enough; free tier removes cost driver).
-- **Gemini's max-tokens kwarg is `max_output_tokens`** — not `max_tokens`. Pre-cutover agent code used `max_tokens`; renamed across the pipeline in the ADR-0006 cutover.
-- **Gemini's LangChain wrapper validates `GOOGLE_API_KEY` at construction time** — Anthropic's defers to `invoke`. Tests need a placeholder key via `tests/conftest.py`'s autouse fixture, or `ChatGoogleGenerativeAI(...)` raises `pydantic.ValidationError` before any mock can intercept.
+- **Gemini's caching API ≠ Anthropic's `cache_control`** - Gemini uses a separate `client.caches.create()` call referenced via the `cached_content` kwarg. Anthropic-style inline `cache_control: ephemeral` blocks do not exist on Gemini and were removed in the ADR-0006 cutover. We currently use no caching (prompts are small enough; free tier removes cost driver).
+- **Gemini's max-tokens kwarg is `max_output_tokens`** - not `max_tokens`. Pre-cutover agent code used `max_tokens`; renamed across the pipeline in the ADR-0006 cutover.
+- **Gemini's LangChain wrapper validates `GOOGLE_API_KEY` at construction time** - Anthropic's defers to `invoke`. Tests need a placeholder key via `tests/conftest.py`'s autouse fixture, or `ChatGoogleGenerativeAI(...)` raises `pydantic.ValidationError` before any mock can intercept.
 - **Gemini sometimes wraps JSON output in ` ```json ` fences** despite a "no fences" instruction. `agents/_llm_utils.py:strip_json_fence()` trims them defensively. Apply to every Gemini agent.
-- **Single-sample testing is overfitting** — always test prompt changes on all 3 sample types (well-structured, vague, multi-feature). The behavior on one sample is *not* the behavior on others.
-- **Worked examples beat prose rules** — when the model isn't following a prompt rule, add a concrete worked example with correct output. Far stronger than rule iteration.
-- **Worktrees can quietly switch** — Bash `cd` doesn't persist between tool calls in some Claude Code environments. Use absolute paths and `pwd && git status` at start of multi-step blocks.
-- **msgpack deserialization warning** — `AnalystOutput` etc. need to be registered for checkpointing. Phase 2.2 fixes; until then, the warning is benign noise.
-- **`gemini-3.5-flash` is an alias** — not pinned to a date. When Google publishes dated suffixes for the 3.5 line, bump `DEFAULT_MODEL` for reproducibility. Same caveat applied to `gemini-2.5-flash` before the ADR-0007 switch.
-- **Gemini 503s are backend-pool specific, not global.** A Gemini model alias that 503s on GitHub-hosted runners can simultaneously respond fine from a maintainer laptop — Google routes runner IP ranges to a specific backend pool. When a 503 storm hits, probe sibling models live (`client.models.list()` + a 1-token `invoke`) before assuming Google is globally down. See ADR-0007 §"What we proved with live probing".
+- **Single-sample testing is overfitting** - always test prompt changes on all 3 sample types (well-structured, vague, multi-feature). The behavior on one sample is *not* the behavior on others.
+- **Worked examples beat prose rules** - when the model isn't following a prompt rule, add a concrete worked example with correct output. Far stronger than rule iteration.
+- **Worktrees can quietly switch** - Bash `cd` doesn't persist between tool calls in some Claude Code environments. Use absolute paths and `pwd && git status` at start of multi-step blocks.
+- **msgpack deserialization warning** - `AnalystOutput` etc. need to be registered for checkpointing. Phase 2.2 fixes; until then, the warning is benign noise.
+- **`gemini-3.5-flash` is an alias** - not pinned to a date. When Google publishes dated suffixes for the 3.5 line, bump `DEFAULT_MODEL` for reproducibility. Same caveat applied to `gemini-2.5-flash` before the ADR-0007 switch.
+- **Gemini 503s are backend-pool specific, not global.** A Gemini model alias that 503s on GitHub-hosted runners can simultaneously respond fine from a maintainer laptop - Google routes runner IP ranges to a specific backend pool. When a 503 storm hits, probe sibling models live (`client.models.list()` + a 1-token `invoke`) before assuming Google is globally down. See ADR-0007 §"What we proved with live probing".
 
 ---
 
 ## 8. LEARNINGS.md is a continuous consideration
 
-`LEARNINGS.md` at the repo root (gitignored) is the maintainer's personal learning log. RTIA is a workshop — the codebase is the artifact, but **the learning is the deliverable**.
+`LEARNINGS.md` at the repo root (gitignored) is the maintainer's personal learning log. RTIA is a workshop - the codebase is the artifact, but **the learning is the deliverable**.
 
 **Always consider** whether the work in progress has produced a durable lesson worth appending. Do not wait for session end. Trigger moments:
 
@@ -278,7 +278,7 @@ uv run python scripts/run_pipeline_demo.py sample-02-vague-ambiguous.md
 gh pr create --title "..." --body "Closes #N…"
 
 # Verify trace appeared after a LangSmith-traced run
-# (no CLI — open https://smith.langchain.com → project 'rtia' → most recent run)
+# (no CLI - open https://smith.langchain.com → project 'rtia' → most recent run)
 ```
 
 If anything in this file is wrong or stale, **update it in the same PR that exposes the staleness**. Don't leave the next session to discover it.

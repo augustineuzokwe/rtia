@@ -5,7 +5,7 @@ the Story Writer's user-story output plus the Analyst's context, and emits
 the Given/When/Then acceptance criteria that fill the third section of
 the FinalUserStory artifact.
 
-Schema-wise it produces ``list[AcceptanceCriterion]`` — the same
+Schema-wise it produces ``list[AcceptanceCriterion]`` - the same
 ``AcceptanceCriterion`` model already declared on the FinalUserStory
 contract, so the composer just slots the list straight into the artifact.
 
@@ -82,7 +82,7 @@ def generate_acceptance_criteria(
 ) -> AcGeneratorOutput:
     """Run the AC Generator on a Story Writer output + Analyst context.
 
-    Inputs come from prior pipeline state, not raw text — the AC Generator
+    Inputs come from prior pipeline state, not raw text - the AC Generator
     never sees the original requirement, only the validated story shape
     and the Analyst's structured read. Same contract pattern as the Story
     Writer: each agent has one upstream source of truth.
@@ -127,7 +127,7 @@ def generate_acceptance_criteria(
         HumanMessage(content=user_prompt),
     ]
     config = {"metadata": {"agent": "ac_generator", "prompt_hash": _PROMPT_HASH}}
-    # Phase 12.5 — see analyze_requirement for the rationale.
+    # Phase 12.5 - see analyze_requirement for the rationale.
     with log_agent_invocation("ac_generator", prompt_hash=_PROMPT_HASH) as rec:
         try:
             response = cached_invoke(

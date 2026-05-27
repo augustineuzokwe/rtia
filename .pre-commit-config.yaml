@@ -24,7 +24,7 @@ repos:
   # API keys, and other high-entropy strings before they land in git
   # history. Companion to the runtime scanner in #124
   # (agents/secret_scan.py) which protects *pasted* requirements at
-  # invocation time — this hook protects the *repo tree* at commit
+  # invocation time - this hook protects the *repo tree* at commit
   # time. Different threat surfaces; both layers are needed.
   #
   # The .secrets.baseline file records every string the scanner
@@ -35,9 +35,9 @@ repos:
   #     uv run detect-secrets scan --baseline .secrets.baseline
   #
   # Excludes:
-  #   .secrets.baseline — the file itself (would self-flag)
-  #   uv.lock          — package hashes look like high-entropy secrets
-  #   evals/reports/   — generated artifacts, gitignored but listed
+  #   .secrets.baseline - the file itself (would self-flag)
+  #   uv.lock          - package hashes look like high-entropy secrets
+  #   evals/reports/   - generated artifacts, gitignored but listed
   #                      defensively in case a contributor force-adds
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0

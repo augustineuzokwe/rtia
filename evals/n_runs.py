@@ -1,12 +1,12 @@
-"""Stochastic AC validation — run each sample N times and aggregate to pass-rates.
+"""Stochastic AC validation - run each sample N times and aggregate to pass-rates.
 
 Closes [Issue #233](https://github.com/augustineuzokwe/rtia/issues/233).
 
-Background — RTIA's default eval loop calls each metric once per sample
+Background - RTIA's default eval loop calls each metric once per sample
 and gates on the mean. That is the right granularity for the
 "did this PR regress?" question, but it is the wrong granularity for
 adversarial samples. An adversarial input targets the tail of the
-model's distribution — the rare failure that happens 1 time in 50 — so a
+model's distribution - the rare failure that happens 1 time in 50 - so a
 single-pass measurement reports PASS for the 49 safe runs and misses the
 1 unsafe run that is the entire point of the sample existing.
 
@@ -32,7 +32,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:  # pragma: no cover — type hints only
+if TYPE_CHECKING:  # pragma: no cover - type hints only
     from evals.dataset import SampleRecord
     from evals.judge import GeminiJudge
 
@@ -54,7 +54,7 @@ class NRunMetricResult:
     """N-run aggregate for one metric on one sample.
 
     ``scores`` is the raw per-run score list (length N). ``pass_rate`` is
-    the fraction of scores >= floor — the gate uses this, not the mean,
+    the fraction of scores >= floor - the gate uses this, not the mean,
     because adversarial samples care about *how often* the unsafe
     behaviour appears, not the average score across runs.
     """
@@ -88,7 +88,7 @@ class NRunMetricResult:
 def _p95(scores: list[float]) -> float:
     """Lightweight p95: linear interpolation over a small sample.
 
-    statistics.quantiles is overkill for N≤20 — return the simple
+    statistics.quantiles is overkill for N≤20 - return the simple
     floor-clamped index. Acceptable for "the worst 5% of runs" framing.
     """
     if not scores:
@@ -107,7 +107,7 @@ class NRunSampleReport:
 
     Sample passes when every metric's ``pass_rate >= threshold``. The
     threshold is configurable per call (default 1.0 for non-adversarial,
-    0.95 for adversarial) — see ``evaluate_samples_n_times``.
+    0.95 for adversarial) - see ``evaluate_samples_n_times``.
     """
 
     sample_name: str
@@ -144,7 +144,7 @@ def load_metric_floors(thresholds_path: Path | None = None) -> dict[str, float]:
     floors = data.get("metric_floors") or {}
     if not isinstance(floors, dict) or not floors:
         raise RuntimeError(
-            f"{path} has no 'metric_floors' map — N-run gate has no floors to measure against."
+            f"{path} has no 'metric_floors' map - N-run gate has no floors to measure against."
         )
     return {str(name): float(score) for name, score in floors.items()}
 
@@ -156,7 +156,7 @@ def assert_cache_disabled_for_n_runs(n_runs: int) -> None:
     the model's distribution" framing degenerates to "1 draw measured N
     times." The N-run gate would silently report a single-draw measurement
     as a 100% pass-rate even when the model's true distribution has a
-    failing tail — the same shape of false-green trap that motivated
+    failing tail - the same shape of false-green trap that motivated
     [Issue #230](https://github.com/augustineuzokwe/rtia/issues/230).
 
     The CLI dispatch sets ``RTIA_LLM_CACHE=disabled`` automatically when
@@ -186,7 +186,7 @@ def evaluate_samples_n_times(
 ) -> list[NRunSampleReport]:
     """Run the eval suite N times per sample; aggregate into pass-rate reports.
 
-    Progress is a hot UX concern — N=10 × 7 samples × ~30s/run = ~35 min.
+    Progress is a hot UX concern - N=10 × 7 samples × ~30s/run = ~35 min.
     The optional ``progress_callback(sample_name, run_index, total_runs)``
     is invoked at the start of each sample-run so a CLI caller can print a
     line per draw.
@@ -256,7 +256,7 @@ def serialise_n_run_reports(
 def print_n_run_summary(reports: list[NRunSampleReport]) -> None:
     print()
     print("=" * 72)
-    print(f"N-RUN REPORT — N = {reports[0].n_runs if reports else 0}")
+    print(f"N-RUN REPORT - N = {reports[0].n_runs if reports else 0}")
     print("=" * 72)
     for r in reports:
         kind = "adversarial" if r.is_adversarial else "non-adv"

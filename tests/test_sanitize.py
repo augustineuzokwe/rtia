@@ -119,7 +119,7 @@ def test_normalize_code_fences_drops_html_javascript_svg() -> None:
     cleaned, rewritten = normalize_code_fences(text)
     assert "```html" not in cleaned
     # Note: ``javascript`` IS in the allowlist (it's a common, safe-by-default lang).
-    # ``html`` and ``svg`` are NOT — only those get dropped.
+    # ``html`` and ``svg`` are NOT - only those get dropped.
     assert "```svg" not in cleaned
     assert "```javascript" in cleaned
     assert set(rewritten) == {"html", "svg"}
@@ -128,7 +128,7 @@ def test_normalize_code_fences_drops_html_javascript_svg() -> None:
 def test_normalize_code_fences_case_insensitive_allowlist() -> None:
     text = "```PYTHON\ny = 2\n```"
     cleaned, rewritten = normalize_code_fences(text)
-    # Allowlist match is case-insensitive — uppercase python is still allowed.
+    # Allowlist match is case-insensitive - uppercase python is still allowed.
     # The opener keeps its original casing since we only rewrite on miss.
     assert cleaned == text
     assert rewritten == []
@@ -186,7 +186,7 @@ def test_enforce_length_cap_exactly_at_limit_is_not_truncated() -> None:
 
 
 # ---------------------------------------------------------------------------
-# sanitize_artifact — composed pipeline
+# sanitize_artifact - composed pipeline
 # ---------------------------------------------------------------------------
 
 
@@ -218,7 +218,7 @@ def test_sanitize_artifact_order_is_strip_then_normalize_then_cap() -> None:
     # Build text where a control char sits where the truncation marker would
     # land if order were reversed. If length-cap ran first, the truncation
     # marker (\n\n_[...]_) survives. If strip ran last, "[truncated"
-    # itself would be safe — but the underscore framing should still appear.
+    # itself would be safe - but the underscore framing should still appear.
     big = "a" * 30_000
     cleaned, report = sanitize_artifact(big, max_chars=200)
     assert "truncated" in cleaned
@@ -264,7 +264,7 @@ def test_sanitize_report_not_clean_when_anything_changed() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Integration — FinalUserStory.as_markdown wires sanitisation
+# Integration - FinalUserStory.as_markdown wires sanitisation
 # ---------------------------------------------------------------------------
 
 
@@ -304,14 +304,14 @@ def test_as_markdown_strips_control_and_bidi_from_fields() -> None:
 
 
 def test_as_markdown_clean_story_byte_equal_snapshot() -> None:
-    """Byte-equal regression snapshot — Phase 12.2 must NOT silently drift the rendered output.
+    """Byte-equal regression snapshot - Phase 12.2 must NOT silently drift the rendered output.
 
     Pinned because as_markdown() now passes its output through
     sanitize_artifact. A clean FinalUserStory must produce the EXACT
     same bytes it did before 12.2 landed. If a future renderer change
     legitimately alters formatting (e.g. adds a horizontal rule between
     sections), update this expected string in the SAME commit that
-    changes the renderer — never silently.
+    changes the renderer - never silently.
     """
     story = FinalUserStory(
         description="As a user, I want to filter results, so I can find things.",
@@ -325,7 +325,7 @@ def test_as_markdown_clean_story_byte_equal_snapshot() -> None:
         "Find relevant content quickly.\n"
         "\n"
         "## Acceptance Criteria\n"
-        "_No acceptance criteria were produced for this story — check the run "
+        "_No acceptance criteria were produced for this story - check the run "
         "trace; the AC Generator agent should populate this section._\n"
         "\n"
         "## Test Cases\n"

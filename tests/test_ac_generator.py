@@ -1,6 +1,6 @@
 """Tests for the AC Generator agent.
 
-Mocks the LLM call — these tests cover the agent's contract (input
+Mocks the LLM call - these tests cover the agent's contract (input
 assembly, JSON parsing, schema validation), not Claude's behavior.
 """
 
@@ -84,7 +84,7 @@ def test_rejects_missing_required_field():
 
 
 def test_accepts_empty_criteria_list():
-    """An empty list should validate — the composer's renderer handles the
+    """An empty list should validate - the composer's renderer handles the
     placeholder. Forcing non-empty would silently mask Generator failures."""
     with _mock_invoke({"criteria": []}):
         result = generate_acceptance_criteria(USER_STORY, ANALYST_OUTPUT, PO_ANSWERS)
@@ -97,7 +97,7 @@ def test_prompt_includes_story_and_analyst_context():
     losing either was a real risk during refactors."""
     captured: dict[str, object] = {}
 
-    def fake_invoke(self, messages, **kwargs):  # noqa: ARG001 — match LangChain signature
+    def fake_invoke(self, messages, **kwargs):  # noqa: ARG001 - match LangChain signature
         captured["messages"] = messages
         return AIMessage(content=json.dumps(VALID_RESPONSE))
 

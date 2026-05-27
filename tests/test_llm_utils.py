@@ -10,7 +10,7 @@ from __future__ import annotations
 from agents._llm_utils import coerce_response_text, strip_json_fence
 
 # ---------------------------------------------------------------------------
-# coerce_response_text — handles the gemini-2.5 → gemini-3.5 content drift
+# coerce_response_text - handles the gemini-2.5 → gemini-3.5 content drift
 # ---------------------------------------------------------------------------
 
 
@@ -43,7 +43,7 @@ def test_coerce_skips_non_text_blocks() -> None:
 
 
 def test_coerce_falls_back_to_str_on_unknown_shape() -> None:
-    """Anything else falls back to str() — same coarse behaviour the agents had
+    """Anything else falls back to str() - same coarse behaviour the agents had
     before this helper, so JSON-parse downstream surfaces the issue loudly."""
     assert coerce_response_text(42) == "42"
     assert coerce_response_text(None) == "None"
@@ -55,7 +55,7 @@ def test_coerce_empty_list_falls_back_to_str() -> None:
 
 
 # ---------------------------------------------------------------------------
-# strip_json_fence — existing helper, regression guard
+# strip_json_fence - existing helper, regression guard
 # ---------------------------------------------------------------------------
 
 

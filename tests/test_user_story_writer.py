@@ -1,6 +1,6 @@
 """Tests for the User Story Writer agent.
 
-Mocks the LLM call — these tests cover the agent's contract (input
+Mocks the LLM call - these tests cover the agent's contract (input
 assembly, JSON parsing, schema validation), not Claude's behavior.
 """
 
@@ -80,7 +80,7 @@ def test_rejects_response_with_legacy_role_want_benefit_schema():
 
 
 def test_write_user_story_renders_picked_story_in_prompt(monkeypatch):
-    """Phase 15.4 — when picked_story is set, the prompt must surface its title + summary."""
+    """Phase 15.4 - when picked_story is set, the prompt must surface its title + summary."""
     from unittest.mock import MagicMock, patch
 
     from langchain_core.messages import AIMessage

@@ -61,7 +61,7 @@ FAKE_AC_RESPONSE = {
 FAKE_TEST_CASE_RESPONSE = {
     "cases": [
         {
-            "scenario": "Happy path — user does X",
+            "scenario": "Happy path - user does X",
             "type": "happy_path",
             "steps": ["Log in as a user.", "Do thing X."],
             "expected": "Outcome Y is observed.",
@@ -158,7 +158,7 @@ def test_pipeline_flows_through_when_no_critical_ambiguities():
     assert result["po_answers"] == {}
     assert result["user_story"].description.startswith("As a user, I want")
     assert "thing X" in result["user_story"].description
-    # Composer runs after Story Review accept — final_artifact populated
+    # Composer runs after Story Review accept - final_artifact populated
     assert "final_artifact" in result
     assert result["final_artifact"].description == result["user_story"].description
     # AC Generator (Phase 8) populates this slot from FAKE_AC_RESPONSE.
@@ -180,15 +180,15 @@ def test_pipeline_flows_through_when_no_critical_ambiguities():
 def test_reviewer_summary_includes_all_report_categories():
     """All four ReviewReport list categories must surface in metadata['review_summary'].
 
-    Regression guard — an earlier draft skipped untestable_criteria from the
+    Regression guard - an earlier draft skipped untestable_criteria from the
     summary string, which would silently hide a real review finding from
     anyone reading only the rendered markdown.
     """
     analyst = _fake_analyst_response([])
     review_payload = {
         "coverage_gaps": ["No AC covers feature Z."],
-        "weak_acs": ["AC1 — vague then-clause"],
-        "untestable_criteria": ["AC2 — subjective outcome"],
+        "weak_acs": ["AC1 - vague then-clause"],
+        "untestable_criteria": ["AC2 - subjective outcome"],
         "recommendations": ["Add concrete AC for Z."],
         "overall_quality": "needs_work",
     }
@@ -266,7 +266,7 @@ def test_pipeline_state_v1_schema_is_stable():
 
     Adding fields is safe (PipelineState is total=False). Removing or
     renaming requires bumping PIPELINE_STATE_VERSION and writing a
-    migration ADR — silent state-shape drift after PR #40's checkpoint
+    migration ADR - silent state-shape drift after PR #40's checkpoint
     landed would corrupt every paused thread on disk.
     """
     expected_v1_fields = {
@@ -323,7 +323,7 @@ def test_build_pipeline_accepts_injected_checkpointer():
 def test_pipeline_pauses_at_story_review_checkpoint():
     """After Story Writer, the graph pauses with a rendered-artifact preview.
 
-    Distinguishable from the PO Checkpoint by interrupt payload keys —
+    Distinguishable from the PO Checkpoint by interrupt payload keys -
     PO emits `critical_ambiguities`; Story Review emits
     `rendered_artifact` + `description` + `objective`.
     """
@@ -358,7 +358,7 @@ def test_story_review_accept_passes_through():
 
     assert "__interrupt__" not in result
     artifact = result["final_artifact"]
-    # Story Writer's mock produced "As a user, I want to do thing X." —
+    # Story Writer's mock produced "As a user, I want to do thing X." -
     # accept path preserves it unchanged.
     assert artifact.description == "As a user, I want to do thing X."
     assert artifact.objective == "Outcome Y is achieved."
@@ -421,13 +421,13 @@ def test_story_review_override_partial_keeps_non_overridden_fields():
 
 
 def test_reviewer_node_passes_empty_deferred_for_single_implied_story():
-    """Phase 15.4 — under split routing, the Reviewer only runs for
+    """Phase 15.4 - under split routing, the Reviewer only runs for
     single-implied-story (or zero) requirements. In those cases the
-    deferred list is always empty — the 15.1 scope-aware Reviewer
+    deferred list is always empty - the 15.1 scope-aware Reviewer
     plumbing stays wired but degenerates to a no-op. Pin that contract.
 
     Multi-implied-story (≥ 2) requirements branch to split_node, so
-    the Reviewer never runs at all on them — that property is covered
+    the Reviewer never runs at all on them - that property is covered
     by ``test_multi_story_branches_to_split_skipping_deep_nodes``.
     """
     from unittest.mock import patch
@@ -524,7 +524,7 @@ def test_deferred_implied_stories_matches_bidirectionally():
 
 def test_deferred_implied_stories_ignores_empty_or_whitespace_answers():
     """Empty/whitespace-only PO answers shouldn't behave like a 'no answer' (which
-    would defer nothing) — they should be skipped like the answers dict was empty."""
+    would defer nothing) - they should be skipped like the answers dict was empty."""
     from agents.graph import deferred_implied_stories
     from agents.requirements_analyst import AnalystOutput, ImpliedStory
 
@@ -540,7 +540,7 @@ def test_deferred_implied_stories_ignores_empty_or_whitespace_answers():
 
 
 def test_picked_implied_story_returns_single_match_or_none():
-    """Phase 15.4 — picked_implied_story is single-pick by design.
+    """Phase 15.4 - picked_implied_story is single-pick by design.
 
     Pin the four cases that determine downstream behaviour:
     - clean single pick → that story
@@ -562,7 +562,7 @@ def test_picked_implied_story_returns_single_match_or_none():
         ),
     }
 
-    # Clean pick — short variant matches exactly one title.
+    # Clean pick - short variant matches exactly one title.
     s = picked_implied_story({**base, "po_answers": {"Q": "dashboard"}})
     assert s is not None and s.title == "Quarantined tests dashboard"
 
@@ -591,12 +591,12 @@ def test_picked_implied_story_returns_single_match_or_none():
 
 
 def test_story_writer_node_passes_picked_story_for_single_implied_story():
-    """Phase 15.4 — single-implied-story deep path still wires the picked story.
+    """Phase 15.4 - single-implied-story deep path still wires the picked story.
 
     Multi-story (≥ 2) cases route to split and never call the Story
     Writer. The picked-story narrowing is now only meaningful for the
     1-implied-story deep case (15.1 Reviewer scope-awareness similarly
-    becomes a no-op for 0-implied — empty deferred list).
+    becomes a no-op for 0-implied - empty deferred list).
     """
     from unittest.mock import patch
 
@@ -634,7 +634,7 @@ def test_story_writer_node_passes_picked_story_for_single_implied_story():
 
 
 def test_multi_story_branches_to_split_skipping_deep_nodes():
-    """Phase 15.4 — implied_stories ≥ 2 routes to split_node, skipping
+    """Phase 15.4 - implied_stories ≥ 2 routes to split_node, skipping
     Story Writer / AC Generator / Test Case Writer / Reviewer entirely.
 
     The split_node populates ``split_stories`` filtered by the PO's
@@ -699,7 +699,7 @@ def test_multi_story_branches_to_split_skipping_deep_nodes():
             config=config,
         )
 
-    # Story Writer was never called — proves deep nodes are skipped.
+    # Story Writer was never called - proves deep nodes are skipped.
     assert deep_calls["story"] == 0
     assert "user_story" not in result
     assert "final_artifact" not in result
@@ -709,7 +709,7 @@ def test_multi_story_branches_to_split_skipping_deep_nodes():
 
 
 def test_split_empty_selection_keeps_all_stories():
-    """Phase 15.4 / Q2 default — empty selected_story_titles ⇒ fan out
+    """Phase 15.4 / Q2 default - empty selected_story_titles ⇒ fan out
     every implied story rather than producing nothing."""
     from agents.graph import split_node
     from agents.requirements_analyst import AnalystOutput, ImpliedStory
@@ -729,7 +729,7 @@ def test_split_empty_selection_keeps_all_stories():
 
 
 def test_is_split_mode_branch_criterion():
-    """Phase 15.4 — pin the branch criterion explicitly.
+    """Phase 15.4 - pin the branch criterion explicitly.
 
     The condition is purely on the Analyst's output (count ≥ 2). Even
     if the PO eventually unchecks all but one story, the routing was
@@ -756,7 +756,7 @@ def test_is_split_mode_branch_criterion():
 
 
 def test_split_node_passes_through_edited_stories():
-    """Issue #207 — when ``selected_split_stories`` is set on state
+    """Issue #207 - when ``selected_split_stories`` is set on state
     (the PO renamed at least one row at the editable PO checkpoint),
     ``split_node`` ships those stories through verbatim, bypassing
     the legacy title-filter on the Analyst's implied list."""
@@ -767,22 +767,22 @@ def test_split_node_passes_through_edited_stories():
         ImpliedStory(title="Story A", summary="a"),
         ImpliedStory(title="Story B", summary="b"),
     ]
-    edited = [ImpliedStory(title="Story A — renamed", summary="a")]
+    edited = [ImpliedStory(title="Story A - renamed", summary="a")]
     state = {
         "analyst_output": AnalystOutput(
             intent="x", actors=["u"], ambiguities=[], implied_stories=analyst_stories
         ),
         "selected_split_stories": edited,
-        # selected_story_titles deliberately stale — the new field wins.
+        # selected_story_titles deliberately stale - the new field wins.
         "selected_story_titles": ["Story A"],
     }
     out = split_node(state)
-    assert [s.title for s in out["split_stories"]] == ["Story A — renamed"]
+    assert [s.title for s in out["split_stories"]] == ["Story A - renamed"]
     assert [s.summary for s in out["split_stories"]] == ["a"]
 
 
 def test_po_checkpoint_node_builds_edited_stories_from_resume():
-    """Issue #207 — ``po_checkpoint_node`` reads the new
+    """Issue #207 - ``po_checkpoint_node`` reads the new
     ``selected_stories`` shape from the interrupt resume and converts
     it into ``ImpliedStory`` objects on state, populating
     ``selected_split_stories`` and a back-compat title list."""
@@ -805,7 +805,7 @@ def test_po_checkpoint_node_builds_edited_stories_from_resume():
     fake_resume = {
         "selected_stories": [
             {
-                "title": "Story A — renamed",
+                "title": "Story A - renamed",
                 # No summary supplied → graph backfills from
                 # ``original_title`` → Analyst's matching implied story.
                 "original_title": "Story A",
@@ -816,13 +816,13 @@ def test_po_checkpoint_node_builds_edited_stories_from_resume():
     with patch("agents.graph.interrupt", return_value=fake_resume):
         result = po_checkpoint_node(state)
     assert "selected_split_stories" in result
-    assert [s.title for s in result["selected_split_stories"]] == ["Story A — renamed"]
+    assert [s.title for s in result["selected_split_stories"]] == ["Story A - renamed"]
     assert [s.summary for s in result["selected_split_stories"]] == ["summary-A"]
-    assert result["selected_story_titles"] == ["Story A — renamed"]
+    assert result["selected_story_titles"] == ["Story A - renamed"]
 
 
 def test_po_checkpoint_node_legacy_title_list_still_works():
-    """Issue #207 — legacy resume value (``selected_story_titles`` only)
+    """Issue #207 - legacy resume value (``selected_story_titles`` only)
     still routes through the old code path; no edited state field set."""
     from unittest.mock import patch
 

@@ -22,7 +22,7 @@ body:
       label: Proposed change
       description: |
         How should RTIA behave differently? Sketch the interface, prompt change,
-        or pipeline edit. A rough idea is fine — this is a starting point.
+        or pipeline edit. A rough idea is fine - this is a starting point.
     validations:
       required: true
   - type: textarea
@@ -30,7 +30,7 @@ body:
     attributes:
       label: Acceptance criteria
       description: |
-        What would prove the change works? Use Given/When/Then if it helps —
+        What would prove the change works? Use Given/When/Then if it helps -
         these flow directly into the eventual user story.
     validations:
       required: false

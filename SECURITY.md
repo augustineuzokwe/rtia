@@ -11,7 +11,7 @@ RTIA is pre-1.0. Only the `main` branch receives security fixes. No patch releas
 
 ## Reporting a vulnerability
 
-**Preferred channel — GitHub Security Advisories**
+**Preferred channel - GitHub Security Advisories**
 
 Open a private advisory at:
 [https://github.com/augustineuzokwe/rtia/security/advisories/new](https://github.com/augustineuzokwe/rtia/security/advisories/new)
@@ -48,14 +48,14 @@ The following are **in scope**:
 
 The following are **out of scope** for this repository:
 
-- Vulnerabilities in the Gemini model itself — report to [Google](https://bughunters.google.com/)
-- Vulnerabilities in LangChain / LangGraph upstream — report to [their security page](https://github.com/langchain-ai/langchain/security)
+- Vulnerabilities in the Gemini model itself - report to [Google](https://bughunters.google.com/)
+- Vulnerabilities in LangChain / LangGraph upstream - report to [their security page](https://github.com/langchain-ai/langchain/security)
 - Customer-deployment hygiene (self-hosted infrastructure, key management)
 - Denial-of-service via LLM cost amplification (no rate-limiting is promised pre-1.0)
 - Social engineering of maintainers
 
 ## Security architecture references
 
-- [`docs/adr-0008-pii-langsmith.md`](docs/adr-0008-pii-langsmith.md) — ADR refusing LangSmith tracing in production to prevent PII leakage
-- [`docs/adr-0009-llm-fallback.md`](docs/adr-0009-llm-fallback.md) — ADR requiring structured failure instead of silent degradation
-- [`GUARDRAILS.md`](GUARDRAILS.md) — Behavioural policies enforced by agents, each mapped to its agent / prompt / test
+- [`docs/adr-0008-pii-langsmith.md`](docs/adr-0008-pii-langsmith.md) - ADR refusing LangSmith tracing in production to prevent PII leakage
+- [`docs/adr-0009-llm-fallback.md`](docs/adr-0009-llm-fallback.md) - ADR requiring structured failure instead of silent degradation
+- [`GUARDRAILS.md`](GUARDRAILS.md) - Behavioural policies enforced by agents, each mapped to its agent / prompt / test

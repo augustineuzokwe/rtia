@@ -37,15 +37,15 @@ _DETECTED_FALSE_RE = re.compile(r"`?suspicious_input\.detected`?\s*==\s*false", 
 
 _BULLET_RE = re.compile(r"^\s*[-*]\s+(?P<body>.+?)\s*$", re.MULTILINE)
 _NONE_EXPECTED_RE = re.compile(r"\(none expected\)", re.IGNORECASE)
-# Bold-label prefix used in sample-02/03 ambiguity bullets: "- **actor scoping** — …".
-_BOLD_PREFIX_RE = re.compile(r"^\*\*(?P<label>[^*]+)\*\*\s*[—\-:]+\s*(?P<rest>.*)$")
+# Bold-label prefix used in sample-02/03 ambiguity bullets: "- **actor scoping** - …".
+_BOLD_PREFIX_RE = re.compile(r"^\*\*(?P<label>[^*]+)\*\*\s*[-\-:]+\s*(?P<rest>.*)$")
 
 
 @dataclass(frozen=True)
 class ExpectedAnalystOutput:
     """Per-agent ground truth for the Requirements Analyst.
 
-    Phrasing is illustrative — metrics compare fuzzily (judge for intent,
+    Phrasing is illustrative - metrics compare fuzzily (judge for intent,
     set semantics for actors, category coverage for ambiguities/implied
     stories), never by exact string match.
     """
@@ -60,7 +60,7 @@ class ExpectedAnalystOutput:
     intent_key_terms: list[str] = field(default_factory=list)
     """Load-bearing domain phrases the Analyst's intent string must mention
     (case-insensitive substring match). Hand-curated per sample because
-    token-overlap against the full prose intent is too coarse — too many
+    token-overlap against the full prose intent is too coarse - too many
     interchangeable verbs ("monitor"/"view", "let"/"enable") collapse the
     score. Substring match on a small set of *named* domain terms
     survives Analyst paraphrasing. See ``score_intent_keyword_overlap``.
@@ -73,7 +73,7 @@ class ExpectedAcceptanceCriteria:
     """Per-agent ground truth for the AC Generator.
 
     ``required_categories`` and ``out_of_scope`` are short labels (not
-    full ACs) — eval metrics check that each required category is covered
+    full ACs) - eval metrics check that each required category is covered
     by *some* generated AC, and that no AC covers an out-of-scope item.
     ``expected_count`` carries the (count, tolerance) pair so the metric
     can penalise both under-coverage and over-flagging.
@@ -99,7 +99,7 @@ class InjectionTest:
       appear anywhere in the composite final artifact. Any one match
       collapses ``score_injection_resistance`` to 0.0.
     - ``expected_detected`` carries the parsed expectation for
-      ``AnalystOutput.suspicious_input.detected`` — True for adversarial
+      ``AnalystOutput.suspicious_input.detected`` - True for adversarial
       samples (04, 05, 06), False for the negative anchor (sample-07).
       The metric asserts the Analyst's actual flag matches this value.
     """
@@ -141,7 +141,7 @@ def _extract_section(content: str, start_header: str, stop_headers: list[str]) -
     """Return the body between `start_header` and the first stop header.
 
     Mirrors `validate_samples.extract_section` but raises if the section is
-    absent — the validator runs first in CI and guarantees presence, so a
+    absent - the validator runs first in CI and guarantees presence, so a
     missing section here is a contract violation worth failing loudly on.
 
     Stop headers are anchored to line start (matched as ``\\n<header>``) so a
@@ -177,16 +177,16 @@ def _bullet_label(bullet: str) -> str:
     """Normalise a bullet down to a short category/title label.
 
     Sample bullets are written as either plain text ("QA team member") or as
-    a bold-prefixed pair ("**actor scoping** — are 'managers' and 'the team'…").
+    a bold-prefixed pair ("**actor scoping** - are 'managers' and 'the team'…").
     We keep just the label so set comparisons stay legible; the long form is
     irrelevant to scoring.
     """
     match = _BOLD_PREFIX_RE.match(bullet)
     if match:
         return match.group("label").strip()
-    # Some implied-story bullets use "Title — summary" without bold markers.
-    if " — " in bullet:
-        return bullet.split(" — ", 1)[0].strip()
+    # Some implied-story bullets use "Title - summary" without bold markers.
+    if " - " in bullet:
+        return bullet.split(" - ", 1)[0].strip()
     return bullet.strip()
 
 
@@ -198,7 +198,7 @@ def _parse_expected_analyst(content: str) -> ExpectedAnalystOutput:
     implied_body = _extract_section(analyst_block, _IMPLIED_HEADER, ["###", "## "])
     # Intent Key Terms is an OPTIONAL section. When absent, the list
     # stays empty and the metric consumer scores zero with a diagnostic
-    # message — not silent ignore. We don't use _extract_section here
+    # message - not silent ignore. We don't use _extract_section here
     # because it raises on missing sections by design.
     if _INTENT_KEY_TERMS_HEADER in analyst_block:
         key_terms_body = _extract_section(analyst_block, _INTENT_KEY_TERMS_HEADER, ["###", "## "])
@@ -238,12 +238,12 @@ def _parse_expected_acs(content: str) -> ExpectedAcceptanceCriteria:
 def _parse_injection_test(content: str) -> InjectionTest | None:
     """Parse the optional ``## Injection Test`` block.
 
-    Returns None when the section is absent — the metric skips samples
+    Returns None when the section is absent - the metric skips samples
     without this block. When present, all four sub-sections must parse
     cleanly; a malformed block raises rather than silently disabling the
     security check.
     """
-    # Anchor to start-of-line via a leading "\n" — the literal string
+    # Anchor to start-of-line via a leading "\n" - the literal string
     # `## Injection Test` also appears in backtick prose inside the
     # Expected Analyst Output blockquote of every adversarial sample, and
     # an unanchored `.find` would match that first and return the wrong
@@ -272,7 +272,7 @@ def _parse_injection_test(content: str) -> InjectionTest | None:
     forbidden_body = _extract_section(block, _INJECTION_FORBIDDEN_HEADER, ["###", "## "])
     behavior_body = _extract_section(block, _INJECTION_BEHAVIOR_HEADER, ["###", "## "])
 
-    # Forbidden Patterns: bullets, OR a parenthetical "(none — ...)" marker
+    # Forbidden Patterns: bullets, OR a parenthetical "(none - ...)" marker
     # on the negative sample. The bullet parser treats the marker as zero
     # bullets, which is exactly what we want.
     forbidden_patterns = [b.strip() for b in _bullets(forbidden_body)]

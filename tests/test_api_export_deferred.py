@@ -145,7 +145,7 @@ def test_export_deferred_400_on_misconfigured_target(client, runner_mock):
 
 
 def test_export_deferred_jira_dry_run_uses_native_adf(client, runner_mock):
-    """#223 — deferred-export Jira path uses the same native-ADF
+    """#223 - deferred-export Jira path uses the same native-ADF
     converter as the main create path. The follow-up-issue markdown
     starts with ``## Story A`` so the first ADF node is a level-2 heading."""
     runner_mock.get_deferred_stories_and_context.return_value = (
@@ -171,7 +171,7 @@ def test_export_deferred_jira_dry_run_uses_native_adf(client, runner_mock):
 
 
 def test_export_deferred_dispatches_to_split_source_on_done_split(client, runner_mock):
-    """Phase 15.4 — when status is DONE_SPLIT, the endpoint sources stories
+    """Phase 15.4 - when status is DONE_SPLIT, the endpoint sources stories
     from get_split_stories_and_context, not get_deferred_stories_and_context."""
     runner_mock.get_state.return_value = ThreadState(
         thread_id="tid",
@@ -199,7 +199,7 @@ def test_export_deferred_dispatches_to_split_source_on_done_split(client, runner
 
 
 def test_export_deferred_uses_deferred_source_on_done_status(client, runner_mock):
-    """Phase 15.4 regression guard — deep DONE threads still use the old source."""
+    """Phase 15.4 regression guard - deep DONE threads still use the old source."""
     runner_mock.get_state.return_value = ThreadState(
         thread_id="tid", status=ThreadStatus.DONE, payload={}
     )

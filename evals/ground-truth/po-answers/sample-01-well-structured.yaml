@@ -7,7 +7,7 @@
 # post-Gemini baseline), the runner needs a deterministic PO answer so
 # downstream AC scoring isn't shaped by the generic auto-PO fallback.
 #
-# Substantive answer — the dashboard targets a QA Lead viewing their own
+# Substantive answer - the dashboard targets a QA Lead viewing their own
 # project work. Default to "the user's selected project" without
 # prescribing a UI mechanism (the requirement is deliberately vague on
 # UX; the Story Writer should not invent one).
@@ -15,9 +15,9 @@
 po_directive: |
   Scope this user story to: an authenticated QA Lead seeing the real-time
   test run summary for the project they have selected. Project selection
-  itself is out of scope for this story — assume the dashboard already
+  itself is out of scope for this story - assume the dashboard already
   knows which project the user is viewing (URL parameter, prior
-  selection, single-project default — the specific mechanism is a
+  selection, single-project default - the specific mechanism is a
   separate UX decision and SHOULD NOT be specified in this story's ACs
   or test cases). The story's behaviour starts once a project is
   selected.

@@ -3,7 +3,7 @@
 Fifth agent in the RTIA pipeline (after the Composer assembles the final
 artifact). Consumes the original requirement text and the assembled
 FinalUserStory, and emits a ReviewReport flagging coverage gaps, weak ACs,
-and untestable criteria — the AI-QA learning capstone.
+and untestable criteria - the AI-QA learning capstone.
 
 The Reviewer never mutates the artifact; it writes a ReviewReport into
 pipeline state. The reviewer_node in graph.py appends a summary string
@@ -46,7 +46,7 @@ _PROMPT_HASH = prompt_hash(SYSTEM_PROMPT, USER_PROMPT_TEMPLATE)
 class ReviewReport(BaseModel):
     """Structured output of the Reviewer agent.
 
-    Each list is empty when the artifact is solid — empty lists are a
+    Each list is empty when the artifact is solid - empty lists are a
     valid, correct response and mean the Reviewer found nothing to flag.
     """
 
@@ -140,11 +140,11 @@ def review_artifact(
     (Phase 15.1 / LEARNINGS #31). When the original requirement bundles
     several independent stories and the PO picks one at the PO
     checkpoint, the Reviewer would otherwise flag the deferred stories'
-    behaviours as coverage gaps — a false-positive ``needs_work`` every
+    behaviours as coverage gaps - a false-positive ``needs_work`` every
     time. Passing the deferred stories tells the Reviewer which
     behaviours were intentionally left out so it stops complaining
     about them. Callers that aren't routing through ``graph.py``'s
-    ``reviewer_node`` can omit this — ``None`` and ``[]`` both render
+    ``reviewer_node`` can omit this - ``None`` and ``[]`` both render
     as ``(none)`` to the LLM.
 
     Resilience knobs mirror ``analyze_requirement``. See
@@ -187,7 +187,7 @@ def review_artifact(
         HumanMessage(content=user_prompt),
     ]
     config = {"metadata": {"agent": "reviewer", "prompt_hash": _PROMPT_HASH}}
-    # Phase 12.5 — see analyze_requirement for the rationale.
+    # Phase 12.5 - see analyze_requirement for the rationale.
     with log_agent_invocation("reviewer", prompt_hash=_PROMPT_HASH) as rec:
         try:
             response = cached_invoke(

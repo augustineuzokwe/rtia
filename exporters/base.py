@@ -5,7 +5,7 @@ returning an ``ExportResult``. The result always includes the
 would-be-sent ``payload`` so the caller can inspect (or surface to the
 operator) what was constructed, regardless of whether the HTTP call ran.
 
-v1 contract is deliberately narrow — one issue per export, no
+v1 contract is deliberately narrow - one issue per export, no
 subtask/child decomposition. Mapping ACs to subtasks is a v2 concern.
 """
 
@@ -54,7 +54,7 @@ class ExportTarget(BaseModel):
     github_project_number: int | None = Field(
         default=None,
         description=(
-            "Optional GitHub Project (v2) number — if set, the created issue "
+            "Optional GitHub Project (v2) number - if set, the created issue "
             "is added to this project after creation."
         ),
     )
@@ -152,7 +152,7 @@ class Exporter(Protocol):
         ``issue_id`` is a numeric GitHub issue number (string form, e.g.
         ``"203"``) or a Jira issue key (e.g. ``"RTIA-42"``). The backend
         validates the shape and raises ``ExportConfigError`` on a
-        mismatch. Closes the duplicate-issue gap from #208 — when the
+        mismatch. Closes the duplicate-issue gap from #208 - when the
         PO re-runs RTIA on a split placeholder's title, the deep artifact
         replaces the placeholder in place instead of creating a sibling.
         """
@@ -160,7 +160,7 @@ class Exporter(Protocol):
 
 
 def make_exporter(backend: BackendName) -> Exporter:
-    """Factory — return the right exporter for a backend name.
+    """Factory - return the right exporter for a backend name.
 
     Imported lazily so importing ``exporters`` doesn't pull every
     backend's deps. Each backend module is self-contained and can be

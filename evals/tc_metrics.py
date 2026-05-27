@@ -1,16 +1,16 @@
 """Test-Case-layer metrics for the per-agent eval suite.
 
-Two metrics, each scored in [0.0, 1.0]. Both are fully programmatic — no
+Two metrics, each scored in [0.0, 1.0]. Both are fully programmatic - no
 LLM judge calls, no API spend. Mirrors the ``ac_testability`` pattern
 established in ``evals/ac_metrics.py``.
 
-- ``tc_coverage_breadth`` — averages two sub-scores: (a) whether all
+- ``tc_coverage_breadth`` - averages two sub-scores: (a) whether all
   three coverage types (``happy_path``, ``edge_case``, ``negative``) are
   represented across the generated test cases, and (b) the fraction of
   the story's acceptance criteria that have at least one test case
   derived from them, measured via token overlap between the AC's ``then``
   clause and a test case's ``expected`` clause.
-- ``tc_executability`` — fraction of test cases whose ``steps`` are free
+- ``tc_executability`` - fraction of test cases whose ``steps`` are free
   of vague-placeholder patterns (``<value>``, weasel words like ``some``,
   ``appropriate``, ``valid``, ``relevant``). Identifies the failure mode
   where the model writes ``Enter <value> in the field`` instead of a
@@ -49,7 +49,7 @@ def score_tc_coverage_breadth(
 
     Edge cases:
     - No test cases generated: score 0.0 (the agent produced nothing to
-      grade — vacuous "covered" is the wrong answer).
+      grade - vacuous "covered" is the wrong answer).
     - No acceptance criteria provided: AC-coverage sub-score defaults to
       1.0 (nothing to cover); the type-coverage sub-score still applies.
     """
@@ -125,7 +125,7 @@ def score_tc_executability(test_cases: list[TestCase]) -> MetricResult:
     Each test case starts at 1.0 and loses ``_PER_VIOLATION_PENALTY`` for
     each distinct vague-pattern hit across all its steps. Floor at 0.
 
-    The metric is *not* a hard pass/fail — a single ``<value>`` in one
+    The metric is *not* a hard pass/fail - a single ``<value>`` in one
     step drops that test case to 0.75 rather than 0, so the score
     degrades smoothly. This matches the pedagogy in baselines.md (most
     AC/TC metrics are continuous fractions, not boolean gates).

@@ -47,7 +47,7 @@ def test_post_pipeline_requires_non_empty_text(client):
 
 
 def test_post_pipeline_rejects_whitespace_only_text(client):
-    """Epic #1 intake-soundness audit (#1) — the UI's ``on_run`` rejects
+    """Epic #1 intake-soundness audit (#1) - the UI's ``on_run`` rejects
     whitespace-only input client-side, but a direct API caller could
     otherwise slip a blank ``"   "`` past the Pydantic ``min_length=1``
     check and start an empty pipeline run that the Analyst then errors
@@ -187,7 +187,7 @@ def test_upload_markdown_roundtrip(client):
 
 
 def test_resume_routes_split_resume_shape(client, runner_mock):
-    """Phase 15.4 — resume with selected_story_titles → structured payload."""
+    """Phase 15.4 - resume with selected_story_titles → structured payload."""
     runner_mock.get_state.return_value = ThreadState(
         thread_id="tid",
         status=ThreadStatus.PAUSED_PO,
@@ -219,7 +219,7 @@ def test_resume_routes_split_resume_shape(client, runner_mock):
 
 
 def test_resume_split_empty_selection_passes_empty_list(client, runner_mock):
-    """Phase 15.4 / Q2 — None or empty selected_story_titles passes [] through."""
+    """Phase 15.4 / Q2 - None or empty selected_story_titles passes [] through."""
     runner_mock.get_state.return_value = ThreadState(
         thread_id="tid",
         status=ThreadStatus.PAUSED_PO,
@@ -238,7 +238,7 @@ def test_resume_split_empty_selection_passes_empty_list(client, runner_mock):
 
 
 def test_resume_deep_mode_still_requires_answers(client, runner_mock):
-    """Phase 15.4 — deep-mode PO checkpoint contract unchanged."""
+    """Phase 15.4 - deep-mode PO checkpoint contract unchanged."""
     runner_mock.get_state.return_value = ThreadState(
         thread_id="tid",
         status=ThreadStatus.PAUSED_PO,
@@ -249,7 +249,7 @@ def test_resume_deep_mode_still_requires_answers(client, runner_mock):
 
 
 def test_resume_split_prefers_selected_stories_over_legacy_titles(client, runner_mock):
-    """Issue #207 — preferred shape ``selected_stories`` (editable
+    """Issue #207 - preferred shape ``selected_stories`` (editable
     titles + summaries) wins over legacy ``selected_story_titles`` and
     is forwarded to the runner verbatim."""
     runner_mock.get_state.return_value = ThreadState(
@@ -280,7 +280,7 @@ def test_resume_split_prefers_selected_stories_over_legacy_titles(client, runner
                     "original_title": "Story A",
                 }
             ],
-            # Legacy field also supplied — must be ignored when
+            # Legacy field also supplied - must be ignored when
             # ``selected_stories`` is present.
             "selected_story_titles": ["Story B"],
         },
@@ -302,7 +302,7 @@ def test_resume_split_prefers_selected_stories_over_legacy_titles(client, runner
 
 
 def test_resume_split_legacy_titles_still_accepted_when_no_selected_stories(client, runner_mock):
-    """Issue #207 — back-compat. When ``selected_stories`` is absent
+    """Issue #207 - back-compat. When ``selected_stories`` is absent
     but legacy ``selected_story_titles`` is present, the legacy shape
     is forwarded unchanged so older API callers keep working."""
     runner_mock.get_state.return_value = ThreadState(

@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-05-19)
 **Author:** augustineuzokwe
-**Decision driver:** Phase 1.4 of the prod-readiness roadmap — reproducibility of eval baselines requires knowing exactly which model produced a given run.
+**Decision driver:** Phase 1.4 of the prod-readiness roadmap - reproducibility of eval baselines requires knowing exactly which model produced a given run.
 
 ## Context
 
@@ -33,7 +33,7 @@ Models from version **4.6 onwards** do not currently expose a dated suffix varia
 RTIA's model-pinning policy:
 
 1. **Prefer the dated suffix** (`-YYYYMMDD`) when Anthropic publishes one for the chosen model. Reproducibility is more important than naming aesthetics.
-2. **Use the canonical name** when no dated suffix is available — there is no alternative for current-generation models (4.6+). Accept the risk of silent updates.
+2. **Use the canonical name** when no dated suffix is available - there is no alternative for current-generation models (4.6+). Accept the risk of silent updates.
 3. **Track the gap.** When Anthropic publishes a dated form for 4.6+, re-pin in a small follow-up PR and note it in the eval baselines so prior baselines are correctly attributed.
 4. **Always log model + version metadata** via LangSmith traces (Phase 1.5 will add `prompt_hash`; the model ID is already in the LangChain trace). Future eval runs can attribute regressions correctly even when the model identifier didn't change.
 

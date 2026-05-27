@@ -1,6 +1,6 @@
 """Tests for the CI eval gate (evals/check_thresholds.py).
 
-No live LLM calls — the gate is pure post-processing on a report JSON.
+No live LLM calls - the gate is pure post-processing on a report JSON.
 Tests cover the contract:
 
 - All metrics pass → exit 0.
@@ -38,7 +38,7 @@ def _write_thresholds(tmp_path: Path, floors: dict[str, float]) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# evaluate() — pure function, no I/O
+# evaluate() - pure function, no I/O
 # ---------------------------------------------------------------------------
 
 
@@ -89,7 +89,7 @@ def test_evaluate_exact_floor_passes() -> None:
 
 
 # ---------------------------------------------------------------------------
-# main() — exit codes via the CLI entry point
+# main() - exit codes via the CLI entry point
 # ---------------------------------------------------------------------------
 
 

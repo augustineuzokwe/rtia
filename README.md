@@ -1,6 +1,6 @@
-# RTIA — Requirements & Test Intelligence Assistant
+# RTIA - Requirements & Test Intelligence Assistant
 
-A multi-agent AI assistant that takes raw software requirements — feature requests, business requirements, PRD snippets, or meeting notes — and produces a structured user story, acceptance criteria (Given/When/Then), and test cases through a supervised pipeline.
+A multi-agent AI assistant that takes raw software requirements - feature requests, business requirements, PRD snippets, or meeting notes - and produces a structured user story, acceptance criteria (Given/When/Then), and test cases through a supervised pipeline.
 
 Two human-in-the-loop checkpoints keep a PO or QA Lead in control: one *before* story generation (to resolve critical ambiguities) and one *after* (to review the generated story before AC generation).
 
@@ -23,13 +23,13 @@ graph TD
 
 **Two paths, one PO decision.** At the PO checkpoint, RTIA picks the path based on how many distinct user stories the Analyst inferred:
 
-- **Deep path** (`implied_stories ≤ 1`) — produces a full four-section artifact: Description, Objective, Acceptance Criteria, Test Cases.
-- **Fan-out path** (`implied_stories ≥ 2`) — produces lightweight backlog stubs only. The PO picks a stub later and re-runs RTIA on it to deep-dive. See [PR #162](https://github.com/augustineuzokwe/rtia/pull/162) for the topology rationale.
+- **Deep path** (`implied_stories ≤ 1`) - produces a full four-section artifact: Description, Objective, Acceptance Criteria, Test Cases.
+- **Fan-out path** (`implied_stories ≥ 2`) - produces lightweight backlog stubs only. The PO picks a stub later and re-runs RTIA on it to deep-dive. See [PR #162](https://github.com/augustineuzokwe/rtia/pull/162) for the topology rationale.
 
 **Why two checkpoints on the deep path?** They do different work that the other can't:
 
 - The **PO checkpoint** resolves missing information *before* the system makes assumptions. The Analyst classifies each ambiguity by severity so the PO only pauses for genuinely blocking questions, not every detail.
-- The **Story Review checkpoint** verifies the *output* — catching cases where the Story Writer's interpretation of the resolved inputs doesn't match what the PO actually meant.
+- The **Story Review checkpoint** verifies the *output* - catching cases where the Story Writer's interpretation of the resolved inputs doesn't match what the PO actually meant.
 
 **Where the artifact goes.** The composed `FinalUserStory` is downloadable as JSON from the API, viewable in the Gradio UI, and exportable to Jira (REST v3 + ADF) or GitHub Issues (with optional Projects v2 placement) via `POST /pipeline/{thread_id}/export`. Fan-out stubs export via `/export-deferred`.
 
@@ -40,7 +40,7 @@ A PO or BA has raw requirements. Instead of manually writing user stories, ACs, 
 **Input formats:** Free text · PDF · Markdown (uploaded through the UI or sent as JSON to the API).
 **Output destinations:** JSON download · Gradio UI render · push to a Jira project · push to a GitHub repository's Issues + Projects v2 board.
 
-> **End-user guide:** if you're a PO, BA, or QA lead using RTIA rather than building it, read [docs/USAGE.md](docs/USAGE.md) — it walks you from "I have a requirement" to "I have a backlog-ready artifact" without assuming any developer knowledge.
+> **End-user guide:** if you're a PO, BA, or QA lead using RTIA rather than building it, read [docs/USAGE.md](docs/USAGE.md) - it walks you from "I have a requirement" to "I have a backlog-ready artifact" without assuming any developer knowledge.
 
 ## Stack
 
@@ -97,7 +97,7 @@ uv run pre-commit install        # one-time: enable the pre-commit hooks
 
 ### Platform notes
 
-The setup commands above assume **macOS, Linux, or WSL** (POSIX shell). RTIA's *runtime* — `uv`, Python, the agents, the cache, LangGraph — is cross-platform; only the *setup shell syntax* differs. Translations for Windows-native and Linux:
+The setup commands above assume **macOS, Linux, or WSL** (POSIX shell). RTIA's *runtime* - `uv`, Python, the agents, the cache, LangGraph - is cross-platform; only the *setup shell syntax* differs. Translations for Windows-native and Linux:
 
 | What | macOS / Linux / WSL (default in this README) | Windows PowerShell | Windows cmd |
 |---|---|---|---|
@@ -105,17 +105,17 @@ The setup commands above assume **macOS, Linux, or WSL** (POSIX shell). RTIA's *
 | Set an env var inline | `export RTIA_LLM_PROVIDER=ollama` | `$env:RTIA_LLM_PROVIDER = "ollama"` | `set RTIA_LLM_PROVIDER=ollama` |
 | Install Ollama (only needed for full-local mode) | macOS: `brew install ollama` · Linux: `curl -fsSL https://ollama.com/install.sh \| sh` | Installer from <https://ollama.com/download> | Installer from <https://ollama.com/download> |
 
-Everything else in the recipe — `uv sync`, `uv run …`, the `.env` file format — is identical on every platform.
+Everything else in the recipe - `uv sync`, `uv run …`, the `.env` file format - is identical on every platform.
 
 ### Environment variables
 
 `.env.example` documents every variable. The minimum to run the demo:
 
 ```
-GOOGLE_API_KEY=...               # Google AI Studio key — RTIA defaults to Gemini 3.5 Flash
+GOOGLE_API_KEY=...               # Google AI Studio key - RTIA defaults to Gemini 3.5 Flash
 ```
 
-Optional but recommended — **LangSmith tracing** (every LLM call surfaces with token counts, latency, and full input/output in the LangSmith UI):
+Optional but recommended - **LangSmith tracing** (every LLM call surfaces with token counts, latency, and full input/output in the LangSmith UI):
 
 ```
 LANGSMITH_TRACING=true
@@ -125,14 +125,14 @@ LANGSMITH_PROJECT=rtia
 
 Tracing is purely opt-in. Production-trace safety (refuses to start under `RTIA_ENV=production` + tracing) is covered by [ADR-0008](docs/adr-0008-pii-langsmith.md).
 
-### Deeper topics — pointers, not duplication
+### Deeper topics - pointers, not duplication
 
 The README intentionally stops at "what you need to get running." For each topic below, the linked doc has the design rationale + the env-var contract + the trade-offs:
 
-- **LLM response cache** — disk-backed, prompt-hash keyed, 24h TTL, disabled in CI. Env vars: `RTIA_LLM_CACHE`, `RTIA_LLM_CACHE_TTL`, `RTIA_LLM_CACHE_DIR`. See [ADR-0013](docs/adr-0013-llm-response-cache.md).
-- **Stochastic AC validation (N-runs)** — `--n-runs N` on the eval runner, pass-rate gating, nightly cron at 02:00 UTC on adversarial samples. See [ADR-0014](docs/adr-0014-stochastic-ac-validation.md) and [USAGE §9](docs/USAGE.md#9-stochastic-ac-validation-for-adversarial-samples).
-- **Full-local mode ($0 API spend)** — set `RTIA_LLM_PROVIDER=ollama` + `RTIA_OLLAMA_JUDGE=1`. Default uses Gemini at ~$0.005/demo, ~$0.03/eval; full local uses Ollama for both generator and judge. See [USAGE §10](docs/USAGE.md#10-running-rtia-with-zero-api-spend-full-local-mode).
-- **When tests fire (CI + nightly cron)** — full trigger table, PR timeline, 24h timeline, and a mental-shortcut table at [docs/ci-and-testing.md](docs/ci-and-testing.md).
+- **LLM response cache** - disk-backed, prompt-hash keyed, 24h TTL, disabled in CI. Env vars: `RTIA_LLM_CACHE`, `RTIA_LLM_CACHE_TTL`, `RTIA_LLM_CACHE_DIR`. See [ADR-0013](docs/adr-0013-llm-response-cache.md).
+- **Stochastic AC validation (N-runs)** - `--n-runs N` on the eval runner, pass-rate gating, nightly cron at 02:00 UTC on adversarial samples. See [ADR-0014](docs/adr-0014-stochastic-ac-validation.md) and [USAGE §9](docs/USAGE.md#9-stochastic-ac-validation-for-adversarial-samples).
+- **Full-local mode ($0 API spend)** - set `RTIA_LLM_PROVIDER=ollama` + `RTIA_OLLAMA_JUDGE=1`. Default uses Gemini at ~$0.005/demo, ~$0.03/eval; full local uses Ollama for both generator and judge. See [USAGE §10](docs/USAGE.md#10-running-rtia-with-zero-api-spend-full-local-mode).
+- **When tests fire (CI + nightly cron)** - full trigger table, PR timeline, 24h timeline, and a mental-shortcut table at [docs/ci-and-testing.md](docs/ci-and-testing.md).
 
 ### Run the demo
 
@@ -148,7 +148,7 @@ The demo runs the pipeline against `evals/sample-requirements/sample-01-well-str
 uv run python scripts/run_api.py
 ```
 
-Starts a FastAPI server on `127.0.0.1:8000` with a Gradio UI mounted at `/`. The startup banner prints a tokenized URL (`http://127.0.0.1:8000/?token=…`) — open it in a browser to paste a requirement or upload a PDF/Markdown file and step through the PO and review checkpoints. All API endpoints require `Authorization: Bearer <token>`; set `RTIA_API_TOKEN` in `.env` to pin a stable token across restarts.
+Starts a FastAPI server on `127.0.0.1:8000` with a Gradio UI mounted at `/`. The startup banner prints a tokenized URL (`http://127.0.0.1:8000/?token=…`) - open it in a browser to paste a requirement or upload a PDF/Markdown file and step through the PO and review checkpoints. All API endpoints require `Authorization: Bearer <token>`; set `RTIA_API_TOKEN` in `.env` to pin a stable token across restarts.
 
 ### Run the tests
 

@@ -1,4 +1,4 @@
-"""Tests for ``evals/n_runs.py`` — stochastic AC validation (Issue #233).
+"""Tests for ``evals/n_runs.py`` - stochastic AC validation (Issue #233).
 
 These assertions defend the design that prevents the adversarial-tail
 false-green trap:
@@ -55,7 +55,7 @@ class TestAdversarialClassifier:
 
 class TestCacheDisableInvariant:
     def test_n_runs_eq_1_does_not_check_cache(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # N=1 is backward-compat — the assertion must not fire.
+        # N=1 is backward-compat - the assertion must not fire.
         monkeypatch.setenv("RTIA_LLM_CACHE", "enabled")
         assert_cache_disabled_for_n_runs(1)  # no raise
 
@@ -102,7 +102,7 @@ class TestSampleReportPassFail:
         return NRunMetricResult.aggregate("injection_resistance", scores=scores, floor=1.0)
 
     def test_80pct_pass_rate_fails_at_threshold_95(self) -> None:
-        # 8/10 runs pass the floor — sample fails at threshold=0.95.
+        # 8/10 runs pass the floor - sample fails at threshold=0.95.
         scores = [1.0] * 8 + [0.5] * 2
         report = NRunSampleReport(
             sample_name="sample-05-injection-inline",
@@ -170,7 +170,7 @@ class TestReportSerialisation:
 
 class TestFloorLoading:
     def test_load_floors_returns_expected_metric_names(self) -> None:
-        # Snapshot-style assertion against the live thresholds.yaml — if the
+        # Snapshot-style assertion against the live thresholds.yaml - if the
         # file gains or loses a metric, this test surfaces the change so the
         # ADR-0014 contract can be re-checked.
         floors = load_metric_floors()

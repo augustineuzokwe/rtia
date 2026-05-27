@@ -74,10 +74,10 @@ def verify_token(request: Request) -> None:
 
     Three acceptance paths, tried in order:
 
-    1. ``Authorization: Bearer <token>`` — canonical; curl + API clients.
-    2. ``?token=<token>`` query param — one-click open from the printed
+    1. ``Authorization: Bearer <token>`` - canonical; curl + API clients.
+    2. ``?token=<token>`` query param - one-click open from the printed
        startup URL; occasionally convenient for curl smoke.
-    3. ``rtia_token`` cookie — set by the UI auth middleware after a
+    3. ``rtia_token`` cookie - set by the UI auth middleware after a
        successful #1 or #2 so in-browser fetches from the Gradio JS
        bundle to ``/pipeline*`` / ``/uploads/*`` authenticate without
        the JS having to handle the token.

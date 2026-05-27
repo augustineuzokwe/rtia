@@ -10,7 +10,7 @@ it doesn't need this. Tests mock ``.invoke`` but still construct real
 instances of the Gemini class, so a placeholder key has to exist.
 
 Using ``autouse=True`` so every test gets the fixture without needing to
-opt in — this is environment setup, not a test-shaped dependency.
+opt in - this is environment setup, not a test-shaped dependency.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import pytest
 def _dummy_provider_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure provider API keys exist for client construction in tests.
 
-    Only sets the var if absent — a developer running tests with a real
+    Only sets the var if absent - a developer running tests with a real
     key in their environment keeps it. ``monkeypatch`` restores the env
     after each test so the fixture is non-leaky.
     """
@@ -41,7 +41,7 @@ def _disable_llm_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     Mocked tests patch ``llm.invoke`` per-call; a stale cache entry from a
     previous test would shadow the new mock and return cached text instead
     of letting the mock run. Per-test cache isolation via temp dirs would
-    also work but is heavier — disabling is the simpler invariant for the
+    also work but is heavier - disabling is the simpler invariant for the
     mocked-LLM contract tests this suite is built around.
 
     Tests that specifically exercise the cache (``tests/test_llm_cache.py``)

@@ -2,15 +2,15 @@
 
 Two metrics, each scored in [0.0, 1.0]:
 
-- ``ac_coverage`` — F1 of (required categories covered) vs (in-scope ACs / total
+- ``ac_coverage`` - F1 of (required categories covered) vs (in-scope ACs / total
   ACs). Catches both **under-coverage** (a required category has no AC) and
   **scope leakage** (ACs that match a deliberately out-of-scope behaviour).
-  Uses the match judge — one short classification call per generated AC.
-- ``ac_testability`` — programmatic. Each AC must have non-empty
+  Uses the match judge - one short classification call per generated AC.
+- ``ac_testability`` - programmatic. Each AC must have non-empty
   given/when/then, no non-observable verbs in ``then`` ("feels", "thinks",
   "knows"), and each field must fit a sane length cap. No LLM calls.
 
-History — a third metric (``ac_faithfulness``) was deleted in the Gemini
+History - a third metric (``ac_faithfulness``) was deleted in the Gemini
 cutover (ADR-0006). It used deepeval's GEval to flag invented scope vs.
 the user story; the metric was documented as structurally pessimistic
 (scored ACs against Story Writer output only, ignoring Analyst context
@@ -65,14 +65,14 @@ def _classify_ac(
         "You are classifying one acceptance criterion against a ground-truth "
         "bundle for the story it belongs to.\n\n"
         "The bundle has TWO lists:\n"
-        "- Required AC categories — behaviours that must be covered by some "
+        "- Required AC categories - behaviours that must be covered by some "
         "AC. An AC 'matches' a category when it tests that behaviour "
         "(wording will vary; match by meaning).\n"
-        "- Out-of-scope behaviours — behaviours the AC Generator must NOT "
+        "- Out-of-scope behaviours - behaviours the AC Generator must NOT "
         "produce ACs for. An AC matches one of these when it tests that "
         "out-of-scope behaviour (again, by meaning).\n\n"
         "An AC may legitimately match neither list (in-scope but not "
-        "required-listed) — in that case both fields are null.\n\n"
+        "required-listed) - in that case both fields are null.\n\n"
         f"AC under classification:\n"
         f"  Given: {ac.given}\n"
         f"  When:  {ac.when}\n"
@@ -98,7 +98,7 @@ def score_ac_coverage(
       scope leakage / invented ACs that match a deliberately deferred topic.
 
     The count-tolerance from the ground truth is reported in the reason but
-    does NOT directly affect the score — coverage already penalises both
+    does NOT directly affect the score - coverage already penalises both
     under- and over-count via the F1 components.
     """
     if not generated.criteria:
@@ -180,7 +180,7 @@ def _testability_violations(ac: AcceptanceCriterion) -> list[str]:
 def score_ac_testability(generated: AcGeneratorOutput) -> MetricResult:
     """Fraction of ACs that pass every programmatic well-formedness check.
 
-    No LLM calls — these are properties we can check from the structure
+    No LLM calls - these are properties we can check from the structure
     directly. Keeps testability cheap to evaluate (and the metric available
     in fully-offline test runs).
     """

@@ -112,7 +112,7 @@ def test_as_markdown_renders_all_four_sections_in_order():
 def test_as_markdown_shows_placeholder_when_ac_missing():
     """An empty acceptance_criteria list must render a placeholder, not be omitted.
 
-    Empty lists must be visible — readers should SEE that AC isn't filled
+    Empty lists must be visible - readers should SEE that AC isn't filled
     yet, not assume the agent ran and produced nothing.
     """
     artifact = FinalUserStory(description="x", objective="y")

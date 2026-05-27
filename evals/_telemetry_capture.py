@@ -9,7 +9,7 @@ return telemetry alongside the parsed output would touch every agent and
 every test.
 
 Instead this module installs a stdlib ``logging.Handler`` that listens
-on the ``rtia.agents.*`` namespace — exactly where Phase 13.2's
+on the ``rtia.agents.*`` namespace - exactly where Phase 13.2's
 ``log_agent_invocation`` context manager already emits a structured
 ``agent_invocation_end`` record for every LLM call. The handler parses
 those records back into typed observations. Zero changes to agent code.
@@ -21,7 +21,7 @@ Constraints kept honest:
   silent because they don't enter this context manager.
 * Token counts are pulled from the structured fields the formatter
   already serialises (``input_tokens``, ``output_tokens``,
-  ``total_tokens``). Missing fields stay ``None`` — observability code
+  ``total_tokens``). Missing fields stay ``None`` - observability code
   must not lie about counts.
 * Judge calls are NOT captured here. The judge uses its own
   ``ChatGoogleGenerativeAI`` outside ``log_agent_invocation`` (different
@@ -137,7 +137,7 @@ def capture_agent_telemetry() -> Iterator[TelemetryCapture]:
     exit. Idempotent across nested usage (each enter gets its own
     handler + capture bag). Importantly, the handler is installed at
     ``logging.DEBUG`` even though ``configure_logging`` sets the logger
-    at INFO by default — the runner doesn't need to know whether the
+    at INFO by default - the runner doesn't need to know whether the
     caller bumped the level. The handler accepts everything; the filter
     on ``event == 'agent_invocation_end'`` selects the records we want.
     """

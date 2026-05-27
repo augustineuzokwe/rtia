@@ -1,7 +1,7 @@
-# Sample Requirement 01 — Well-Structured
+# Sample Requirement 01 - Well-Structured
 
 **Type:** Well-structured, clear, single feature
-**Purpose:** Happy path test — RTIA should produce a clean user story and ACs with no ambiguity to resolve
+**Purpose:** Happy path test - RTIA should produce a clean user story and ACs with no ambiguity to resolve
 
 ---
 
@@ -51,7 +51,7 @@ As a QA Lead, I want to see a real-time test run summary for my selected project
 
 ## Expected Analyst Output (per-agent ground truth for the Requirements Analyst)
 
-> Ground truth for the **Analyst agent only**. Phrasing is illustrative — eval metrics
+> Ground truth for the **Analyst agent only**. Phrasing is illustrative - eval metrics
 > compare against this fuzzily (judge for intent, set semantics for actors, category
 > coverage for ambiguities), not by exact string match.
 
@@ -72,30 +72,30 @@ paraphrase preserves these even when verbs and connectives change.
 - authenticated user
 - unauthenticated user
 
-> **Note (post-Gemini calibration, #102):** the raw requirement says only "authenticated users" — the "QA Lead" qualifier was an inference from the dashboard's domain context. Demanding the Analyst echo that qualifier was over-fitting to Claude's tendency to over-qualify roles. The judge's synonym match correctly declined "authenticated user" ≈ "QA Lead (authenticated user)" because they're structurally different labels. Relaxed to match the requirement text.
+> **Note (post-Gemini calibration, #102):** the raw requirement says only "authenticated users" - the "QA Lead" qualifier was an inference from the dashboard's domain context. Demanding the Analyst echo that qualifier was over-fitting to Claude's tendency to over-qualify roles. The judge's synonym match correctly declined "authenticated user" ≈ "QA Lead (authenticated user)" because they're structurally different labels. Relaxed to match the requirement text.
 
 ### Ambiguity Categories
-- **project selection mechanism** — the requirement says the dashboard shows a summary "for a selected project" but never specifies HOW selection happens (dropdown? URL parameter? remembered last-used? default to the user's only project?). This is a story-shape question — it changes the user's flow into the feature, not just the UI polish. A disciplined Analyst is expected to surface it as a critical ambiguity. This category was added in the post-Gemini calibration: the question is genuinely worth asking, and forcing the Analyst to suppress it would penalise legitimate scope-shape inquiry.
+- **project selection mechanism** - the requirement says the dashboard shows a summary "for a selected project" but never specifies HOW selection happens (dropdown? URL parameter? remembered last-used? default to the user's only project?). This is a story-shape question - it changes the user's flow into the feature, not just the UI polish. A disciplined Analyst is expected to surface it as a critical ambiguity. This category was added in the post-Gemini calibration: the question is genuinely worth asking, and forcing the Analyst to suppress it would penalise legitimate scope-shape inquiry.
 
-Items that would still indicate a discipline failure (implementation/UX detail the prompt's scope rule forbids — these are NOT categories, just illustrative anti-patterns): specific refresh-indicator UI (spinner, "last updated" timestamp), retry-on-network-error behaviour, redirect-target choice after successful login.
+Items that would still indicate a discipline failure (implementation/UX detail the prompt's scope rule forbids - these are NOT categories, just illustrative anti-patterns): specific refresh-indicator UI (spinner, "last updated" timestamp), retry-on-network-error behaviour, redirect-target choice after successful login.
 
 ### Implied Stories
-- (none expected) — single-story requirement.
+- (none expected) - single-story requirement.
 
 ---
 
 ## Expected Acceptance Criteria (per-agent ground truth for the AC Generator)
 
-> Ground truth for the **AC Generator agent only**. Phrasing is illustrative —
+> Ground truth for the **AC Generator agent only**. Phrasing is illustrative -
 > eval metrics check that each category below is covered by at least one
 > produced AC (fuzzy match), not exact Given/When/Then wording.
 
 ### Required AC Categories
 The AC Generator should produce at least one AC for each:
 
-- **summary display** — selecting a project surfaces totals + pass/failed/skipped counts for the most recent run
-- **auto-refresh cadence** — summary updates without a full page reload on the stated interval (30s)
-- **access boundary** — unauthenticated users are redirected to the login page; the dashboard is not visible to them
+- **summary display** - selecting a project surfaces totals + pass/failed/skipped counts for the most recent run
+- **auto-refresh cadence** - summary updates without a full page reload on the stated interval (30s)
+- **access boundary** - unauthenticated users are redirected to the login page; the dashboard is not visible to them
 
 ### Expected AC Count
 3 (±1). Below 3 means a missing category; above 4 usually means atomicity violations or invented scope.

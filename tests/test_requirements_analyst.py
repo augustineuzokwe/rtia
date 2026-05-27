@@ -1,6 +1,6 @@
 """Tests for the Requirements Analyst agent.
 
-Mocks the LLM call — these tests cover the agent's contract (prompt assembly,
+Mocks the LLM call - these tests cover the agent's contract (prompt assembly,
 JSON parsing, schema validation), not Claude's behavior.
 """
 
@@ -24,7 +24,7 @@ VALID_RESPONSE = {
     "actors": ["QA Lead", "unauthenticated user"],
     "ambiguities": [
         {
-            "question": "What counts as 'real-time' — sub-second or 30s refresh acceptable?",
+            "question": "What counts as 'real-time' - sub-second or 30s refresh acceptable?",
             "severity": "normal",
         },
         {

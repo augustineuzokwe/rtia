@@ -1,6 +1,6 @@
 """Tests for agents/_logging.py (Phase 13.2).
 
-The interesting cases here are NOT "does Python's logging module work" —
+The interesting cases here are NOT "does Python's logging module work" -
 that's a given. They are:
 
 * The JSON formatter emits one parseable object per line with the
@@ -10,7 +10,7 @@ that's a given. They are:
 * The context manager records error_class/error_message and re-raises
   unchanged on exception.
 * configure_logging() is idempotent and doesn't multiply handlers.
-* Library import is silent — no handlers are emitting unless
+* Library import is silent - no handlers are emitting unless
   configure_logging() has been called.
 """
 
@@ -113,7 +113,7 @@ def test_log_agent_invocation_success_captures_tokens_and_duration():
 
 
 def test_log_agent_invocation_missing_token_metadata_is_none_not_zero():
-    """Absent counts must report None — zero would be a lie."""
+    """Absent counts must report None - zero would be a lie."""
     _, buf = _capture_handler()
     response = _FakeResponse(usage=None)
     with log_agent_invocation("analyst") as rec:

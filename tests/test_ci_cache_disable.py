@@ -7,9 +7,9 @@ the trustworthiness of every PR metric goes to zero.
 
 Two redundant disables are checked because they cover different
 refactor risks:
-1. ``env: RTIA_LLM_CACHE: disabled`` on the eval-suite step — survives a
+1. ``env: RTIA_LLM_CACHE: disabled`` on the eval-suite step - survives a
    refactor that swaps the command but keeps the env block.
-2. ``--no-cache`` on the ``run_evals.py`` command line — survives a
+2. ``--no-cache`` on the ``run_evals.py`` command line - survives a
    refactor that swaps the env block (e.g. via a matrix strategy or a
    reusable workflow) but keeps the command unchanged.
 

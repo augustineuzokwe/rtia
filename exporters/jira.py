@@ -1,12 +1,12 @@
-"""Jira Cloud exporter — REST v3 ``POST /issue``.
+"""Jira Cloud exporter - REST v3 ``POST /issue``.
 
 Auth: basic with ``JIRA_EMAIL`` + ``JIRA_API_TOKEN``, base URL from
 ``JIRA_BASE_URL`` (e.g. ``https://your-org.atlassian.net``).
 
 Description is sent as ADF (Atlassian Document Format). v1 wraps the
 rendered markdown in a single ``codeBlock`` node so the artifact survives
-intact in Jira's UI. POs can re-format inside Jira; the alternative —
-shipping a Markdown→ADF converter — is heavy and out of scope for v1.
+intact in Jira's UI. POs can re-format inside Jira; the alternative -
+shipping a Markdown→ADF converter - is heavy and out of scope for v1.
 
 Dry-run is the verification path. With no credentials in the env, you
 can still inspect the would-be POST body via ``dry_run=True``.
@@ -33,7 +33,7 @@ _log = logging.getLogger("rtia.exporters.jira")
 
 
 class JiraExporter:
-    """Jira exporter. One instance per process is fine — it's stateless."""
+    """Jira exporter. One instance per process is fine - it's stateless."""
 
     backend = "jira"
 
@@ -131,9 +131,9 @@ class JiraExporter:
 
         Maps to ``PUT /rest/api/3/issue/{key}`` with the standard
         ``{"fields": {...}}`` body shape. Jira returns ``204 No Content``
-        on success — we synthesise the resulting URL from
+        on success - we synthesise the resulting URL from
         ``JIRA_BASE_URL`` + the issue key. Project / issuetype / parent
-        are intentionally NOT included in the update body — they were
+        are intentionally NOT included in the update body - they were
         set at create time and Jira validates updates against the
         existing issue's context.
         """
@@ -152,7 +152,7 @@ class JiraExporter:
                 "in the environment (or use dry_run=true to inspect the payload)."
             )
 
-        # #223 — same native-ADF conversion as the create path. Update
+        # #223 - same native-ADF conversion as the create path. Update
         # bodies must match what create sends so an update doesn't
         # silently regress a previously-ADF-rendered description into a
         # codeBlock wall.
@@ -192,7 +192,7 @@ class JiraExporter:
                 error=f"Jira API returned {response.status_code}: {response.text[:500]}",
             )
 
-        # 204 No Content on success — no body to parse. Synthesise URL.
+        # 204 No Content on success - no body to parse. Synthesise URL.
         url = f"{base_url}/browse/{key}"
         return ExportResult(
             backend="jira",
@@ -211,7 +211,7 @@ def _build_payload(target: ExportTarget, title: str, markdown: str) -> dict[str,
     (#223). Native ADF renders as proper headings, lists, and inline
     bold/italic in Jira instead of a static code-block wall.
 
-    ``parent`` is set only when ``jira_parent_key`` is supplied — Jira
+    ``parent`` is set only when ``jira_parent_key`` is supplied - Jira
     Cloud company-managed projects honor ``parent`` for Epic Link;
     team-managed projects use the same field for parent issues.
     """
@@ -230,7 +230,7 @@ def _description_adf(markdown: str) -> dict[str, Any]:
     """Convert ``markdown`` to an ADF ``doc`` for Jira's description field.
 
     Falls back to the legacy ``codeBlock`` wrap if the converter raises
-    — keeping a push working through a parser bug is more valuable than
+    - keeping a push working through a parser bug is more valuable than
     a clean ADF (we'll see and fix the bug from logs). #223 contract.
     """
     try:

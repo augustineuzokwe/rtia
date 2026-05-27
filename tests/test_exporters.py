@@ -30,7 +30,7 @@ def test_jira_dry_run_builds_payload_without_creds(monkeypatch):
     assert result.dry_run is True
     assert result.payload["fields"]["project"]["key"] == "RTIA"
     assert result.payload["fields"]["summary"] == "As a user I want X"
-    # #223 — description is now native ADF (heading + paragraph) rather
+    # #223 - description is now native ADF (heading + paragraph) rather
     # than a codeBlock wrap. Markdown→ADF conversion lives in
     # exporters/_adf.py; this assertion pins the integration point.
     desc = result.payload["fields"]["description"]
@@ -172,7 +172,7 @@ def test_github_project_add_failure_surfaces_in_error(monkeypatch):
     )
     result = GitHubExporter(http_client=client).export("body", target, title="t", dry_run=False)
 
-    # Issue was still created — the result reports the project-add error
+    # Issue was still created - the result reports the project-add error
     # but success=True for the issue itself.
     assert result.success is True
     assert result.key == "9"
@@ -263,12 +263,12 @@ def test_jira_update_dry_run_builds_put_payload(monkeypatch):
     assert result.success is True
     assert result.dry_run is True
     assert result.payload["fields"]["summary"] == "Updated"
-    # #223 — update path uses the same native-ADF converter as create.
+    # #223 - update path uses the same native-ADF converter as create.
     first = result.payload["fields"]["description"]["content"][0]
     assert first["type"] == "heading"
     assert first["attrs"]["level"] == 2
     assert first["content"][0]["text"] == "body"
-    # No project / issuetype / parent on update — those are pinned at create.
+    # No project / issuetype / parent on update - those are pinned at create.
     assert "project" not in result.payload["fields"]
     assert "issuetype" not in result.payload["fields"]
     assert result.payload["_meta"]["operation"] == "update"

@@ -1,7 +1,7 @@
 """Structured JSON logging for RTIA (Phase 13.2).
 
 This module is intentionally separate from ``agents.observability`` (which
-owns the LangSmith integration). LangSmith is a *trace* sink — it can be
+owns the LangSmith integration). LangSmith is a *trace* sink - it can be
 disabled (Phase 12.4 forces it off in production) and it can be down.
 Structured logs are RTIA's own narrative of what happened: who ran, how
 long it took, what it cost, and whether it failed. They survive a
@@ -27,7 +27,7 @@ Design choices worth knowing about:
   ``usage_metadata`` with slightly different shapes; the extractor falls
   back gracefully when a field is missing rather than raising and
   corrupting the success path. The point of these logs is observability,
-  not correctness — a missing token count must never break the pipeline.
+  not correctness - a missing token count must never break the pipeline.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ _DEFAULT_LEVEL = "INFO"
 _DEFAULT_DESTINATION = "stderr"
 
 # Module-level flag guarding ``configure_logging``. Repeat calls are
-# idempotent — handy when both the demo's main() and a unit test
+# idempotent - handy when both the demo's main() and a unit test
 # (which should never trigger it) end up importing the same module.
 _configured: bool = False
 
@@ -60,7 +60,7 @@ _configured: bool = False
 def _resolve_level() -> int:
     """Read RTIA_LOG_LEVEL from env. Unknown values fall back to INFO.
 
-    We intentionally do NOT raise on a typo — an operator setting
+    We intentionally do NOT raise on a typo - an operator setting
     ``RTIA_LOG_LEVEL=INF0`` (zero, not O) at 3 AM should still get logs,
     just at the default level. The fallback is logged at WARNING once
     so the misconfiguration is visible.
@@ -88,15 +88,15 @@ class JsonFormatter(logging.Formatter):
 
     The schema is intentionally flat:
 
-    * ``ts`` — UNIX epoch milliseconds (integer). Easier to sort than ISO.
-    * ``level`` — WARNING / INFO / DEBUG / ERROR.
-    * ``logger`` — full dotted logger name (``rtia.agents.foo``).
-    * ``event`` — short kebab-case event name from ``extra={"event": ...}``.
-    * ``message`` — the human-readable message (often empty for structured
+    * ``ts`` - UNIX epoch milliseconds (integer). Easier to sort than ISO.
+    * ``level`` - WARNING / INFO / DEBUG / ERROR.
+    * ``logger`` - full dotted logger name (``rtia.agents.foo``).
+    * ``event`` - short kebab-case event name from ``extra={"event": ...}``.
+    * ``message`` - the human-readable message (often empty for structured
       events; useful when grepping).
     * Any extra fields from ``extra={...}`` are merged at the top level.
 
-    A nested ``context`` namespace was considered and rejected — flat
+    A nested ``context`` namespace was considered and rejected - flat
     is much easier to query with ``jq '.duration_ms'`` than
     ``jq '.context.duration_ms'``.
     """
@@ -147,7 +147,7 @@ class JsonFormatter(logging.Formatter):
         if record.exc_info:
             payload["exc_info"] = self.formatException(record.exc_info)
         # ``default=str`` makes the formatter robust to surprise types
-        # (Pydantic models, datetimes) — observability code must never
+        # (Pydantic models, datetimes) - observability code must never
         # crash the caller because someone passed a fancy object.
         return json.dumps(payload, default=str, ensure_ascii=False)
 
@@ -158,7 +158,7 @@ def configure_logging(*, force: bool = False) -> None:
     Idempotent: repeat calls are no-ops unless ``force=True``. Tests can
     use ``force=True`` to swap handlers between cases.
 
-    Only touches the ``rtia`` logger — never the root logger, never the
+    Only touches the ``rtia`` logger - never the root logger, never the
     handlers of other libraries. This is what makes the module safe to
     import from anywhere.
     """
@@ -289,7 +289,7 @@ def log_agent_invocation(
     * ``event=agent_invocation_end`` (INFO on success, ERROR on
       exception) when the block exits. Includes ``duration_ms``,
       ``status``, token counts, and (on exception) the error class and
-      message — but NOT the requirement text. Per ADR-0008, logs must
+      message - but NOT the requirement text. Per ADR-0008, logs must
       not exfiltrate customer input.
 
     Usage::
@@ -299,7 +299,7 @@ def log_agent_invocation(
             response = llm.invoke(messages, config=config)
             rec.record_response(response)
 
-    The ``raise`` path is automatic — an exception inside the block is
+    The ``raise`` path is automatic - an exception inside the block is
     logged with status=error and re-raised unchanged.
     """
     logger = get_logger(f"agents.{agent}")

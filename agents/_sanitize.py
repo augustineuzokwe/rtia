@@ -9,15 +9,15 @@ downstream consumer regardless of what any individual agent emitted.
 Defence-in-depth note: this is independent of the Phase 12.1 prompt-
 injection metric. 12.1 measures whether the Analyst flagged hostile
 *input*; 12.2 cleans whatever *output* the pipeline produced. The two
-layers are not substitutes — an Analyst that fails to flag an injection
+layers are not substitutes - an Analyst that fails to flag an injection
 can still produce contaminated text, and a clean Analyst can still emit
 a stray control byte under model stress.
 
 Order matters (and is asserted by ``sanitize_artifact``):
 
-1. Strip control characters first — cleanest input for the regex pass.
-2. Normalise code fences next — operates on the cleaned text.
-3. Apply the length cap last — so the truncation marker isn't itself
+1. Strip control characters first - cleanest input for the regex pass.
+2. Normalise code fences next - operates on the cleaned text.
+3. Apply the length cap last - so the truncation marker isn't itself
    stripped or mangled by an earlier pass.
 
 All three sanitisers are pure functions on ``str`` so they can be unit-
@@ -37,7 +37,7 @@ DEFAULT_MAX_CHARS = 16_384
 
 # Markdown line endings only. Everything else in the ASCII C0 / C1 range
 # (NUL, BEL, BS, VT, FF, ESC, DEL, …) is invisible at best and an
-# injection vector at worst — strip silently.
+# injection vector at worst - strip silently.
 _ALLOWED_CONTROL_CHARS = frozenset({"\t", "\n", "\r"})
 
 # Trojan Source / steganography / homoglyph surface. None of these
@@ -54,15 +54,15 @@ _INVISIBLE_FORMATTING_CHARS = frozenset(
         "‪",  # LRE
         "‫",  # RLE
         "‬",  # PDF (pop directional formatting)
-        "‭",  # LRO  — the Trojan Source vector
-        "‮",  # RLO  — the Trojan Source vector
+        "‭",  # LRO  - the Trojan Source vector
+        "‮",  # RLO  - the Trojan Source vector
         "﻿",  # BOM / zero-width no-break space
     ]
 )
 
 # Code-fence language allowlist. Members are the languages we accept on a
 # triple-backtick opener; everything else is rewritten to a bare fence.
-# The body of the fenced block is preserved verbatim — we are only
+# The body of the fenced block is preserved verbatim - we are only
 # defending against renderer behaviour keyed on the language tag (mermaid,
 # html, svg, javascript, etc. in Jira / Confluence / Notion / GitHub).
 DEFAULT_ALLOWED_LANGS = frozenset(
@@ -89,7 +89,7 @@ DEFAULT_ALLOWED_LANGS = frozenset(
 )
 
 # Match the opener of a fenced code block: line-anchored ``` followed by an
-# optional language tag (alphanumeric + dash/underscore — no spaces, no
+# optional language tag (alphanumeric + dash/underscore - no spaces, no
 # punctuation that could smuggle attributes). Captures the tag so it can
 # be inspected and rewritten.
 _FENCE_OPENER_RE = re.compile(
@@ -131,7 +131,7 @@ def strip_control_chars(text: str) -> tuple[str, int, int]:
 
     Returns the cleaned text plus a (control_count, invisible_count) pair
     so the caller can populate a SanitizeReport. Splitting the two counts
-    keeps the security signal legible — Trojan Source bidi overrides are
+    keeps the security signal legible - Trojan Source bidi overrides are
     a different threat class than stray NUL bytes and worth distinguishing
     in audit output.
     """
@@ -164,7 +164,7 @@ def normalize_code_fences(
     """Rewrite fenced-code openers whose language tag is not in the allowlist.
 
     The fence delimiter is preserved (so the block still renders as code)
-    and the body is untouched — only the language tag is dropped. This
+    and the body is untouched - only the language tag is dropped. This
     defends against renderer behaviour keyed on the tag (HTML, SVG,
     Mermaid auto-render in Confluence/Notion) without sacrificing the
     legitimate use of fenced code in requirements.
@@ -196,7 +196,7 @@ def enforce_length_cap(text: str, max_chars: int = DEFAULT_MAX_CHARS) -> tuple[s
     placed in-band so the PO sees the cut at the LangGraph checkpoint
     rather than silently losing context.
 
-    The truncation leaves room for the marker itself within the cap — the
+    The truncation leaves room for the marker itself within the cap - the
     final string length is bounded by ``max_chars``, not ``max_chars +
     len(marker)``. This matters because the cap exists to bound paste
     flooding; an attacker who could push the output exactly to the cap
@@ -223,7 +223,7 @@ def sanitize_artifact(
     normalise → length cap) and not any other permutation. Returns the
     cleaned text and a SanitizeReport summarising what changed.
 
-    Pure function — safe to call in tests, in render code, and in eval
+    Pure function - safe to call in tests, in render code, and in eval
     runners without side effects.
     """
     cleaned, control_count, invisible_count = strip_control_chars(text)
