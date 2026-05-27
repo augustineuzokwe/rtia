@@ -32,7 +32,7 @@ API calls; runs in milliseconds.
 
 | File | Covers |
 |---|---|
-| [`test_graph.py`](test_graph.py) | LangGraph topology, `PipelineState` schema, fan-out conditional edge, HITL interrupt shapes |
+| [`test_graph.py`](test_graph.py) | LangGraph topology, `PipelineState` schema, split conditional edge, HITL interrupt shapes |
 
 ### API layer (FastAPI)
 
@@ -46,9 +46,9 @@ bridge.
 | [`test_api_endpoints.py`](test_api_endpoints.py) | `/pipeline*` and `/uploads/*` endpoint contracts |
 | [`test_api_parsers.py`](test_api_parsers.py) | PDF / Markdown / text input parsing |
 | [`test_api_runner.py`](test_api_runner.py) | Pipeline runner state transitions through the API |
-| [`test_api_runner_title.py`](test_api_runner_title.py) | Title derivation for backlog stubs (#222/#224) |
+| [`test_api_runner_title.py`](test_api_runner_title.py) | Title derivation for backlog placeholder stories (#222/#224) |
 | [`test_api_export.py`](test_api_export.py) | `POST /pipeline/{id}/export` - full deep artifact to Jira/GitHub |
-| [`test_api_export_deferred.py`](test_api_export_deferred.py) | `POST /pipeline/{id}/export-deferred` - fan-out stubs batch |
+| [`test_api_export_deferred.py`](test_api_export_deferred.py) | `POST /pipeline/{id}/export-deferred` - split placeholder stories batch |
 
 ### UI layer (Gradio)
 
@@ -59,7 +59,7 @@ verification step in `docs/USAGE.md`).
 | File | Covers |
 |---|---|
 | [`test_ui_state_panels.py`](test_ui_state_panels.py) | Which panels show/hide on each `ThreadStatus` transition |
-| [`test_ui_followup_dispatch.py`](test_ui_followup_dispatch.py) | Fan-out checkbox group → resume payload routing |
+| [`test_ui_followup_dispatch.py`](test_ui_followup_dispatch.py) | Split checkbox group → resume payload routing |
 | [`test_ui_export_target.py`](test_ui_export_target.py) | `_build_export_target` for Jira project key / GitHub `owner/repo` |
 
 ### Exporters (Jira + GitHub backends)

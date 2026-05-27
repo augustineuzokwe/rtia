@@ -145,11 +145,11 @@ The general lesson: a *provider + model* decision is a recurring decision, not a
 
 ---
 
-## Section 7 - Worked example: multi-story fan-out + structured HITL
+## Section 7 - Worked example: multi-story split + structured HITL
 
-Some requirements describe four features, not one. Trying to force a deep-dive run on a four-feature input mashes the ACs and Test Cases together and produces an artifact no one wants. RTIA's Analyst flags the count of implied stories; if the count ≥ 2, a LangGraph conditional edge routes the run down the fan-out path - producing lightweight backlog stubs (title + one-liner) rather than a full deep artifact. The PO comes back later and re-runs RTIA on each stub individually.
+Some requirements describe four features, not one. Trying to force a deep-dive run on a four-feature input mashes the ACs and Test Cases together and produces an artifact no one wants. RTIA's Analyst flags the count of implied stories; if the count ≥ 2, a LangGraph conditional edge routes the run down the split path - producing lightweight placeholder stories (title + one-liner) rather than a full deep artifact. The PO comes back later and re-runs RTIA on each placeholder individually.
 
-The HITL ("human in the loop") checkpoint is editable: the PO can rename a stub title in the Gradio UI before the fan-out commits. The titles flow into the Jira / GitHub exporter as the actual issue titles. Single decision, two LangGraph nodes, one HITL pause - documented in [`docs/adr-0010-multi-story-fan-out.md`](https://github.com/augustineuzokwe/rtia/blob/main/docs/adr-0010-multi-story-fan-out.md).
+The HITL ("human in the loop") checkpoint is editable: the PO can rename a placeholder title in the Gradio UI before the split commits. The titles flow into the Jira / GitHub exporter as the actual issue titles. Single decision, two LangGraph nodes, one HITL pause - documented in [`docs/adr-0010-multi-story-split.md`](https://github.com/augustineuzokwe/rtia/blob/main/docs/adr-0010-multi-story-split.md).
 
 The general lesson: the most-used Gradio checkpoint in a multi-agent pipeline is rarely the technical decision. It's the *renaming*. Build the UI for that first.
 
@@ -202,7 +202,7 @@ Five interview-grade questions and the one-line answers that came out of buildin
 | How do you test a non-deterministic agent? | Golden dataset + LLM-as-judge + CI threshold gate, with the gate set at "above floor" not "above last run." | [`evals/`](https://github.com/augustineuzokwe/rtia/tree/main/evals) + [`.github/workflows/ci.yml`](https://github.com/augustineuzokwe/rtia/blob/main/.github/workflows/ci.yml) |
 | How do you stop the model leaking secrets? | Pre-LLM regex block + commit-time scanner + an ADR'd PII-vs-secret policy. | [`agents/_secret_scan.py`](https://github.com/augustineuzokwe/rtia/blob/main/agents/_secret_scan.py) + [ADR-0008](https://github.com/augustineuzokwe/rtia/blob/main/docs/adr-0008-pii-langsmith.md) |
 | How do you survive a provider's 503 cascade? | Bounded SDK retries + workflow-level retry + an ADR'd model swap derived from live probing. | [`agents/_llm_errors.py`](https://github.com/augustineuzokwe/rtia/blob/main/agents/_llm_errors.py) + [ADR-0007](https://github.com/augustineuzokwe/rtia/blob/main/docs/adr-0007-gemini-3-5-flash-switch.md) |
-| How do you split multi-feature requirements? | Analyst flags implied stories; LangGraph conditional edge routes to deep-dive vs fan-out path; HITL checkpoint is editable. | [`agents/graph.py`](https://github.com/augustineuzokwe/rtia/blob/main/agents/graph.py) + [ADR-0010](https://github.com/augustineuzokwe/rtia/blob/main/docs/adr-0010-multi-story-fan-out.md) |
+| How do you split multi-feature requirements? | Analyst flags implied stories; LangGraph conditional edge routes to deep-dive vs split path; HITL checkpoint is editable. | [`agents/graph.py`](https://github.com/augustineuzokwe/rtia/blob/main/agents/graph.py) + [ADR-0010](https://github.com/augustineuzokwe/rtia/blob/main/docs/adr-0010-multi-story-split.md) |
 | How do you cost-optimise an LLM pipeline? | Benchmark every provider × model on the actual task; CI-enforced token budgets; do the cache work *carefully* (see Section 4). | [ADR-0006](https://github.com/augustineuzokwe/rtia/blob/main/docs/adr-0006-provider-switch.md) + [`pyproject.toml [tool.rtia.budgets]`](https://github.com/augustineuzokwe/rtia/blob/main/pyproject.toml) |
 
 The hardest one to internalise - and the one I'd put first on an interview answer - is the eval-floor framing. *Above last run* is a ratchet that locks you into accidental quality wins; you can never make a trade-off PR (e.g. "the new prompt is slightly less verbose but much cheaper") because it'd register as a regression. *Above floor* is the right invariant: you set the bar at "good enough for the feature's job" and refuse merges that fall below it, but you don't punish PRs that hold the line.
@@ -219,7 +219,7 @@ cp .env.example .env             # then drop your GOOGLE_API_KEY in
 uv run python scripts/run_pipeline_demo.py  # default sample-01
 ```
 
-Expected output: a fully populated user story (Description + Objective + ACs + Test Cases) printed to stdout, ~30s wall-clock, ~$0.005 of Gemini calls. The fan-out path triggers automatically if you swap in `sample-03-multi-feature.md`; the PO checkpoint pauses for input if the Analyst flagged critical ambiguities.
+Expected output: a fully populated user story (Description + Objective + ACs + Test Cases) printed to stdout, ~30s wall-clock, ~$0.005 of Gemini calls. The split path triggers automatically if you swap in `sample-03-multi-feature.md`; the PO checkpoint pauses for input if the Analyst flagged critical ambiguities.
 
 To run the eval gate yourself: `uv run python evals/run_evals.py` (~90s, ~$0.03). To run the local-model probe with the Gemini judge held constant: `RTIA_LLM_PROVIDER=ollama uv run python evals/run_evals.py` after `ollama pull llama3.1:8b` (~25 min wall-clock, ~$0.01 of Gemini judge calls). For a strictly $0 stack, add `RTIA_OLLAMA_JUDGE=1` - both env vars together route every LLM call to local Ollama. Caveats above in Section 8.
 

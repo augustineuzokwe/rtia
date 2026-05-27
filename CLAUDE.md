@@ -24,11 +24,11 @@ Deep path (single-story requirements, implied_stories ≤ 1):
   START → Analyst → PO Checkpoint → Story Writer → Story Review Checkpoint
         → AC Generator → Test Case Writer → Composer → Reviewer → END
 
-Fan-out path (multi-story requirements, implied_stories ≥ 2):
-  START → Analyst → PO Checkpoint (CheckboxGroup UI) → fan_out_node → END
+Split path (multi-story requirements, implied_stories ≥ 2):
+  START → Analyst → PO Checkpoint (CheckboxGroup UI) → split_node → END
 ```
 
-The deep path produces a full `FinalUserStory` (Description / Objective / ACs / Test Cases). The fan-out path produces lightweight backlog stubs only - the PO re-runs RTIA on any individual stub title later to deep-dive that one. See `PR #162` for the topology shift rationale.
+The deep path produces a full `FinalUserStory` (Description / Objective / ACs / Test Cases). The split path produces lightweight placeholder stories only - the PO re-runs RTIA on any individual placeholder title later to deep-dive that one. See `PR #162` for the topology shift rationale.
 
 ---
 
@@ -85,11 +85,11 @@ This is the *commit-time* layer; the runtime layer (`agents/_secret_scan.py`, #1
 
 **API token (`RTIA_API_TOKEN`, Phase 14):** the `run_api.py` entrypoint mints a fresh URL-safe bearer token per process unless `RTIA_API_TOKEN` is set in `.env`. The token gates all `/pipeline*` and `/uploads/*` endpoints (`Authorization: Bearer <token>`) and the Gradio mount accepts it via `?token=…` so the printed startup URL is one-click. Set `RTIA_API_HOST` / `RTIA_API_PORT` to override the default `127.0.0.1:8000`.
 
-**Multi-story fan-out (Phase 15.4):** when the Analyst's output has `implied_stories ≥ 2`, the PO checkpoint emits a different interrupt payload (`{"mode": "fan_out", "implied_stories": [...], "critical_ambiguities": [...]}`) and resume value (`{"selected_story_titles": [...], "answers": {...}}`); the conditional edge routes to `fan_out_node` (pure Python, no LLM) which writes `state["fan_out_stories"]` and ends. Terminal status is `ThreadStatus.DONE_FANOUT`. The Story Writer / AC Generator / Test Case Writer / Reviewer are SKIPPED entirely on this path. Single-story requirements (`implied_stories ≤ 1`) still go through the deep flow unchanged.
+**Multi-story split (Phase 15.4):** when the Analyst's output has `implied_stories ≥ 2`, the PO checkpoint emits a different interrupt payload (`{"mode": "split", "implied_stories": [...], "critical_ambiguities": [...]}`) and resume value (`{"selected_story_titles": [...], "answers": {...}}`); the conditional edge routes to `split_node` (pure Python, no LLM) which writes `state["split_stories"]` and ends. Terminal status is `ThreadStatus.DONE_SPLIT`. The Story Writer / AC Generator / Test Case Writer / Reviewer are SKIPPED entirely on this path. Single-story requirements (`implied_stories ≤ 1`) still go through the deep flow unchanged.
 
 `agents.graph.picked_implied_story` (single picked story, used by Story Writer's scope-aware prompt block) and `agents.graph.deferred_implied_stories` (everything else, used by the Reviewer's scope-aware DEFERRED STORIES block) survive for the 1-implied-story deep case. Both degenerate cleanly when implied_stories is empty.
 
-**Exporters (Phase 15.2):** `POST /pipeline/{thread_id}/export` ships the full deep artifact to Jira (REST v3, ADF codeBlock body) or GitHub (Issues + optional Projects v2 via GraphQL). `POST /pipeline/{thread_id}/export-deferred` batch-creates one lightweight backlog stub per deferred/fan-out story. Both backends use `make_exporter("jira" | "github")` in `exporters/base.py`. `dry_run=true` returns the would-be payload - safe without credentials. Credentials: `JIRA_BASE_URL` / `JIRA_EMAIL` / `JIRA_API_TOKEN`, `GITHUB_TOKEN`.
+**Exporters (Phase 15.2):** `POST /pipeline/{thread_id}/export` ships the full deep artifact to Jira (REST v3, ADF codeBlock body) or GitHub (Issues + optional Projects v2 via GraphQL). `POST /pipeline/{thread_id}/export-deferred` batch-creates one lightweight placeholder per deferred/split story. Both backends use `make_exporter("jira" | "github")` in `exporters/base.py`. `dry_run=true` returns the would-be payload - safe without credentials. Credentials: `JIRA_BASE_URL` / `JIRA_EMAIL` / `JIRA_API_TOKEN`, `GITHUB_TOKEN`.
 
 **State schema version (`PIPELINE_STATE_VERSION`):** bumped 1 → 2 in Phase 15.4 (conditional edge + new state fields). **Clear `~/.rtia/state.db` after pulling 15.4** if any pre-15.4 paused threads existed locally - they're not auto-migrated.
 
