@@ -100,6 +100,32 @@ export async function getThreadState(threadId: string): Promise<ThreadState> {
   );
 }
 
+/** Body shapes accepted by ``POST /pipeline/{tid}/resume`` (see api/models.py). */
+export type ResumeBody =
+  | { answers: Record<string, string> } // paused_po, deep mode
+  | {
+      selected_stories?: { title: string; summary?: string; original_title?: string }[];
+      selected_story_titles?: string[];
+      answers?: Record<string, string>;
+    } // paused_po, split mode
+  | { accepted: true } // paused_review, accept
+  | { accepted: false; description: string; objective: string }; // paused_review, override
+
+/** ``POST /pipeline/{thread_id}/resume`` — returns the post-resume state. */
+export async function resumeThread(
+  threadId: string,
+  body: ResumeBody,
+): Promise<ThreadState> {
+  return jsonRequest<ThreadState>(
+    `/pipeline/${encodeURIComponent(threadId)}/resume`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
 /** ``POST /uploads/pdf`` — server extracts text and returns it + char count. */
 export async function uploadPdf(file: File): Promise<UploadResult> {
   const form = new FormData();
