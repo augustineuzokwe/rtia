@@ -1,0 +1,29 @@
+{
+  "intent": "Build a multi-part user-management feature spanning password reset, role assignment, audit log access, and bulk import.",
+  "actors": ["administrator", "end user"],
+  "ambiguities": [
+    {
+      "question": "Which of the four implied stories should RTIA draft in full for this run?",
+      "severity": "critical"
+    }
+  ],
+  "implied_stories": [
+    {
+      "title": "Self-service password reset",
+      "summary": "An end user can request a password reset via email without contacting support."
+    },
+    {
+      "title": "Admin assigns role to user",
+      "summary": "An administrator can assign or revoke a named role on any user account."
+    },
+    {
+      "title": "Admin views user audit log",
+      "summary": "An administrator can review every authentication and permission change for a chosen user."
+    },
+    {
+      "title": "Bulk user import from CSV",
+      "summary": "An administrator can upload a CSV to create or update many users in one operation."
+    }
+  ],
+  "suspicious_input": {"detected": false, "reason": "", "spans": []}
+}

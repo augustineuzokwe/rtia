@@ -1,0 +1,7 @@
+{
+  "description": "As an administrator, I want to export the list of active (non-deleted) users for compliance reporting.",
+  "objective": "I can produce an auditable record of who currently has access to the system, on demand.",
+  "assumptions": [
+    "Export defaults to CSV format; other formats can be added later."
+  ]
+}

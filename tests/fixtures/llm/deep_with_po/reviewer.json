@@ -1,0 +1,9 @@
+{
+  "coverage_gaps": [],
+  "weak_acs": [],
+  "untestable_criteria": [],
+  "recommendations": [
+    "Consider adding an AC for the export file naming convention so consumers can predict it."
+  ],
+  "overall_quality": "acceptable"
+}

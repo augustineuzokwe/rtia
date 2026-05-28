@@ -1,0 +1,33 @@
+{
+  "cases": [
+    {
+      "scenario": "Admin exports active user list",
+      "type": "happy_path",
+      "steps": [
+        "Log in as an administrator",
+        "Open the admin panel and click 'Export users'",
+        "Save the downloaded CSV"
+      ],
+      "expected": "The CSV contains exactly the set of active user accounts, one row per user, with a status column reading 'active'"
+    },
+    {
+      "scenario": "Soft-deleted users are excluded from export",
+      "type": "edge_case",
+      "steps": [
+        "Seed the database with two active users and one soft-deleted user",
+        "Log in as an administrator",
+        "Trigger the user export"
+      ],
+      "expected": "The CSV contains the two active users only; the soft-deleted user is not present in any row"
+    },
+    {
+      "scenario": "Non-admin is forbidden from triggering export",
+      "type": "negative",
+      "steps": [
+        "Log in as a regular user (non-admin role)",
+        "Send a POST to the admin export endpoint"
+      ],
+      "expected": "Response is HTTP 403 Forbidden; no CSV is generated and the attempt is logged for audit"
+    }
+  ]
+}

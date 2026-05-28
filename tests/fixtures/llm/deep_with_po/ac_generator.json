@@ -1,0 +1,19 @@
+{
+  "criteria": [
+    {
+      "given": "I am authenticated as an administrator",
+      "when": "I trigger the user export from the admin panel",
+      "then": "a CSV file is generated containing every active (non-deleted) user account with HTTP 200"
+    },
+    {
+      "given": "I am authenticated as an administrator and at least one user is soft-deleted",
+      "when": "I trigger the user export",
+      "then": "soft-deleted users are excluded from the resulting CSV"
+    },
+    {
+      "given": "I am authenticated as a non-administrator",
+      "when": "I attempt to trigger the user export",
+      "then": "the server responds with HTTP 403 and no file is generated"
+    }
+  ]
+}
