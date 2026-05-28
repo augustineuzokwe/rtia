@@ -5,7 +5,7 @@ detection is silently expensive - a CI run that thinks tracing is on but
 isn't loses observability for that run; a local run that thinks it's off
 when it isn't can leak data to the wrong LangSmith project.
 
-adds the production guard: when ``RTIA_ENV=production``,
+Phase 12.4 adds the production guard: when ``RTIA_ENV=production``,
 tracing is forcibly off and the pipeline refuses to start if both prod
 and tracing-on are configured. See ``docs/adr-0008-pii-langsmith.md``.
 """
@@ -79,7 +79,7 @@ def test_falsy_flag_values_keep_tracing_off(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# production guard (ADR-0008)
+# Phase 12.4 - production guard (ADR-0008)
 # ---------------------------------------------------------------------------
 
 

@@ -1,4 +1,4 @@
-"""Tests for the cost + latency budget gate.
+"""Tests for the Phase 13.1 cost + latency budget gate.
 
 Covers two surfaces:
 

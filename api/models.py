@@ -52,7 +52,7 @@ class PipelineRequest(BaseModel):
 
 
 class SelectedStory(BaseModel):
-    """One implied-story selection in a split PO resume body (#207).
+    """One implied-story selection in a split PO resume body.
 
     The PO checkpoint UI shows each implied story as a Checkbox + editable
     Textbox; on Submit the kept (checked) rows are serialised as

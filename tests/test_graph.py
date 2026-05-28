@@ -421,7 +421,7 @@ def test_story_review_override_partial_keeps_non_overridden_fields():
 
 
 def test_reviewer_node_passes_empty_deferred_for_single_implied_story():
-    """under split routing, the Reviewer only runs for
+    """Phase 15.4 - under split routing, the Reviewer only runs for
     single-implied-story (or zero) requirements. In those cases the
     deferred list is always empty - the 15.1 scope-aware Reviewer
     plumbing stays wired but degenerates to a no-op. Pin that contract.
@@ -468,7 +468,7 @@ def test_reviewer_node_passes_empty_deferred_for_single_implied_story():
 
 
 def test_deferred_implied_stories_matches_bidirectionally():
-    """Hotfix: PO answer ⊂ title OR title ⊂ answer both count as picked.
+    """Phase 15 hotfix: PO answer ⊂ title OR title ⊂ answer both count as picked.
 
     Earlier single-direction match silently misclassified the picked
     story when POs typed a shorter variant of the title (e.g. 'Slack
@@ -540,7 +540,7 @@ def test_deferred_implied_stories_ignores_empty_or_whitespace_answers():
 
 
 def test_picked_implied_story_returns_single_match_or_none():
-    """picked_implied_story is single-pick by design.
+    """Phase 15.4 - picked_implied_story is single-pick by design.
 
     Pin the four cases that determine downstream behaviour:
     - clean single pick → that story
@@ -591,7 +591,7 @@ def test_picked_implied_story_returns_single_match_or_none():
 
 
 def test_story_writer_node_passes_picked_story_for_single_implied_story():
-    """single-implied-story deep path still wires the picked story.
+    """Phase 15.4 - single-implied-story deep path still wires the picked story.
 
     Multi-story (≥ 2) cases route to split and never call the Story
     Writer. The picked-story narrowing is now only meaningful for the
@@ -634,7 +634,7 @@ def test_story_writer_node_passes_picked_story_for_single_implied_story():
 
 
 def test_multi_story_branches_to_split_skipping_deep_nodes():
-    """implied_stories ≥ 2 routes to split_node, skipping
+    """Phase 15.4 - implied_stories ≥ 2 routes to split_node, skipping
     Story Writer / AC Generator / Test Case Writer / Reviewer entirely.
 
     The split_node populates ``split_stories`` filtered by the PO's
@@ -709,7 +709,7 @@ def test_multi_story_branches_to_split_skipping_deep_nodes():
 
 
 def test_split_empty_selection_keeps_all_stories():
-    """Q2 default - empty selected_story_titles ⇒ fan out
+    """Phase 15.4 / Q2 default - empty selected_story_titles ⇒ fan out
     every implied story rather than producing nothing."""
     from agents.graph import split_node
     from agents.requirements_analyst import AnalystOutput, ImpliedStory
@@ -729,7 +729,7 @@ def test_split_empty_selection_keeps_all_stories():
 
 
 def test_is_split_mode_branch_criterion():
-    """pin the branch criterion explicitly.
+    """Phase 15.4 - pin the branch criterion explicitly.
 
     The condition is purely on the Analyst's output (count ≥ 2). Even
     if the PO eventually unchecks all but one story, the routing was

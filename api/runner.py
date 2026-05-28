@@ -99,7 +99,7 @@ class PipelineRunner:
             payload = interrupts[0].value
             return self._paused_state(thread_id, payload)
 
-        # split terminal state precedes the deep one because
+        # Phase 15.4 - split terminal state precedes the deep one because
         # final_artifact is never populated in split runs. Use key-presence
         # not truthiness: a split thread that filtered to zero matches still
         # produced an empty split_stories list, and that's still a split
@@ -155,7 +155,7 @@ class PipelineRunner:
     def get_split_stories_and_context(self, thread_id: str) -> tuple[list[Any], str] | None:
         """Return ``(split_stories, requirement_text)`` for split threads.
 
-        sibling of :meth:`get_deferred_stories_and_context`.
+        Phase 15.4 sibling of :meth:`get_deferred_stories_and_context`.
         Returns ``None`` if no state at all, OR if the thread is not a
         split thread (key absent). Returns ``([], requirement_text)``
         when the thread is split but the PO filtered to zero stories
@@ -213,7 +213,7 @@ class PipelineRunner:
 
     @staticmethod
     def _paused_state(thread_id: str, payload: dict) -> ThreadState:
-        # split PO checkpoint payload carries `mode == "split"`
+        # Phase 15.4 - split PO checkpoint payload carries `mode == "split"`
         # plus the implied-stories list (for the CheckboxGroup) and any
         # remaining non-story critical questions (for text input).
         if payload.get("mode") == "split":
@@ -250,7 +250,7 @@ class PipelineRunner:
 
     @staticmethod
     def _done_state(thread_id: str, result: dict) -> ThreadState:
-        # split branch terminates without producing a
+        # Phase 15.4 - split branch terminates without producing a
         # FinalUserStory. Translate that into a DONE_SPLIT state. Use
         # key-presence not truthiness: empty list is still a split
         # terminal state (filtered to zero matches), not a deep failure.

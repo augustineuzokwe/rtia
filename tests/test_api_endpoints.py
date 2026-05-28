@@ -187,7 +187,7 @@ def test_upload_markdown_roundtrip(client):
 
 
 def test_resume_routes_split_resume_shape(client, runner_mock):
-    """resume with selected_story_titles → structured payload."""
+    """Phase 15.4 - resume with selected_story_titles → structured payload."""
     runner_mock.get_state.return_value = ThreadState(
         thread_id="tid",
         status=ThreadStatus.PAUSED_PO,
@@ -219,7 +219,7 @@ def test_resume_routes_split_resume_shape(client, runner_mock):
 
 
 def test_resume_split_empty_selection_passes_empty_list(client, runner_mock):
-    """Q2 - None or empty selected_story_titles passes [] through."""
+    """Phase 15.4 / Q2 - None or empty selected_story_titles passes [] through."""
     runner_mock.get_state.return_value = ThreadState(
         thread_id="tid",
         status=ThreadStatus.PAUSED_PO,
@@ -238,7 +238,7 @@ def test_resume_split_empty_selection_passes_empty_list(client, runner_mock):
 
 
 def test_resume_deep_mode_still_requires_answers(client, runner_mock):
-    """deep-mode PO checkpoint contract unchanged."""
+    """Phase 15.4 - deep-mode PO checkpoint contract unchanged."""
     runner_mock.get_state.return_value = ThreadState(
         thread_id="tid",
         status=ThreadStatus.PAUSED_PO,

@@ -194,7 +194,7 @@ def analyze_requirement(
     # Attach prompt_hash to LangSmith trace metadata so every traced run is
     # attributable to the exact prompt version. See agents.config.prompt_hash.
     config = {"metadata": {"agent": "requirements_analyst", "prompt_hash": _PROMPT_HASH}}
-    # wrap Gemini exceptions into LLMPipelineError. Catches
+    # Phase 12.5 - wrap Gemini exceptions into LLMPipelineError. Catches
     # the retry-exhausted case so the caller gets a structured failure
     # rather than a raw SDK exception leaking through the LangChain
     # adapter. See agents/_llm_errors.py and docs/adr-0009-llm-fallback.md.

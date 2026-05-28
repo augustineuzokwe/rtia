@@ -8,7 +8,7 @@ the panel directly above it.
 Root cause: the in-process Gradio handler called
 ``get_deferred_stories_and_context`` unconditionally. The API endpoint
 ``/pipeline/{thread_id}/export-deferred`` had the correct dispatch since
-but the UI handler shipped without the equivalent branch.
+Phase 15.4, but the UI handler shipped without the equivalent branch.
 
 The dispatch lived in two places (a UI helper + inline in the API
 endpoint) until issue #194 / R2 lifted it into :mod:`api._shared` so

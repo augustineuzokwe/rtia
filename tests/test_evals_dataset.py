@@ -13,7 +13,7 @@ from evals.dataset import SAMPLES_DIR, load_all_samples, load_sample
 def test_loads_all_samples() -> None:
     samples = load_all_samples()
     names = [s.name for s in samples]
-    # Includes adversarial samples (04-06) and the negative
+    # Includes Phase 12.1 adversarial samples (04-06) and the negative
     # false-positive boundary sample (07).
     assert names == [
         "sample-01-well-structured",
@@ -27,7 +27,7 @@ def test_loads_all_samples() -> None:
 
 
 def test_non_adversarial_samples_have_no_injection_test() -> None:
-    """Samples 01-03 predate and must not parse an injection block."""
+    """Samples 01-03 predate Phase 12.1 and must not parse an injection block."""
     for name in (
         "sample-01-well-structured",
         "sample-02-vague-ambiguous",

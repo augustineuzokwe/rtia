@@ -1,6 +1,6 @@
-"""Capture per-agent telemetry by listening to the logging stream.
+"""Capture per-agent telemetry by listening to the Phase 13.2 logging stream.
 
-the eval runner needs token counts + wall-clock duration per
+Phase 13.1: the eval runner needs token counts + wall-clock duration per
 agent so the budget gate can enforce cost and latency ceilings. The
 per-agent token data exists today only on the LangChain response inside
 each agent function; the runner doesn't see it. Restructuring every
@@ -9,7 +9,7 @@ return telemetry alongside the parsed output would touch every agent and
 every test.
 
 Instead this module installs a stdlib ``logging.Handler`` that listens
-on the ``rtia.agents.*`` namespace - exactly where the
+on the ``rtia.agents.*`` namespace - exactly where Phase 13.2's
 ``log_agent_invocation`` context manager already emits a structured
 ``agent_invocation_end`` record for every LLM call. The handler parses
 those records back into typed observations. Zero changes to agent code.

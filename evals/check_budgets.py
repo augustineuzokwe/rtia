@@ -71,7 +71,7 @@ def _load_budgets(pyproject_path: Path) -> dict:
     except KeyError as exc:
         raise SystemExit(
             f"No [tool.rtia.budgets] block found in {pyproject_path}. "
-            "budgets must be declared before this gate runs."
+            "Phase 13.1 budgets must be declared before this gate runs."
         ) from exc
 
 

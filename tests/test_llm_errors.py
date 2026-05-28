@@ -1,4 +1,4 @@
-"""Tests for the LLM-failure conversion + stub-artifact path.
+"""Tests for the Phase 12.5 LLM-failure conversion + stub-artifact path.
 
 Covers:
 - ``LLMFailureDetail`` JSON shape (stable contract for downstream consumers).
@@ -331,7 +331,7 @@ def test_review_artifact_wraps_llm_exception(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# non-LLM step failures wrapped at node boundary
+# Phase 13.4 - non-LLM step failures wrapped at node boundary
 # ---------------------------------------------------------------------------
 
 

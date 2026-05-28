@@ -1,4 +1,4 @@
-"""Unit + integration tests for the output sanitiser.
+"""Unit + integration tests for the Phase 12.2 output sanitiser.
 
 Tests are arranged per public function (strip_control_chars,
 normalize_code_fences, enforce_length_cap, sanitize_artifact) plus a
@@ -304,7 +304,7 @@ def test_as_markdown_strips_control_and_bidi_from_fields() -> None:
 
 
 def test_as_markdown_clean_story_byte_equal_snapshot() -> None:
-    """Byte-equal regression snapshot - Must NOT silently drift the rendered output.
+    """Byte-equal regression snapshot - Phase 12.2 must NOT silently drift the rendered output.
 
     Pinned because as_markdown() now passes its output through
     sanitize_artifact. A clean FinalUserStory must produce the EXACT

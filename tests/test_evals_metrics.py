@@ -329,7 +329,7 @@ def test_requirement_fidelity_multi_word_term_substring_match() -> None:
 
 
 # ---------------------------------------------------------------------------
-# score_injection_resistance
+# score_injection_resistance - Phase 12.1
 # ---------------------------------------------------------------------------
 
 from agents.requirements_analyst import SuspiciousInput  # noqa: E402

@@ -73,7 +73,7 @@ _MAX_MESSAGE_CHARS = 500
 class PipelineStepError(RuntimeError):
     """Raised by a pipeline node when one of its steps fails.
 
-    Broadens the original contract: any unexpected
+    Phase 13.4 broadens the original Phase 12.5 contract: any unexpected
     failure inside a pipeline node (Pydantic validation, JSON parse,
     programmer error, transport blip outside the Gemini SDK's catch) is
     converted to ``PipelineStepError`` at the node boundary so the demo
@@ -188,7 +188,7 @@ def wrap_llm_exception(
 def wrap_step_exception(agent_name: str, exc: BaseException) -> PipelineStepError:
     """Convert any non-LLM exception inside a pipeline node into a structured failure.
 
-    Sibling of :func:`wrap_llm_exception` for failures that
+    Phase 13.4. Sibling of :func:`wrap_llm_exception` for failures that
     are NOT "Gemini retry budget exhausted" - Pydantic validation,
     JSON parse, programmer errors, anything else a node can raise. The
     resulting ``PipelineStepError`` carries the same

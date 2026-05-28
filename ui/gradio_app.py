@@ -179,7 +179,7 @@ def _state_to_panels(state) -> dict[str, Any]:
         base["po_paused_payload"] = dict(state.payload)
         questions = state.payload.get("critical_ambiguities", [])
         if mode == "split":
-            # CheckboxGroup for implied stories + text input
+            # Phase 15.4 - CheckboxGroup for implied stories + text input
             # for any remaining non-story critical questions.
             stories = state.payload.get("implied_stories", [])
             preview_lines = [
@@ -262,7 +262,7 @@ def _state_to_panels(state) -> dict[str, Any]:
         ) as fh:
             fh.write(rendered)
             base["download_file"] = gr.update(value=fh.name, visible=True)
-        # surface deferred implied stories so the PO can
+        # Phase 15.3 - surface deferred implied stories so the PO can
         # batch-create follow-up issues from the same panel.
         deferred = state.payload.get("deferred_stories") or []
         base["deferred_visible"] = gr.update(visible=bool(deferred))
@@ -280,7 +280,7 @@ def _state_to_panels(state) -> dict[str, Any]:
             base["deferred_md"] = gr.update(value="")
             base["deferred_checkboxes"] = gr.update(choices=[], value=[], visible=False)
     elif state.status == ThreadStatus.DONE_SPLIT:
-        # split terminal state. No deep artifact; render
+        # Phase 15.4 - split terminal state. No deep artifact; render
         # the lightweight placeholder list and reuse the deferred-stories
         # CheckboxGroup + Push-to-backlog flow.
         placeholders = state.payload.get("split_stories") or []

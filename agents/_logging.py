@@ -2,7 +2,7 @@
 
 This module is intentionally separate from ``agents.observability`` (which
 owns the LangSmith integration). LangSmith is a *trace* sink - it can be
-disabled (Forces it off in production) and it can be down.
+disabled (Phase 12.4 forces it off in production) and it can be down.
 Structured logs are RTIA's own narrative of what happened: who ran, how
 long it took, what it cost, and whether it failed. They survive a
 LangSmith outage and they survive ``RTIA_ENV=production`` (which

@@ -120,7 +120,7 @@ def write_test_cases(
         HumanMessage(content=user_prompt),
     ]
     config = {"metadata": {"agent": "test_case_writer", "prompt_hash": _PROMPT_HASH}}
-    # see analyze_requirement for the rationale.
+    # Phase 12.5 - see analyze_requirement for the rationale.
     with log_agent_invocation("test_case_writer", prompt_hash=_PROMPT_HASH) as rec:
         try:
             response = cached_invoke(

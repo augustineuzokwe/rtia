@@ -6,7 +6,7 @@ runs three defensive passes on that rendered string so hostile bytes,
 arbitrary code-fence language tags, and unbounded length cannot reach a
 downstream consumer regardless of what any individual agent emitted.
 
-Defence-in-depth note: this is independent of the prompt-
+Defence-in-depth note: this is independent of the Phase 12.1 prompt-
 injection metric. 12.1 measures whether the Analyst flagged hostile
 *input*; 12.2 cleans whatever *output* the pipeline produced. The two
 layers are not substitutes - an Analyst that fails to flag an injection
