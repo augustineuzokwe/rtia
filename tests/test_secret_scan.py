@@ -1,4 +1,4 @@
-"""Tests for the Phase 12.3 secret pattern scanner.
+"""Tests for the secret pattern scanner.
 
 Per-pattern positive + negative tests, redaction safety, regression
 guard on the committed sample files, and integration coverage of the

@@ -127,7 +127,7 @@ def generate_acceptance_criteria(
         HumanMessage(content=user_prompt),
     ]
     config = {"metadata": {"agent": "ac_generator", "prompt_hash": _PROMPT_HASH}}
-    # Phase 12.5 - see analyze_requirement for the rationale.
+    # see analyze_requirement for the rationale.
     with log_agent_invocation("ac_generator", prompt_hash=_PROMPT_HASH) as rec:
         try:
             response = cached_invoke(

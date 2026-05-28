@@ -6,7 +6,7 @@ reasons:
 
 1. Let callers (the demo, future UI, future eval harness) detect whether
    tracing is on and surface a useful status message to the user.
-2. Enforce the Phase 12.4 policy: **no LangSmith tracing in production**.
+2. Enforce the policy: **no LangSmith tracing in production**.
    See ``docs/adr-0008-pii-langsmith.md`` for the full rationale.
 
 Detection lives here (not inline) so the env-var contract is documented
@@ -81,7 +81,7 @@ def tracing_status() -> TracingStatus:
 
     Tracing is considered ON when ALL of the following hold:
 
-    - ``RTIA_ENV`` is NOT ``production``. Phase 12.4 forces tracing off
+    - ``RTIA_ENV`` is NOT ``production``. Forces tracing off
       in production regardless of the LangSmith vars - see ADR-0008.
     - ``LANGSMITH_TRACING`` is truthy.
     - ``LANGSMITH_API_KEY`` is present and non-empty.
@@ -95,7 +95,7 @@ def tracing_status() -> TracingStatus:
     project = (os.environ.get("LANGSMITH_PROJECT") or "").strip() or None
     truthy = tracing_flag in {"true", "1", "yes", "on"}
 
-    # Phase 12.4 production guard. Even if the caller hasn't invoked
+    # production guard. Even if the caller hasn't invoked
     # ``assert_safe_for_env`` (defence in depth), every read of the
     # tracing status returns OFF when env=production. Any code that
     # conditions on `enabled` sees the right answer.

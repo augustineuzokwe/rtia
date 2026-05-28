@@ -93,7 +93,7 @@ def collect_po_answers(critical_questions: list[str]) -> dict[str, str]:
 
 
 def collect_split_selection(payload: dict) -> dict:
-    """Phase 15.4 - CLI prompt for the split PO checkpoint.
+    """CLI prompt for the split PO checkpoint.
 
     Mirrors the Gradio CheckboxGroup. Default behaviour (empty input)
     keeps every implied story - matches Q2's "fan out everything"
@@ -163,13 +163,13 @@ _COST_DISCLOSURE = (
 def main() -> None:
     load_dotenv()
 
-    # Phase 13.2 - install the JSON log handler before any agent runs.
+    # install the JSON log handler before any agent runs.
     # Logs go to stderr by default so the rendered artifact on stdout
     # remains paste-ready. RTIA_LOG_DESTINATION=stdout, RTIA_LOG_LEVEL,
     # and friends are the operator-facing knobs (see agents/_logging.py).
     configure_logging()
 
-    # Phase 12.4 - refuse to start with RTIA_ENV=production AND
+    # refuse to start with RTIA_ENV=production AND
     # LANGSMITH_TRACING truthy. See docs/adr-0008-pii-langsmith.md.
     # Asserted BEFORE the cost banner so a misconfigured prod
     # deployment fails fast without printing anything that implies the
@@ -216,7 +216,7 @@ def main() -> None:
     raw_markdown = sample_path.read_text(encoding="utf-8")
     requirement_text = extract_section(raw_markdown, "Raw Requirement")
 
-    # Phase 12.3 - refuse to invoke the pipeline if the input contains a
+    # refuse to invoke the pipeline if the input contains a
     # high-confidence secret pattern. The scanner runs BEFORE any LLM
     # call or LangSmith trace, so a detected credential never leaves the
     # local process. See agents/_secret_scan.py and issue #124 for the
@@ -249,7 +249,7 @@ def main() -> None:
 
     banner("INVOKING PIPELINE")
     print("Calling Gemini (Analyst)…")
-    # Phase 12.5 - when an LLM call exhausts its retry budget, an agent
+    # when an LLM call exhausts its retry budget, an agent
     # raises LLMPipelineError. Catch it here, build a stub artifact with
     # structured error metadata, render it so the user sees the failure
     # context, and exit 3 (distinct from 0 success / 2 security block).
@@ -257,7 +257,7 @@ def main() -> None:
     try:
         result = pipeline.invoke({"requirement_text": requirement_text}, config=config)
     except PipelineStepError as exc:
-        # Phase 13.4 - catches both the narrower LLMPipelineError
+        # catches both the narrower LLMPipelineError
         # (Gemini retry budget exhausted) and any other unexpected node
         # failure that graph.py has wrapped (Pydantic validation, JSON
         # parse, programmer errors). The stub artifact carries the
@@ -275,7 +275,7 @@ def main() -> None:
     while "__interrupt__" in result:
         payload = result["__interrupt__"][0].value
         if payload.get("mode") == "split":
-            # Phase 15.4 - multi-story branch. CheckboxGroup-equivalent
+            # multi-story branch. CheckboxGroup-equivalent
             # in the CLI is a comma-separated list of indices.
             banner(
                 f"PO CHECKPOINT (split) - {len(payload.get('implied_stories', []))} IMPLIED STORIES"
@@ -292,7 +292,7 @@ def main() -> None:
         else:
             raise RuntimeError(f"Unknown interrupt payload shape: {sorted(payload)}")
         banner("RESUMING PIPELINE")
-        # Same Phase 12.5 + 13.4 catch as the first invoke - downstream
+        # Same + 13.4 catch as the first invoke - downstream
         # agents (AC Generator, Test Case Writer, Reviewer) can also raise
         # LLMPipelineError, and any node can raise PipelineStepError for
         # unexpected non-LLM failures (Pydantic validation, JSON parse).
@@ -328,7 +328,7 @@ def main() -> None:
             print(f"Q: {question}")
             print(f"A: {answer}\n")
 
-    # Phase 15.4 - split terminal state: no final_artifact, no Reviewer.
+    # split terminal state: no final_artifact, no Reviewer.
     # Print the lightweight placeholder list and exit successfully.
     if "split_stories" in result:
         placeholders = result["split_stories"]

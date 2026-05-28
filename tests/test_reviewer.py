@@ -143,7 +143,7 @@ def test_review_artifact_with_no_acs_or_test_cases():
 
 
 def test_review_artifact_passes_deferred_stories_into_prompt():
-    """Phase 15.1 - the deferred-stories list must reach the user prompt verbatim.
+    """the deferred-stories list must reach the user prompt verbatim.
 
     LEARNINGS #31: without this, the Reviewer flags every deferred
     story's behaviour as a coverage gap on multi-story requirements.

@@ -8,7 +8,7 @@ for normal-severity ambiguities recorded as Assumptions for downstream
 review.
 
 This is the shape that maps cleanly to the future `FinalUserStory`
-artifact (Phase 3 of the prod-readiness plan): description and objective
+artifact (of the prod-readiness plan): description and objective
 become the corresponding sections of the final artifact, with
 Acceptance Criteria and Test Cases populated by later agents.
 
@@ -65,7 +65,7 @@ class UserStory(BaseModel):
     )
 
     # NOTE: rendering moved to `agents.final_artifact.FinalUserStory.as_markdown()`
-    # in Phase 3. The composer node in `agents.graph` maps UserStory →
+    # in The composer node in `agents.graph` maps UserStory →
     # FinalUserStory; downstream consumers should render via the final
     # artifact, not directly off UserStory.
 
@@ -114,7 +114,7 @@ def write_user_story(
     to be the single source of truth about what was asked, and gives the
     Story Writer a clean, validated contract to work against.
 
-    ``picked_story`` is the Phase 15.4 narrowing hook. When the Analyst
+    ``picked_story`` is the narrowing hook. When the Analyst
     flagged a multi-story requirement and the PO clearly picked one at
     the PO checkpoint, the caller passes the picked ``ImpliedStory``
     here so the Writer scopes the description + objective to ONLY that
@@ -162,7 +162,7 @@ def write_user_story(
         HumanMessage(content=user_prompt),
     ]
     config = {"metadata": {"agent": "user_story_writer", "prompt_hash": _PROMPT_HASH}}
-    # Phase 12.5 - see analyze_requirement for the rationale.
+    # see analyze_requirement for the rationale.
     with log_agent_invocation("user_story_writer", prompt_hash=_PROMPT_HASH) as rec:
         try:
             response = cached_invoke(

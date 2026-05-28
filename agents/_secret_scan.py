@@ -1,4 +1,4 @@
-"""Secret-pattern detection on incoming requirement text (Phase 12.3).
+"""Secret-pattern detection on incoming requirement text.
 
 Scans raw user input for high-confidence API key / token patterns BEFORE
 any external call. If a match is found, the pipeline refuses to run: no

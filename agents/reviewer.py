@@ -137,7 +137,7 @@ def review_artifact(
     coverage.
 
     ``deferred_stories`` is the scope-aware Reviewer's bug fix
-    (Phase 15.1 / LEARNINGS #31). When the original requirement bundles
+    (LEARNINGS #31). When the original requirement bundles
     several independent stories and the PO picks one at the PO
     checkpoint, the Reviewer would otherwise flag the deferred stories'
     behaviours as coverage gaps - a false-positive ``needs_work`` every
@@ -187,7 +187,7 @@ def review_artifact(
         HumanMessage(content=user_prompt),
     ]
     config = {"metadata": {"agent": "reviewer", "prompt_hash": _PROMPT_HASH}}
-    # Phase 12.5 - see analyze_requirement for the rationale.
+    # see analyze_requirement for the rationale.
     with log_agent_invocation("reviewer", prompt_hash=_PROMPT_HASH) as rec:
         try:
             response = cached_invoke(

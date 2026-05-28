@@ -1,4 +1,4 @@
-"""FastAPI application factory for RTIA's Phase 14 surface.
+"""FastAPI application factory for RTIA's surface.
 
 Mounts the Gradio UI at ``/`` so a single process + a single token covers
 both API and UI. The startup banner prints a tokenized URL the operator
@@ -8,7 +8,7 @@ Layered like the demo script:
 
 1. ``configure_logging()`` - structured JSON logs on stderr.
 2. ``assert_safe_for_env()`` - refuse to start if ``RTIA_ENV=production``
-   AND LangSmith tracing is on (Phase 12.4 guard).
+   AND LangSmith tracing is on (guard).
 3. Mint the API token (or read ``RTIA_API_TOKEN``).
 4. Build the runner (one compiled pipeline per process).
 5. Mount routes + Gradio.
@@ -100,7 +100,7 @@ def _resume_value_from(
     - PO checkpoint, **deep mode** (Analyst found ≤ 1 implied story):
       LangGraph expects ``dict[question, answer]`` - pass ``request.answers``
       through.
-    - PO checkpoint, **split mode** (Phase 15.4): LangGraph expects
+    - PO checkpoint, **split mode**: LangGraph expects
       ``{"selected_story_titles": [...], "answers": {...}}``. Empty
       ``selected_story_titles`` is the Q2 default - graph treats it as
       "keep every implied story".
@@ -352,13 +352,13 @@ def _register_routes(app: FastAPI) -> None:
     ) -> DeferredExportResponse:
         """Create one follow-up issue per deferred implied story.
 
-        Phase 15.3. When the PO picked one of several implied stories at
+        When the PO picked one of several implied stories at
         the PO checkpoint, the others were intentionally left out of the
         finished artifact. This endpoint pushes a lightweight placeholder
         issue for each so they land on the backlog instead of being lost.
         """
         runner: PipelineRunner = request.app.state.runner
-        # Phase 15.4 - dispatch to the split source on DONE_SPLIT threads.
+        # dispatch to the split source on DONE_SPLIT threads.
         # Split stories are the same shape (ImpliedStory) as deferred, so
         # the rest of the loop body is identical. The shared helper picks
         # which state field to read; the UI's "Create follow-up issues"

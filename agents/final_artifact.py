@@ -32,13 +32,13 @@ _AC_PLACEHOLDER = (
     "_No acceptance criteria were produced for this story - check the run "
     "trace; the AC Generator agent should populate this section._"
 )
-_TEST_PLACEHOLDER = "_To be populated by the Test Case agent (Phase 9)._"
+_TEST_PLACEHOLDER = "_To be populated by the Test Case agent._"
 
 
 class AcceptanceCriterion(BaseModel):
     """One Given/When/Then acceptance criterion.
 
-    Populated by the AC Generator agent in Phase 8. Keep the shape
+    Populated by the AC Generator agent in Keep the shape
     minimal (three strings) - Cucumber/Gherkin compatibility comes
     naturally from the field names.
     """
@@ -55,9 +55,9 @@ class AcceptanceCriterion(BaseModel):
 class TestCase(BaseModel):
     """One concrete test case derived from an acceptance criterion.
 
-    Populated by the Test Case agent in Phase 9. `type` lets the renderer
+    Populated by the Test Case agent. `type` lets the renderer
     group cases (happy path first, edge cases next, negatives last) and
-    lets evals assert coverage breadth (Phase 9 metric).
+    lets evals assert coverage breadth (metric).
     """
 
     # Tell pytest not to try to collect this as a test class - the name
@@ -116,18 +116,18 @@ class FinalUserStory(BaseModel):
     ) -> str:
         """Render as paste-ready Jira/GitHub Issue markdown.
 
-        Sections with no content from their authoring agent show an
-        explicit placeholder so the artifact's full shape is always
-        visible - readers see what's coming, not just what's done.
+         Sections with no content from their authoring agent show an
+         explicit placeholder so the artifact's full shape is always
+         visible - readers see what's coming, not just what's done.
 
-        The rendered output is passed through ``sanitize_artifact``
-        (Phase 12.2): strips ASCII control bytes and invisible / bidi-
-        override Unicode, normalises fenced-code language tags against
-        an allowlist, and caps the total length. Callers that need the
-        SanitizeReport (LangGraph checkpoint observability, eval suite)
-        should call ``sanitize_artifact`` directly instead - this method
-        preserves its ``str`` return type so existing consumers don't
-        break.
+         The rendered output is passed through ``sanitize_artifact``
+        : strips ASCII control bytes and invisible / bidi-
+         override Unicode, normalises fenced-code language tags against
+         an allowlist, and caps the total length. Callers that need the
+         SanitizeReport (LangGraph checkpoint observability, eval suite)
+         should call ``sanitize_artifact`` directly instead - this method
+         preserves its ``str`` return type so existing consumers don't
+         break.
         """
         parts = [
             "## Description",

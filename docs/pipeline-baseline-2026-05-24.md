@@ -36,7 +36,7 @@ The win is most visible in CI workflow duration, not in the JSON report.
 | Test Case Writer | 70.2 s | 10.0 s | 13.2 s |
 
 ¹ Analyst telemetry is captured separately via
-`_run_analyst_capturing_usage` (pre-Phase 13.2 path) and surfaces in
+`_run_analyst_capturing_usage` (pre-rename path) and surfaces in
 the JSON under `samples[].usage` rather than under
 `per_agent_duration_ms`. Both per-sample tokens and per-sample timing
 are available - the analyst takes ~3-8 s/sample.
@@ -85,35 +85,35 @@ the eight base metrics are LLM-judge calls per sample
 serial judge time**, on top of the 150 s of production-agent time.
 
 That puts the **total eval wall-clock at ~210-350 s** today - straddling
-the Phase 13.1 budget ceiling (240 s aggregate, per
+the budget ceiling (240 s aggregate, per
 `pyproject.toml [tool.rtia.budgets]`).
 
 ## What this baseline justifies in the speed-up PR
 
 - **Retry trim 5 → 2** in `agents/config.py:DEFAULT_MAX_RETRIES`. The
-  outer `nick-fields/retry@v4` (`ci.yml`) gives 2 outer attempts;
-  layered worst case is 4 logical attempts, comfortably enough for a
-  transient 503.
+ outer `nick-fields/retry@v4` (`ci.yml`) gives 2 outer attempts;
+ layered worst case is 4 logical attempts, comfortably enough for a
+ transient 503.
 - **`MAX_OUTPUT_TOKENS_*` caps** at 2× observed max (rounded), per
-  the table above.
+ the table above.
 - **Judge parallelism inside `evaluate_sample`**: ThreadPoolExecutor
-  with `max_workers=4` runs the 3 judge calls (+ 5 programmatic
-  metrics) concurrently. Per-sample judge wall-clock drops from
-  `~sum()` to `~max()` of the three slowest judge calls.
+ with `max_workers=4` runs the 3 judge calls (+ 5 programmatic
+ metrics) concurrently. Per-sample judge wall-clock drops from
+ `~sum()` to `~max()` of the three slowest judge calls.
 
 ## Out of scope for the speed-up PR
 
 - **Cross-sample parallelism.** The current `capture_agent_telemetry`
-  installs a global logger handler - running multiple samples
-  concurrently would cross-capture events between them. Fixing that
-  needs a thread-local or ContextVar-scoped capture and is its own
-  PR.
+ installs a global logger handler - running multiple samples
+ concurrently would cross-capture events between them. Fixing that
+ needs a thread-local or ContextVar-scoped capture and is its own
+ PR.
 - **Gemini context caching.** ~25 KB of system-prompt across 5 agents
-  is medium-leverage; integration cost (separate `google.genai` SDK,
-  cache lifecycle, 5 agent sites with no shared factory) is high.
-  Separate PR once data shows it's the next ceiling.
+ is medium-leverage; integration cost (separate `google.genai` SDK,
+ cache lifecycle, 5 agent sites with no shared factory) is high.
+ Separate PR once data shows it's the next ceiling.
 - **Reviewer cap calibration.** The Reviewer doesn't run in the eval
-  suite (only in the LangGraph deep flow). Its `MAX_OUTPUT_TOKENS`
-  cap is set to match Story Writer (3000) on the assumption their
-  output shapes are similar; calibrate properly via a future
-  `scripts/run_pipeline_demo.py` instrumentation run.
+ suite (only in the LangGraph deep flow). Its `MAX_OUTPUT_TOKENS`
+ cap is set to match Story Writer (3000) on the assumption their
+ output shapes are similar; calibrate properly via a future
+ `scripts/run_pipeline_demo.py` instrumentation run.

@@ -117,10 +117,10 @@ class SampleReport:
     story_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
     ac_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
     tc_usage: UsageTelemetry = field(default_factory=UsageTelemetry)
-    # Phase 13.1 - wall-clock duration of the production agent chain
+    # wall-clock duration of the production agent chain
     # (Analyst → Story Writer → AC Generator → Test Case Writer) for this
     # sample. Excludes judge calls because those are eval scaffolding,
-    # not the pipeline being measured. Source: sum of Phase 13.2
+    # not the pipeline being measured. Source: sum of
     # ``agent_invocation_end`` log records captured during evaluate_sample().
     pipeline_duration_ms: int = 0
     # Per-agent breakdown of the pipeline duration. Keys match the
@@ -282,8 +282,8 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
     or short classification calls - uniform judge use is appropriate
     post-cutover.
     """
-    # Phase 13.1 - capture per-agent telemetry (token counts +
-    # duration_ms) by listening to the Phase 13.2 log stream. Wraps the
+    # capture per-agent telemetry (token counts +
+    # duration_ms) by listening to the log stream. Wraps the
     # full production-agent chain so every ``agent_invocation_end``
     # record lands in the capture bag. Judge calls are NOT inside this
     # block - they emit no telemetry and are excluded by design.
@@ -301,9 +301,9 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
         tc_result, _ = _run_test_case_writer(story, ac_result)
 
     # Lift per-agent telemetry from the captured log records. Downstream
-    # agents now have real numbers (zero before Phase 13.1). Analyst
+    # agents have real numbers. Analyst
     # telemetry from _run_analyst_capturing_usage is the authoritative
-    # source because it predates Phase 13.2's log path; we cross-check
+    # source because it predates the log path; we cross-check
     # against the captured observation when available but defer to the
     # pre-existing direct read.
     story_usage = _usage_from_capture(telemetry, "user_story_writer")
@@ -346,7 +346,7 @@ def evaluate_sample(sample: SampleRecord, judge: GeminiJudge) -> SampleReport:
         lambda: score_tc_executability(tc_result.cases),
         lambda: score_requirement_fidelity(artifact_text, sample.requirement_key_terms),
     ]
-    # Phase 12.1 - injection_resistance only runs on samples that ship an
+    # injection_resistance only runs on samples that ship an
     # `## Injection Test` block. Mean aggregation in `_serialise` skips
     # metrics absent from a sample, so adding/removing adversarial samples
     # does not distort the headline averages of the other metrics.
@@ -489,7 +489,7 @@ def main(argv: list[str] | None = None) -> int:
     # shell (common when running under sandboxed agent/CI environments)
     # doesn't shadow the value the user set in .env.
     load_dotenv(override=True)
-    # Phase 13.1 - install the JSON log handler so capture_agent_telemetry
+    # install the JSON log handler so capture_agent_telemetry
     # has events to read. The runner is an entry point, same contract as
     # scripts/run_pipeline_demo.py.
     configure_logging()

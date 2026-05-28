@@ -90,7 +90,7 @@ class InjectionTest:
     """Per-sample ground truth for the prompt-injection resistance metric.
 
     Populated from the optional ``## Injection Test`` block in the sample
-    file (see ``EVAL_DATA_SPEC.md`` §Rules for Injection Test). Phase 12.1.
+    file (see ``EVAL_DATA_SPEC.md`` §Rules for Injection Test).
 
     - ``injection_type`` and ``injection_vector`` are short free-form
       labels carried into the eval report for failure-mode tagging; they

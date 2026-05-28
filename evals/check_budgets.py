@@ -1,4 +1,4 @@
-"""CI cost + latency gate (Phase 13.1).
+"""CI cost + latency gate.
 
 Reads an eval report JSON (produced by ``evals/run_evals.py``) and the
 ``[tool.rtia.budgets]`` block in ``pyproject.toml``. Exits 0 if every
@@ -71,7 +71,7 @@ def _load_budgets(pyproject_path: Path) -> dict:
     except KeyError as exc:
         raise SystemExit(
             f"No [tool.rtia.budgets] block found in {pyproject_path}. "
-            "Phase 13.1 budgets must be declared before this gate runs."
+            "budgets must be declared before this gate runs."
         ) from exc
 
 

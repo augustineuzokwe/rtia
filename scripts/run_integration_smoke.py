@@ -12,7 +12,7 @@ right call for the demo but wrong for an unattended nightly run. This
 script bypasses the checkpoint by calling the agents directly and
 auto-answering critical ambiguities with a fixed string the Story
 Writer can absorb. The goal is invariant checking ("did the pipeline
-break?"), not story quality (Phase 6 evals own that).
+break?"), not story quality (evals own that).
 
 Usage:
     uv run python scripts/run_integration_smoke.py
@@ -69,7 +69,7 @@ from prompts.requirements_analyst_prompts import (
 DEFAULT_INTEGRATION_MODEL = "claude-haiku-4-5-20251001"
 
 # Token budget for a single nightly run across all samples. Calibrated to be
-# roughly 2x the observed Phase 6 baseline (input≈6.9k, output≈0.9k on Opus
+# roughly 2x the observed baseline (input≈6.9k, output≈0.9k on Opus
 # for Analyst alone; adding Story Writer ≈ doubles it). The budget is a
 # regression tripwire, not a SLO - bump it deliberately when a real prompt
 # change moves the floor.

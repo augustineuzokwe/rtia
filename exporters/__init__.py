@@ -1,4 +1,4 @@
-"""Exporters - push a FinalUserStory to an external backlog (Phase 15.2).
+"""Exporters - push a FinalUserStory to an external backlog.
 
 Two backends in v1: Jira (Atlassian Cloud, REST v3) and GitHub (issue +
 project add). Both behind one Protocol so the API endpoint + UI button

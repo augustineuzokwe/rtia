@@ -14,17 +14,17 @@ Two human-in-the-loop checkpoints keep a PO or QA Lead in control: one *before* 
 
 ```mermaid
 graph TD
-    start([requirements: free text, PDF, or markdown]) --> analyst[Requirements Analyst<br/>extracts intent + actors + ambiguities<br/>flags 'critical' vs 'normal' + counts implied stories]
-    analyst --> po{PO checkpoint<br/>pause if critical ambiguities OR implied_stories ≥ 2}
-    po -- "deep path<br/>(single story)" --> writer[User Story Writer<br/>Description + Objective + assumptions]
-    po -. "split<br/>(multi-story)" .-> split[split<br/>emit lightweight placeholder stories<br/>no LLM call]
-    writer --> review{Story Review checkpoint<br/>PO/QA edits the draft story}
-    review --> ac[AC Generator<br/>Given/When/Then]
-    ac --> tc[Test Case Writer<br/>happy + edge + negative paths]
-    tc --> composer[Composer<br/>assemble FinalUserStory]
-    composer --> reviewer[Reviewer<br/>coverage gaps + weak ACs]
-    reviewer --> done([FinalUserStory<br/>Description / Objective / ACs / Test Cases / Review notes])
-    split --> placeholders([placeholder stories<br/>re-run RTIA on any placeholder to deep-dive])
+ start([requirements: free text, PDF, or markdown]) --> analyst[Requirements Analyst<br/>extracts intent + actors + ambiguities<br/>flags 'critical' vs 'normal' + counts implied stories]
+ analyst --> po{PO checkpoint<br/>pause if critical ambiguities OR implied_stories ≥ 2}
+ po -- "deep path<br/>(single story)" --> writer[User Story Writer<br/>Description + Objective + assumptions]
+ po -. "split<br/>(multi-story)" .-> split[split<br/>emit lightweight placeholder stories<br/>no LLM call]
+ writer --> review{Story Review checkpoint<br/>PO/QA edits the draft story}
+ review --> ac[AC Generator<br/>Given/When/Then]
+ ac --> tc[Test Case Writer<br/>happy + edge + negative paths]
+ tc --> composer[Composer<br/>assemble FinalUserStory]
+ composer --> reviewer[Reviewer<br/>coverage gaps + weak ACs]
+ reviewer --> done([FinalUserStory<br/>Description / Objective / ACs / Test Cases / Review notes])
+ split --> placeholders([placeholder stories<br/>re-run RTIA on any placeholder to deep-dive])
 ```
 
 **Two paths, one PO decision.** At the PO checkpoint, RTIA picks the path based on how many distinct user stories the Analyst inferred:
@@ -70,17 +70,17 @@ A PO or BA has raw requirements. Instead of manually writing user stories, ACs, 
 
 ```
 rtia/
-├── agents/          # LangGraph agent definitions (Analyst, Story Writer, AC Gen, Test Case, Reviewer, Composer)
-├── prompts/         # Prompt templates (one module per agent; versioned with code)
-├── api/             # FastAPI routes + bearer-token auth + exporter bridge
-├── ui/              # Gradio Blocks frontend (mounted at /)
-├── exporters/       # Jira + GitHub backends behind one Exporter Protocol
-├── evals/           # Golden samples + DeepEval suite + N-runs runner
-├── scripts/         # Demo + API entry points (run_pipeline_demo.py, run_api.py)
-├── tests/           # Mocked unit tests (see tests/README.md for the category map)
-├── docs/            # ADRs, USAGE.md, ci-and-testing.md, blog drafts
+├── agents/ # LangGraph agent definitions (Analyst, Story Writer, AC Gen, Test Case, Reviewer, Composer)
+├── prompts/ # Prompt templates (one module per agent; versioned with code)
+├── api/ # FastAPI routes + bearer-token auth + exporter bridge
+├── ui/ # Gradio Blocks frontend (mounted at /)
+├── exporters/ # Jira + GitHub backends behind one Exporter Protocol
+├── evals/ # Golden samples + DeepEval suite + N-runs runner
+├── scripts/ # Demo + API entry points (run_pipeline_demo.py, run_api.py)
+├── tests/ # Mocked unit tests (see tests/README.md for the category map)
+├── docs/ # ADRs, USAGE.md, ci-and-testing.md, blog drafts
 └── .github/
-    └── workflows/   # CI (eval gate) + nightly safety regression
+ └── workflows/ # CI (eval gate) + nightly safety regression
 ```
 
 ## Getting Started
@@ -98,9 +98,9 @@ rtia/
 ```bash
 git clone https://github.com/augustineuzokwe/rtia.git
 cd rtia
-uv sync                          # install deps into a local .venv
-cp .env.example .env             # then fill in your keys (see below)
-uv run pre-commit install        # one-time: enable the pre-commit hooks
+uv sync # install deps into a local .venv
+cp .env.example .env # then fill in your keys (see below)
+uv run pre-commit install # one-time: enable the pre-commit hooks
 ```
 
 ### Platform notes
@@ -120,7 +120,7 @@ Everything else in the recipe - `uv sync`, `uv run …`, the `.env` file format 
 `.env.example` documents every variable. The minimum to run the demo:
 
 ```
-GOOGLE_API_KEY=...               # Google AI Studio key - RTIA defaults to Gemini 3.5 Flash
+GOOGLE_API_KEY=... # Google AI Studio key - RTIA defaults to Gemini 3.5 Flash
 ```
 
 Optional but recommended - **LangSmith tracing** (every LLM call surfaces with token counts, latency, and full input/output in the LangSmith UI):
@@ -150,7 +150,7 @@ uv run python scripts/run_pipeline_demo.py
 
 The demo runs the pipeline against `evals/sample-requirements/sample-01-well-structured.md`, pauses for PO input if the Analyst flagged critical ambiguities, and prints the generated user story. If tracing is on, the script prints a link to the LangSmith dashboard at the start of the run.
 
-### Run the API + UI (Phase 14)
+### Run the API + UI
 
 ```bash
 uv run python scripts/run_api.py
@@ -161,7 +161,7 @@ Starts a FastAPI server on `127.0.0.1:8000` with a Gradio UI mounted at `/`. The
 ### Run the tests
 
 ```bash
-uv run pytest -q                 # unit tests (mocked, offline)
+uv run pytest -q # unit tests (mocked, offline)
 uv run pre-commit run --all-files
 ```
 

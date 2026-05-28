@@ -79,7 +79,7 @@ class PipelineState(TypedDict, total=False):
     Schema version: see PIPELINE_STATE_VERSION. Field additions are safe;
     removals or renames require a version bump + migration plan.
 
-    Phase 15.4 added the split fields (``selected_story_titles``,
+    Added the split fields (``selected_story_titles``,
     ``split_stories``). Multi-story requirements bypass the deep nodes
     entirely - those fields are populated by ``split_node`` and
     consumed by the API runner's DONE_SPLIT state and the
@@ -96,7 +96,7 @@ class PipelineState(TypedDict, total=False):
     test_cases: list[TestCase]
     final_artifact: FinalUserStory
     review_report: ReviewReport
-    # Phase 15.4 - split path.
+    # split path.
     selected_story_titles: list[str]
     # Issue #207 - editable split selection. When set, ``split_node``
     # bypasses the title-filter and uses these (potentially renamed)
@@ -109,7 +109,7 @@ class PipelineState(TypedDict, total=False):
 def _wrap_node_exceptions(agent_name: str, fn):
     """Convert unexpected node failures into structured ``PipelineStepError``.
 
-    Phase 13.4. ``LLMPipelineError`` already carries its own structured
+    ``LLMPipelineError`` already carries its own structured
     detail and re-raises unchanged. Anything else (Pydantic validation,
     JSON parse, programmer errors) is wrapped with the node's
     ``agent_name`` pinned so the demo can route it through the same
@@ -138,7 +138,7 @@ def _wrap_node_exceptions(agent_name: str, fn):
 def analyst_node(state: PipelineState) -> dict:
     """Run the Requirements Analyst on `state["requirement_text"]`.
 
-    Phase 12.3: defensively scan the input for high-confidence secret
+    defensively scan the input for high-confidence secret
     patterns BEFORE the LLM call. If a match is found, raise
     ``SecretInInputError`` - no Gemini call, no LangSmith trace, no
     downstream node runs. This duplicates the demo script's pre-graph
@@ -153,7 +153,7 @@ def analyst_node(state: PipelineState) -> dict:
 def is_split_mode(state: PipelineState) -> bool:
     """Return True when the Analyst identified ≥ 2 implied stories.
 
-    Phase 15.4. The branch criterion for the conditional edge at the PO
+    The branch criterion for the conditional edge at the PO
     checkpoint. Pure function of the Analyst's output - independent of
     the PO's eventual answer - so the same value is used both to shape
     the interrupt payload (CheckboxGroup vs text input) and to route
@@ -185,7 +185,7 @@ def _looks_like_story_picker_question(question: str) -> bool:
 def po_checkpoint_node(state: PipelineState) -> dict:
     """Pause the graph for PO input. Shape depends on split vs deep mode.
 
-    Phase 15.4. Two distinct interrupt payloads:
+    Two distinct interrupt payloads:
 
     - **Split mode** (``implied_stories ≥ 2``): always pause, even when
       there are no non-story critical questions, so the PO confirms or
@@ -278,7 +278,7 @@ def po_checkpoint_node(state: PipelineState) -> dict:
 def split_node(state: PipelineState) -> dict:
     """Filter the Analyst's implied stories by the PO's checkbox selection.
 
-    Phase 15.4. Pure Python - no LLM call. Skipped entirely in the
+    Pure Python - no LLM call. Skipped entirely in the
     deep-flow branch. The selected stories land in
     ``state["split_stories"]`` and are surfaced by the API runner as
     a ``DONE_SPLIT`` payload + by the existing
@@ -324,13 +324,13 @@ def _route_after_po(state: PipelineState) -> str:
 def story_writer_node(state: PipelineState) -> dict:
     """Run the User Story Writer on the Analyst's output + PO answers + scope.
 
-    Phase 15.4. When the Analyst produced multiple implied stories and the
+    When the Analyst produced multiple implied stories and the
     PO clearly picked one at the PO checkpoint, the Writer is told to
     narrow its description and objective to ONLY that picked story's
     scope. When no single story was picked (ambiguous PO answer, "all",
     no PO answer, or single-feature requirement), the Writer falls back
     to its original behaviour: write for the full intent. Symmetric with
-    the scope-aware Reviewer (Phase 15.1).
+    the scope-aware Reviewer.
     """
     picked = picked_implied_story(state)
     story = write_user_story(
@@ -453,35 +453,35 @@ def composer_node(state: PipelineState) -> dict:
 def picked_implied_story(state: PipelineState) -> ImpliedStory | None:
     """Identify the single implied story the PO picked at the PO checkpoint.
 
-    Inverse of :func:`deferred_implied_stories`: returns the picked story
-    instead of the leftovers. Returns ``None`` in any of the following
-    "no clean pick" cases:
+     Inverse of :func:`deferred_implied_stories`: returns the picked story
+     instead of the leftovers. Returns ``None`` in any of the following
+     "no clean pick" cases:
 
-    - The Analyst didn't produce implied stories (single-feature
-      requirement - there's nothing to scope down to).
-    - The PO checkpoint never fired (no critical ambiguities flagged).
-    - The PO answered but no story title matched (e.g. PO typed "all"
-      or "split them up" - the answer doesn't name a specific story).
-    - The PO's answer matches MORE than one story title (e.g. typed
-      both "Story A and Story B" - ambiguous as a single pick; the
-      caller should treat this as "no narrowing"). The deferred-export
-      flow handles the "I want multiple as backlog issues" workflow.
+     - The Analyst didn't produce implied stories (single-feature
+       requirement - there's nothing to scope down to).
+     - The PO checkpoint never fired (no critical ambiguities flagged).
+     - The PO answered but no story title matched (e.g. PO typed "all"
+       or "split them up" - the answer doesn't name a specific story).
+     - The PO's answer matches MORE than one story title (e.g. typed
+       both "Story A and Story B" - ambiguous as a single pick; the
+       caller should treat this as "no narrowing"). The deferred-export
+       flow handles the "I want multiple as backlog issues" workflow.
 
-    Match logic is the same bidirectional substring used by
-    :func:`deferred_implied_stories` - title ⊂ answer OR answer ⊂
-    title, case-insensitive - so the two helpers stay symmetric.
+     Match logic is the same bidirectional substring used by
+     :func:`deferred_implied_stories` - title ⊂ answer OR answer ⊂
+     title, case-insensitive - so the two helpers stay symmetric.
 
-    Returning ``None`` (rather than e.g. a list of picks) is the
-    intentional v1 contract: the Story Writer produces ONE story.
-    Multi-story workflows belong to the deferred-export flow
-    (Phase 15.3), which already creates lightweight follow-up issues
-    for each unselected story.
+     Returning ``None`` (rather than e.g. a list of picks) is the
+     intentional v1 contract: the Story Writer produces ONE story.
+     Multi-story workflows belong to the deferred-export flow
+    , which already creates lightweight follow-up issues
+     for each unselected story.
     """
     analyst = state.get("analyst_output")
     if analyst is None or not analyst.implied_stories:
         return None
     # Exactly one implied story → unambiguously the picked one, no PO
-    # answer needed. Phase 15.4 makes this the common deep-path case
+    # answer needed. Later makes this the common deep-path case
     # (multi-implied requirements route to split instead of reaching
     # the Story Writer at all).
     if len(analyst.implied_stories) == 1:
@@ -570,7 +570,7 @@ def reviewer_node(state: PipelineState) -> dict:
     summary to final_artifact.metadata so the rendered markdown always
     surfaces review notes alongside the artifact.
 
-    Phase 15.1 - scope-aware. Passes any implied stories the PO deferred
+    scope-aware. Passes any implied stories the PO deferred
     at the PO checkpoint into ``review_artifact`` so the Reviewer stops
     flagging deferred behaviours as coverage gaps (LEARNINGS #31).
     """
@@ -648,7 +648,7 @@ def build_pipeline(checkpointer: BaseCheckpointSaver | None = None):
     builder = StateGraph(PipelineState)
     # Each node is wrapped so unexpected exceptions (Pydantic validation,
     # JSON parse, programmer errors) surface as PipelineStepError with
-    # agent attribution - see Phase 13.4. The checkpoint nodes are also
+    # agent attribution - see The checkpoint nodes are also
     # wrapped because user-supplied resume payloads can violate shape
     # assumptions; attributing those failures to the checkpoint, not the
     # next agent, keeps debugging honest.
@@ -665,11 +665,11 @@ def build_pipeline(checkpointer: BaseCheckpointSaver | None = None):
     )
     builder.add_node("composer", _wrap_node_exceptions("composer", composer_node))
     builder.add_node("reviewer", _wrap_node_exceptions("reviewer", reviewer_node))
-    # Phase 15.4 - split node. Pure Python, no wrapper LLM concerns.
+    # split node. Pure Python, no wrapper LLM concerns.
     builder.add_node("split", _wrap_node_exceptions("split", split_node))
     builder.add_edge(START, "analyst")
     builder.add_edge("analyst", "po_checkpoint")
-    # Phase 15.4 - conditional edge after the PO checkpoint. Multi-story
+    # conditional edge after the PO checkpoint. Multi-story
     # requirements (≥ 2 implied stories) skip every downstream LLM node
     # and route straight to the split node, which produces lightweight
     # placeholder stories instead of a deep artifact.
@@ -692,8 +692,8 @@ def build_stub_artifact_from_error(error: PipelineStepError) -> FinalUserStory:
     """Produce a ``FinalUserStory`` describing a pipeline-step failure.
 
     Accepts any ``PipelineStepError`` - including its narrower
-    ``LLMPipelineError`` subclass (Phase 12.5: Gemini retry budget
-    exhausted) and the broader Phase 13.4 wrapping of unexpected node
+    ``LLMPipelineError`` subclass (Gemini retry budget
+    exhausted) and the broader wrapping of unexpected node
     failures (Pydantic validation, JSON parse, programmer errors). The
     artifact has empty sections (the agent that would have filled them
     never finished) and carries the structured failure detail as JSON
@@ -711,7 +711,7 @@ def build_stub_artifact_from_error(error: PipelineStepError) -> FinalUserStory:
     """
     detail = error.detail
     if detail.http_status is None and detail.retries_attempted == 0:
-        # Non-LLM step failure (Phase 13.4). Skip the LLM-specific
+        # Non-LLM step failure. Skip the LLM-specific
         # status/retries suffix that would just say "None" / "0".
         summary = (
             f"[ERROR] Step failure in '{detail.agent}' "

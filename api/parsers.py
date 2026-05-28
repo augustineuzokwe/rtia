@@ -13,7 +13,7 @@ Bounds:
 * ``MAX_INPUT_CHARS`` caps the extracted requirement size before it
   reaches the pipeline. This mirrors the artifact-side bound enforced by
   ``agents/_sanitize.py``. A 1 MB extracted requirement would blow past
-  the eval/cost budgets in Phase 13.1 and is almost certainly an upload
+  the eval/cost budgets and is almost certainly an upload
   mistake - fail fast.
 * The PDF size check is at the byte level so a 50 MB PDF never gets fed
   to ``pypdf`` in the first place.

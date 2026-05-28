@@ -155,7 +155,7 @@ def test_runner_render_markdown_returns_none_before_composer():
 
 
 def test_runner_done_split_payload_includes_selected_stories():
-    """Phase 15.4 - multi-story → DONE_SPLIT with split_stories payload.
+    """multi-story → DONE_SPLIT with split_stories payload.
 
     Analyst returns 3 implied stories. Runner pauses with split shape.
     PO resumes selecting 2 of 3 → split_node filters → DONE_SPLIT
@@ -205,7 +205,7 @@ def test_runner_done_split_payload_includes_selected_stories():
 
 
 def test_runner_done_split_with_no_matching_selection_returns_empty_done_split():
-    """Phase 15.4 regression - when the PO's selection doesn't match any
+    """regression - when the PO's selection doesn't match any
     implied-story title, split_node writes ``split_stories=[]`` and
     the runner must still return DONE_SPLIT (not fall through to the
     deep-state path and KeyError on the missing final_artifact).
@@ -236,7 +236,7 @@ def test_runner_done_split_with_no_matching_selection_returns_empty_done_split()
 
 
 def test_runner_done_split_empty_selection_keeps_all_stories():
-    """Phase 15.4 / Q2 - empty selected_story_titles ⇒ fan out everything."""
+    """Q2 - empty selected_story_titles ⇒ fan out everything."""
     analyst = {
         "intent": "multi-story req",
         "actors": ["User"],

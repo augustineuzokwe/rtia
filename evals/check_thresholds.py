@@ -26,7 +26,7 @@ Design choices:
 - **Unknown metrics in the report are ignored.** New metrics can be
   added to the runner before they're added to thresholds.yaml - useful
   for the "land the metric first, calibrate the floor in a follow-up PR"
-  workflow that's already been used twice (Phase 9.3, #102).
+  workflow that's already been used twice (, #102).
 """
 
 from __future__ import annotations

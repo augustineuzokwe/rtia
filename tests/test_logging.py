@@ -1,4 +1,4 @@
-"""Tests for agents/_logging.py (Phase 13.2).
+"""Tests for agents/_logging.py.
 
 The interesting cases here are NOT "does Python's logging module work" -
 that's a given. They are:

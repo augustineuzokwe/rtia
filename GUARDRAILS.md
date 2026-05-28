@@ -123,7 +123,7 @@ These are explicit, documented gaps in guardrail enforcement. Each one trades a 
 
 ### Eval gate skipped on Dependabot PRs
 
-**What's skipped.** The Phase 11 CI eval gate (`Regression` job in [`.github/workflows/ci.yml`](.github/workflows/ci.yml)) does not run on pull requests opened by `dependabot[bot]`.
+**What's skipped.** The CI eval gate (`Regression` job in [`.github/workflows/ci.yml`](.github/workflows/ci.yml)) does not run on pull requests opened by `dependabot[bot]`.
 
 **Why.** GitHub blocks repository secrets from Dependabot-triggered workflow runs as an anti-exfiltration measure. The eval needs `GOOGLE_API_KEY_CI` to call Gemini Flash; without it the step hard-fails on every Dependabot PR. Three choices: (a) expose the secret to Dependabot (real exfiltration risk via a malicious dep update), (b) hard-fail every Dependabot PR (operator must close-and-reopen each one from their account), (c) skip the eval at the PR stage and rely on the `push`-to-`main` branch of the workflow as the safety net. Option (c) was chosen.
 
