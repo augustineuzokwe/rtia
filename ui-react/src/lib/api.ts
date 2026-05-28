@@ -92,6 +92,14 @@ export async function runPipeline(requirementText: string): Promise<ThreadState>
   });
 }
 
+/** ``GET /pipeline/{thread_id}`` — current state for polling. */
+export async function getThreadState(threadId: string): Promise<ThreadState> {
+  return jsonRequest<ThreadState>(
+    `/pipeline/${encodeURIComponent(threadId)}`,
+    { method: "GET" },
+  );
+}
+
 /** ``POST /uploads/pdf`` — server extracts text and returns it + char count. */
 export async function uploadPdf(file: File): Promise<UploadResult> {
   const form = new FormData();
