@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-RTIA is pre-1.0. Only the `main` branch receives security fixes. No patch releases are issued for historical tags.
+Only the `main` branch receives security fixes. No patch releases are issued for historical tags.
 
 | Version | Supported |
 |---------|-----------|
@@ -51,7 +51,7 @@ The following are **out of scope** for this repository:
 - Vulnerabilities in the Gemini model itself - report to [Google](https://bughunters.google.com/)
 - Vulnerabilities in LangChain / LangGraph upstream - report to [their security page](https://github.com/langchain-ai/langchain/security)
 - Customer-deployment hygiene (self-hosted infrastructure, key management)
-- Denial-of-service via LLM cost amplification (no rate-limiting is promised pre-1.0)
+- Denial-of-service via LLM cost amplification (rate-limiting is not currently implemented)
 - Social engineering of maintainers
 
 ## Security architecture references
