@@ -1,27 +1,15 @@
 """Structured LLM-failure errors.
 
-When an LLM call exhausts the retry budget (ADR-0003: 5 retries on
-5xx / 429 with exponential backoff), the underlying Gemini exception
-propagates out of LangChain. Today's code treats that as an uncaught
-exception and the pipeline crashes - the caller gets a stack trace
-rather than an artifact.
-
-This module replaces the crash with a structured failure:
-
-1. ``LLMPipelineError`` wraps the underlying exception, attributing it
-   to the specific agent that was running and carrying a fixed shape
-   that downstream consumers can rely on.
-2. ``wrap_llm_exception`` is the conversion helper called inside each
-   agent's library function. Maps the Gemini SDK's exception classes
-   to the structured form, preserving the HTTP status and message.
+When an LLM call exhausts its retry budget (ADR-0003) the Gemini exception
+propagates out of LangChain. This module replaces the resulting pipeline
+crash with a structured ``LLMPipelineError`` that wraps the underlying
+exception, attributes it to the failing agent, and preserves HTTP status.
 
 The structured form is serialised to JSON and stashed in
 ``FinalUserStory.metadata['error']`` by ``invoke_pipeline_safely``
-(see ``agents/graph.py``), so the artifact returned to the caller
-carries the failure information legibly. See
-``docs/adr-0009-llm-fallback.md`` for the policy decision and the
-alternatives considered (silent model fallback rejected, hard crash
-rejected).
+(``agents/graph.py``) so the artifact returned to the caller carries the
+failure legibly. See ``docs/adr-0009-llm-fallback.md`` for the policy
+decision - silent model fallback was rejected.
 """
 
 from __future__ import annotations
@@ -30,9 +18,6 @@ import json
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 
-# Imported lazily-friendly: top-level import keeps the helper fast, but
-# the Gemini SDK is already a hard dependency of every agent so there is
-# no additional install cost.
 from google.genai import errors as gemini_errors
 
 
@@ -40,9 +25,9 @@ from google.genai import errors as gemini_errors
 class LLMFailureDetail:
     """JSON-serialisable payload for ``FinalUserStory.metadata['error']``.
 
-    Stable contract: downstream consumers (LangGraph checkpoint UI,
-    future API client, eval reports) parse this shape. Adding fields
-    is safe; removing or renaming requires a schema bump.
+    Stable contract: downstream consumers (LangGraph checkpoint UI, API
+    clients, eval reports) parse this shape. Adding fields is safe;
+    removing or renaming requires a schema bump.
     """
 
     agent: str
@@ -63,33 +48,30 @@ class LLMFailureDetail:
         return json.dumps(asdict(self), separators=(",", ":"))
 
 
-# Cap the stored message so a chatty server response cannot blow up the
-# artifact size (which is also bounded by ``agents/_sanitize.py``'s
-# DEFAULT_MAX_CHARS, but defence in depth - bounding here keeps the
-# JSON payload predictably small).
+# Defence-in-depth bound on stored message size. Artifact size is also
+# capped by ``agents/_sanitize.py``'s DEFAULT_MAX_CHARS; bounding here
+# keeps the JSON payload predictably small.
 _MAX_MESSAGE_CHARS = 500
 
 
 class PipelineStepError(RuntimeError):
     """Raised by a pipeline node when one of its steps fails.
 
-    Phase 13.4 broadens the original Phase 12.5 contract: any unexpected
-    failure inside a pipeline node (Pydantic validation, JSON parse,
-    programmer error, transport blip outside the Gemini SDK's catch) is
-    converted to ``PipelineStepError`` at the node boundary so the demo
-    and any future API caller see *exactly one* exception type. The
-    caller builds a stub ``FinalUserStory`` and surfaces the failure in
+    Any unexpected failure inside a pipeline node (Pydantic validation,
+    JSON parse, programmer error, transport blip outside the Gemini SDK)
+    is converted to ``PipelineStepError`` at the node boundary so the
+    demo and API caller see *exactly one* exception type. The caller
+    builds a stub ``FinalUserStory`` and surfaces the failure in
     ``metadata['error']`` rather than crashing.
 
-    ``LLMPipelineError`` is the narrower subclass for the specific
-    "Gemini retry budget exhausted" case carrying HTTP status. Callers
-    that want to distinguish can ``isinstance`` it. Callers that only
-    care "something failed" catch ``PipelineStepError`` and get both.
+    ``LLMPipelineError`` is the narrower subclass for the "Gemini retry
+    budget exhausted" case carrying HTTP status. Callers that want to
+    distinguish can ``isinstance`` it; callers that only care "something
+    failed" catch ``PipelineStepError`` and get both.
 
-    Detail shape: a ``LLMFailureDetail`` with ``http_status=None`` and
-    ``retries_attempted=0`` for the non-LLM case. Keeping one detail
-    type - rather than introducing a sibling - means the artifact
-    metadata schema stays stable for downstream consumers.
+    Detail shape: ``LLMFailureDetail`` with ``http_status=None`` and
+    ``retries_attempted=0`` for the non-LLM case. One detail type keeps
+    the artifact metadata schema stable for downstream consumers.
     """
 
     def __init__(self, detail: LLMFailureDetail) -> None:
@@ -98,10 +80,8 @@ class PipelineStepError(RuntimeError):
 
     @staticmethod
     def _format_message(detail: LLMFailureDetail) -> str:
-        # For non-LLM failures (http_status=None, retries=0) the
-        # "(class=…, status=…, retries=…)" suffix would be noise; emit a
-        # cleaner single-line form. LLM failures keep the original
-        # diagnostic suffix so 12.5's log shape is preserved.
+        # Non-LLM failures (http_status=None, retries=0): cleaner suffix.
+        # LLM failures keep the diagnostic suffix to preserve log shape.
         if detail.http_status is None and detail.retries_attempted == 0:
             return (
                 f"Pipeline step failed in agent '{detail.agent}' "
@@ -117,16 +97,16 @@ class PipelineStepError(RuntimeError):
 class LLMPipelineError(PipelineStepError):
     """Raised by an agent's library function when its LLM call ultimately fails.
 
-    "Ultimately fails" means: after the SDK's retry budget is exhausted,
-    or for non-retryable errors, on the first failure. The caller
-    (``invoke_pipeline_safely`` in ``agents/graph.py``) catches this
-    exception and produces a stub ``FinalUserStory`` with the structured
-    detail JSON-encoded in ``metadata['error']``.
+    "Ultimately fails" means: after the SDK retry budget is exhausted, or
+    on the first failure for non-retryable errors. The caller
+    (``invoke_pipeline_safely`` in ``agents/graph.py``) catches this and
+    produces a stub ``FinalUserStory`` with the structured detail
+    JSON-encoded in ``metadata['error']``.
 
-    Never silently fall back to a different model on this exception.
-    The whole point of structuring the failure is to surface it clearly
-    to the operator - a transparent retry to a different model would
-    defeat the policy. See ADR-0009.
+    Never silently fall back to a different model on this exception -
+    the whole point of structuring the failure is to surface it. A
+    transparent retry to a different model would defeat the policy.
+    See ADR-0009.
     """
 
 
@@ -140,17 +120,13 @@ def _truncate(text: str, limit: int = _MAX_MESSAGE_CHARS) -> str:
 def _classify(exc: BaseException) -> tuple[int | None, str]:
     """Extract (http_status, message) from a Gemini or transport exception.
 
-    Returns ``(None, str(exc))`` for any exception type we don't
-    specifically recognise - that keeps the wrapper safe for future
-    SDK changes without silently losing failure information.
+    Returns ``(None, str(exc))`` for unrecognised types - keeps the
+    wrapper safe for future SDK changes without losing failure info.
     """
     if isinstance(exc, gemini_errors.APIError):
-        # APIError carries code (int) + message (str). Both attrs are
-        # always present per the SDK contract; treat them as the source
-        # of truth even if str(exc) would format differently.
+        # APIError contract: code (int) + message (str) always present.
         return exc.code, _truncate(str(exc.message or "") or str(exc))
-    # TimeoutError / ConnectionError / socket.gaierror / etc. - no
-    # HTTP status, just the message.
+    # TimeoutError / ConnectionError / socket.gaierror - no HTTP status.
     return None, _truncate(str(exc) or exc.__class__.__name__)
 
 
@@ -164,14 +140,13 @@ def wrap_llm_exception(
 
     Called inside each agent's library function from a ``try/except``
     around the LangChain invoke. Pinning ``agent_name`` here (rather
-    than inferring from a traceback) keeps the attribution unambiguous
-    even if the failing call is wrapped by multiple layers of helpers.
+    than inferring from a traceback) keeps attribution unambiguous when
+    the failing call sits behind multiple helper layers.
 
     ``retries_attempted`` is the agent's effective retry count
-    (``agents.config.DEFAULT_MAX_RETRIES`` for the standard path,
-    overridable by the caller). Reported in the failure detail so an
-    operator triaging a 503 storm knows how patient the pipeline was
-    being.
+    (``agents.config.DEFAULT_MAX_RETRIES`` by default). Reported in the
+    failure detail so an operator triaging a 503 storm knows how patient
+    the pipeline was being.
     """
     http_status, message = _classify(exc)
     detail = LLMFailureDetail(
@@ -188,18 +163,15 @@ def wrap_llm_exception(
 def wrap_step_exception(agent_name: str, exc: BaseException) -> PipelineStepError:
     """Convert any non-LLM exception inside a pipeline node into a structured failure.
 
-    Phase 13.4. Sibling of :func:`wrap_llm_exception` for failures that
-    are NOT "Gemini retry budget exhausted" - Pydantic validation,
-    JSON parse, programmer errors, anything else a node can raise. The
-    resulting ``PipelineStepError`` carries the same
-    ``LLMFailureDetail`` shape so the demo and the artifact metadata
-    schema don't have to branch on the failure source.
+    Sibling of :func:`wrap_llm_exception` for failures that are NOT
+    "Gemini retry budget exhausted" - Pydantic validation, JSON parse,
+    programmer errors. The resulting ``PipelineStepError`` carries the
+    same ``LLMFailureDetail`` shape so the artifact metadata schema
+    doesn't have to branch on failure source.
 
-    ``http_status`` is ``None`` because there is no API call involved;
-    ``retries_attempted`` is ``0`` because non-LLM failures aren't
-    retried. Both are honest values, NOT placeholders - downstream
-    consumers can rely on "status is None" meaning "this was not an
-    API failure".
+    ``http_status=None`` and ``retries_attempted=0`` are honest values,
+    NOT placeholders - downstream consumers can rely on "status is None"
+    meaning "this was not an API failure".
     """
     detail = LLMFailureDetail(
         agent=agent_name,
@@ -215,14 +187,13 @@ def wrap_step_exception(agent_name: str, exc: BaseException) -> PipelineStepErro
 def is_retryable_llm_failure(exc: BaseException) -> bool:
     """Heuristic - is this the kind of exception the SDK would retry?
 
-    Useful for tests and for any caller that wants to know whether a
-    given failure is the "the LLM is overloaded" class (which Phase
-    12.5's structured-error policy is designed for) vs a programmer
-    error like a malformed prompt template.
+    Useful for tests and for callers that need to distinguish "LLM is
+    overloaded" (the case the structured-error policy is designed for)
+    from programmer errors like a malformed prompt template.
 
-    The Gemini SDK retries on 5xx and 429. We mirror that classification
-    here, plus ``TimeoutError`` and ``ConnectionError`` (transport
-    blips) as "the LLM was unreachable" failures.
+    Mirrors Gemini SDK retry classification: 5xx and 429. Plus
+    ``TimeoutError`` and ``ConnectionError`` (transport blips) as "the
+    LLM was unreachable" failures.
     """
     if isinstance(exc, gemini_errors.APIError):
         code = getattr(exc, "code", None)
