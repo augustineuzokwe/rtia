@@ -18,8 +18,11 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Anchored to repo root: these are Python packaging artifacts ("python
+# setup.py build"). Bare ``lib/`` would also swallow ``ui-react/src/lib/``
+# and any other module-local lib directory.
+/lib/
+/lib64/
 parts/
 sdist/
 var/
