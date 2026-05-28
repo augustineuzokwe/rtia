@@ -1,6 +1,6 @@
 [project]
 name = "rtia"
-version = "0.1.0"
+version = "1.0.0"
 description = "Requirements & Test Intelligence Assistant - multi-agent pipeline for user stories, ACs, and test cases."
 authors = [
     { name = "Augustine Uzokwe", email = "augustine.uzokwe@gmail.com" }
