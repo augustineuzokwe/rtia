@@ -82,7 +82,11 @@ class FakeChatModel:
 
     Stateless beyond the binding: every ``.invoke()`` re-reads the env
     var and the file, so tests can monkey-patch ``RTIA_FAKE_SCENARIO``
-    between calls if they want to walk a thread through multiple states.
+    between calls if they want to walk a thread through multiple states
+    in one process. This is intentional - locking the scenario at
+    construction time would have made it impossible for an E2E test to
+    drive the same thread through (for example) ``deep_with_po`` and
+    then ``error`` to verify the UI's resume-into-error path.
 
     Failure modes:
 

@@ -226,6 +226,47 @@ on three Analyst-side metrics (`ambiguity_discipline`,
 generation tolerated the swap within ±3 %. Treat full-local mode as
 exploratory until you've run the probe on your own dataset.
 
+## 11. Deterministic UI testing with the fake provider
+
+A third provider value, `RTIA_LLM_PROVIDER=fake`, returns canned JSON
+fixtures instead of calling any LLM. Designed for the Playwright E2E
+suite (Epic 7) and unit tests where determinism and zero spend matter
+more than realism. Microseconds per call, identical bytes every run.
+
+```bash
+# Pick the scenario you want to drive the UI / pipeline through.
+export RTIA_LLM_PROVIDER=fake
+export RTIA_FAKE_SCENARIO=deep_clean   # or deep_with_po | split | error
+export RTIA_LLM_CACHE=disabled          # tests don't want stale cache hits
+uv run python scripts/run_pipeline_demo.py
+```
+
+The four shipped scenarios each terminate the pipeline in a different
+`ThreadStatus`, covering the React UI's full state space:
+
+| `RTIA_FAKE_SCENARIO` | What happens | Terminal status |
+|---|---|---|
+| `deep_clean` (default) | Single-story, no PO ambiguity, all 5 agents run | `DONE` |
+| `deep_with_po` | Critical ambiguity → PO checkpoint pauses → resume → full run | `DONE` (after resume) |
+| `split` | Multi-story (≥2 implied stories) → split mode → fan-out | `DONE_SPLIT` |
+| `error` | Analyst raises a controlled `RuntimeError` | `ERROR` |
+
+Any other value raises `ValueError` at the first `.invoke()` so a typo
+fails loudly. The scenario is re-read on every `.invoke()`, so a test
+can monkey-patch the env var mid-thread to walk through multiple states
+in one process.
+
+Fixtures live under [`tests/fixtures/llm/<scenario>/<agent>.json`](../tests/fixtures/llm/);
+each one parses against its agent's Pydantic output schema (verified by
+`tests/test_fake_llm.py`). Adding a new scenario means: (a) drop fixtures
+under a new directory, (b) append the name to `VALID_SCENARIOS` in
+[`agents/_fake_llm.py`](../agents/_fake_llm.py), (c) update the matrix in
+`tests/test_fake_llm.py`, (d) note it in
+[ADR-0015](adr-0015-fake-llm-provider.md).
+
+The fake provider is purely additive — production runs (`RTIA_LLM_PROVIDER`
+unset or `=google`) are unchanged.
+
 ## See also
 
 - [README](../README.md) - setup, architecture, contributing.
@@ -233,4 +274,5 @@ exploratory until you've run the probe on your own dataset.
 - [docs/adr-0004-final-artifact.md](adr-0004-final-artifact.md) - why the artifact has these four sections and not others.
 - [docs/adr-0013-llm-response-cache.md](adr-0013-llm-response-cache.md) - the cache design that backs §8 above.
 - [docs/adr-0014-stochastic-ac-validation.md](adr-0014-stochastic-ac-validation.md) - the N-run design that backs §9 above.
+- [docs/adr-0015-fake-llm-provider.md](adr-0015-fake-llm-provider.md) - the provider contract behind §11 above.
 - [docs/ollama-probe-2026-05-26.md](ollama-probe-2026-05-26.md) - quality + cost + latency measurements behind the §10 caveats.
