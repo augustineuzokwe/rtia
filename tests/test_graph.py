@@ -177,6 +177,72 @@ def test_pipeline_flows_through_when_no_critical_ambiguities():
     assert "[strong]" in result["final_artifact"].metadata["review_summary"]
 
 
+def test_pipeline_flows_through_with_fake_provider(monkeypatch):
+    """Drop-in replacement for ``test_pipeline_flows_through_when_no_critical_ambiguities``
+    using ``RTIA_LLM_PROVIDER=fake`` instead of per-import-site ``patch()`` calls.
+
+    Demonstrates the v1.1.0 recommended pattern (ADR-0015) for tests that
+    need to drive the pipeline through a known state path. The win over
+    ``_mock_pipeline_llms``:
+
+    - No ``patch("agents.X.ChatGoogleGenerativeAI", ...)`` boilerplate for
+      every agent. The ``feedback_mock_class_per_module`` pain point is
+      gone — the env var sets ALL agents at once, no bleed risk.
+    - Fixtures live on disk under ``tests/fixtures/llm/<scenario>/``,
+      reviewable as JSON diffs.
+    - Adding a new agent later doesn't require updating the test setup —
+      the new agent's ``_build_llm`` will read the same env var.
+
+    The test exercises the same path (deep, no critical ambiguities,
+    accept-as-is at story review) as the mocked counterpart but asserts
+    on the ``deep_clean`` fixture content rather than the ``Goal X`` /
+    ``thing X`` fixtures hard-coded above.
+
+    See US-37 / Epic 8 (#293) / ADR-0015.
+    """
+    # The fake provider switches every agent's _build_llm at construction
+    # time — no per-agent patching required.
+    monkeypatch.setenv("RTIA_LLM_PROVIDER", "fake")
+    monkeypatch.setenv("RTIA_FAKE_SCENARIO", "deep_clean")
+    # Disable the LLM response cache so tests don't accidentally hit a
+    # stale cached entry from a prior real-LLM run on the same host.
+    monkeypatch.setenv("RTIA_LLM_CACHE", "disabled")
+
+    pipeline = build_pipeline(checkpointer=_test_checkpointer())
+    config = {"configurable": {"thread_id": "test-flow-through-fake"}}
+
+    first = pipeline.invoke({"requirement_text": "some requirement"}, config=config)
+    # Story Review Checkpoint always pauses for explicit accept (same as
+    # the mocked version above; the fake-llm swap doesn't change graph
+    # topology).
+    assert "rendered_artifact" in first["__interrupt__"][0].value
+
+    result = pipeline.invoke(Command(resume={"accepted": True}), config=config)
+
+    # Shape assertions — same as the mocked counterpart, content tied to
+    # the deep_clean fixture.
+    assert "__interrupt__" not in result
+    assert result["po_answers"] == {}
+    # deep_clean's analyst fixture: intent describes the CSV-download story.
+    assert "csv" in result["analyst_output"].intent.lower()
+    # deep_clean's story fixture: "As a logged-in user, I want to download…"
+    assert result["user_story"].description.startswith("As a logged-in user")
+    # Composer ran → final artifact populated.
+    assert "final_artifact" in result
+    assert result["final_artifact"].description == result["user_story"].description
+    # AC Generator fixture has 3 criteria; same shape contract as before
+    # (≥1 criterion proves AC Gen ran), just different count.
+    assert len(result["final_artifact"].acceptance_criteria) == 3
+    # Test Case Writer fixture covers all three types (happy / edge / negative).
+    types = {tc.type for tc in result["final_artifact"].test_cases}
+    assert {"happy_path", "edge_case", "negative"} <= types
+    # Reviewer fixture: overall_quality="strong", no findings.
+    assert result["review_report"].overall_quality == "strong"
+    assert result["review_report"].coverage_gaps == []
+    assert "review_summary" in result["final_artifact"].metadata
+    assert "[strong]" in result["final_artifact"].metadata["review_summary"]
+
+
 def test_reviewer_summary_includes_all_report_categories():
     """All four ReviewReport list categories must surface in metadata['review_summary'].
 
