@@ -100,7 +100,7 @@ def _resume_value_from(
     - PO checkpoint, **deep mode** (Analyst found ≤ 1 implied story):
       LangGraph expects ``dict[question, answer]`` - pass ``request.answers``
       through.
-    - PO checkpoint, **split mode** (Phase 15.4): LangGraph expects
+    - PO checkpoint, **split mode**: LangGraph expects
       ``{"selected_story_titles": [...], "answers": {...}}``. Empty
       ``selected_story_titles`` is the Q2 default - graph treats it as
       "keep every implied story".

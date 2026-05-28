@@ -1,4 +1,4 @@
-"""CI cost + latency gate (Phase 13.1).
+"""CI cost + latency gate.
 
 Reads an eval report JSON (produced by ``evals/run_evals.py``) and the
 ``[tool.rtia.budgets]`` block in ``pyproject.toml``. Exits 0 if every

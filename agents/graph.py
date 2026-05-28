@@ -330,7 +330,7 @@ def story_writer_node(state: PipelineState) -> dict:
     scope. When no single story was picked (ambiguous PO answer, "all",
     no PO answer, or single-feature requirement), the Writer falls back
     to its original behaviour: write for the full intent. Symmetric with
-    the scope-aware Reviewer (Phase 15.1).
+    the scope-aware Reviewer.
     """
     picked = picked_implied_story(state)
     story = write_user_story(
@@ -453,29 +453,29 @@ def composer_node(state: PipelineState) -> dict:
 def picked_implied_story(state: PipelineState) -> ImpliedStory | None:
     """Identify the single implied story the PO picked at the PO checkpoint.
 
-    Inverse of :func:`deferred_implied_stories`: returns the picked story
-    instead of the leftovers. Returns ``None`` in any of the following
-    "no clean pick" cases:
+     Inverse of :func:`deferred_implied_stories`: returns the picked story
+     instead of the leftovers. Returns ``None`` in any of the following
+     "no clean pick" cases:
 
-    - The Analyst didn't produce implied stories (single-feature
-      requirement - there's nothing to scope down to).
-    - The PO checkpoint never fired (no critical ambiguities flagged).
-    - The PO answered but no story title matched (e.g. PO typed "all"
-      or "split them up" - the answer doesn't name a specific story).
-    - The PO's answer matches MORE than one story title (e.g. typed
-      both "Story A and Story B" - ambiguous as a single pick; the
-      caller should treat this as "no narrowing"). The deferred-export
-      flow handles the "I want multiple as backlog issues" workflow.
+     - The Analyst didn't produce implied stories (single-feature
+       requirement - there's nothing to scope down to).
+     - The PO checkpoint never fired (no critical ambiguities flagged).
+     - The PO answered but no story title matched (e.g. PO typed "all"
+       or "split them up" - the answer doesn't name a specific story).
+     - The PO's answer matches MORE than one story title (e.g. typed
+       both "Story A and Story B" - ambiguous as a single pick; the
+       caller should treat this as "no narrowing"). The deferred-export
+       flow handles the "I want multiple as backlog issues" workflow.
 
-    Match logic is the same bidirectional substring used by
-    :func:`deferred_implied_stories` - title ⊂ answer OR answer ⊂
-    title, case-insensitive - so the two helpers stay symmetric.
+     Match logic is the same bidirectional substring used by
+     :func:`deferred_implied_stories` - title ⊂ answer OR answer ⊂
+     title, case-insensitive - so the two helpers stay symmetric.
 
-    Returning ``None`` (rather than e.g. a list of picks) is the
-    intentional v1 contract: the Story Writer produces ONE story.
-    Multi-story workflows belong to the deferred-export flow
-    (Phase 15.3), which already creates lightweight follow-up issues
-    for each unselected story.
+     Returning ``None`` (rather than e.g. a list of picks) is the
+     intentional v1 contract: the Story Writer produces ONE story.
+     Multi-story workflows belong to the deferred-export flow
+    , which already creates lightweight follow-up issues
+     for each unselected story.
     """
     analyst = state.get("analyst_output")
     if analyst is None or not analyst.implied_stories:
@@ -711,7 +711,7 @@ def build_stub_artifact_from_error(error: PipelineStepError) -> FinalUserStory:
     """
     detail = error.detail
     if detail.http_status is None and detail.retries_attempted == 0:
-        # Non-LLM step failure (Phase 13.4). Skip the LLM-specific
+        # Non-LLM step failure. Skip the LLM-specific
         # status/retries suffix that would just say "None" / "0".
         summary = (
             f"[ERROR] Step failure in '{detail.agent}' "

@@ -1,4 +1,4 @@
-"""Structured LLM-failure errors (Phase 12.5).
+"""Structured LLM-failure errors.
 
 When an LLM call exhausts the retry budget (ADR-0003: 5 retries on
 5xx / 429 with exponential backoff), the underlying Gemini exception

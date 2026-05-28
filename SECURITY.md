@@ -38,11 +38,11 @@ The following are **in scope**:
 
 | Area | Reference |
 |------|-----------|
-| Agent prompt-injection (user-controlled text influencing agent behaviour) | Phase 12.1, `suspicious_input` flag |
-| LLM output rendered without sanitization (XSS, markup injection) | Phase 12.2, `docs/adr-0009-llm-fallback.md` |
-| Runtime secret leakage via agent inputs | Phase 12.3, secret-regex blocker |
-| PII exfiltration through LangSmith tracing in production | Phase 12.4, `docs/adr-0008-pii-langsmith.md` |
-| Silent LLM-error fallbacks masking failures | Phase 12.5, `docs/adr-0009-llm-fallback.md` |
+| Agent prompt-injection (user-controlled text influencing agent behaviour) | `suspicious_input` flag on Analyst output |
+| LLM output rendered without sanitization (XSS, markup injection) | Output sanitizer in `agents/_sanitize.py`; see `docs/adr-0009-llm-fallback.md` |
+| Runtime secret leakage via agent inputs | Pre-LLM secret-regex blocker in `agents/_secret_scan.py` |
+| PII exfiltration through LangSmith tracing in production | Production-tracing guard in `agents/observability.py`; see `docs/adr-0008-pii-langsmith.md` |
+| Silent LLM-error fallbacks masking failures | Structured `LLMPipelineError` + stub artifact path; see `docs/adr-0009-llm-fallback.md` |
 | Pipeline graph correctness (wrong agent order producing incorrect artifacts) | Core pipeline |
 | Eval suite ground-truth poisoning (malicious samples biasing benchmarks) | `evals/` directory |
 

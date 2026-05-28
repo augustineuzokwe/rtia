@@ -150,7 +150,7 @@ uv run python scripts/run_pipeline_demo.py
 
 The demo runs the pipeline against `evals/sample-requirements/sample-01-well-structured.md`, pauses for PO input if the Analyst flagged critical ambiguities, and prints the generated user story. If tracing is on, the script prints a link to the LangSmith dashboard at the start of the run.
 
-### Run the API + UI (Phase 14)
+### Run the API + UI
 
 ```bash
 uv run python scripts/run_api.py

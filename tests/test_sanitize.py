@@ -329,7 +329,7 @@ def test_as_markdown_clean_story_byte_equal_snapshot() -> None:
         "trace; the AC Generator agent should populate this section._\n"
         "\n"
         "## Test Cases\n"
-        "_To be populated by the Test Case agent (Phase 9)._"
+        "_To be populated by the Test Case agent._"
     )
     assert story.as_markdown() == expected
 

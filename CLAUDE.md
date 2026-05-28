@@ -17,7 +17,7 @@ A multi-agent AI assistant that turns raw software requirements (feature request
 
 The artifact is designed to paste directly into a Jira Epic or stand alone on a GitHub Project backlog. Every agent in the pipeline contributes to one or more sections of this single artifact - there are no standalone outputs.
 
-Pipeline today (since Phase 15.4) has two paths chosen by a LangGraph conditional edge at the PO checkpoint:
+Pipeline today has two paths chosen by a LangGraph conditional edge at the PO checkpoint:
 
 ```
 Deep path (single-story requirements, implied_stories ≤ 1):
@@ -40,15 +40,15 @@ rtia/
 ├── prompts/               # Prompt templates as Python modules (versioned with code)
 ├── tests/                 # Mocked unit tests
 ├── scripts/               # Live demo entry points (run_pipeline_demo.py)
-├── evals/                 # Golden datasets + eval runner (Phase 6+)
+├── evals/                 # Golden datasets + eval runner
 │   ├── sample-requirements/  # 3 sample inputs (well-structured, vague, multi-feature)
 │   ├── EVAL_DATA_SPEC.md     # Contract for ground-truth files
 │   └── validate_samples.py   # Sample structural validator
 ├── .github/workflows/     # CI (lint + format + tests)
-├── api/                   # FastAPI app + bearer-token auth + exporters bridge (Phase 14)
-├── ui/                    # Gradio Blocks UI mounted at / (Phase 14)
-├── exporters/             # Jira + GitHub backends behind one Exporter Protocol (Phase 15.2)
-└── docs/                  # ADRs + USAGE.md (Phase 16)
+├── api/                   # FastAPI app + bearer-token auth + exporters bridge
+├── ui/                    # Gradio Blocks UI mounted at /
+├── exporters/             # Jira + GitHub backends behind one Exporter Protocol
+└── docs/                  # ADRs + USAGE.md
 ```
 
 `agents/` and `prompts/` mirror 1:1 - each agent owns one prompts module.
@@ -74,7 +74,7 @@ uv run python scripts/run_api.py                       # FastAPI + Gradio UI at 
 
 The demo requires `GOOGLE_API_KEY` in `.env` (see `.env.example`). LangSmith tracing is optional - set `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY=lsv2_pt_…` + `LANGSMITH_PROJECT=rtia` to enable.
 
-**Pre-commit secret scanner (`detect-secrets`, Phase 12.3.1 / #126):** committed alongside `.pre-commit-config.yaml`. Runs on every commit and in CI. New high-entropy strings (AWS keys, JWTs, private keys, base64 blobs above the default-entropy threshold) fail the hook. Legitimate fixtures live in `.secrets.baseline` - the file lists every flagged string the project already knows about (today: the test fixtures in `agents/_secret_scan.py` and `tests/test_secret_scan.py`). When a new finding is real, redact it; when it's an intentional fixture, refresh the baseline:
+**Pre-commit secret scanner (`detect-secrets`, #126):** committed alongside `.pre-commit-config.yaml`. Runs on every commit and in CI. New high-entropy strings (AWS keys, JWTs, private keys, base64 blobs above the default-entropy threshold) fail the hook. Legitimate fixtures live in `.secrets.baseline` - the file lists every flagged string the project already knows about (today: the test fixtures in `agents/_secret_scan.py` and `tests/test_secret_scan.py`). When a new finding is real, redact it; when it's an intentional fixture, refresh the baseline:
 
 ```bash
 uv run detect-secrets scan > .secrets.baseline   # rebuild from scratch
@@ -83,17 +83,17 @@ uv run pre-commit run detect-secrets --all-files # verify the hook is clean
 
 This is the *commit-time* layer; the runtime layer (`agents/_secret_scan.py`, #124) catches secrets pasted into requirements at invocation time. Both are needed - they cover different threat surfaces.
 
-**API token (`RTIA_API_TOKEN`, Phase 14):** the `run_api.py` entrypoint mints a fresh URL-safe bearer token per process unless `RTIA_API_TOKEN` is set in `.env`. The token gates all `/pipeline*` and `/uploads/*` endpoints (`Authorization: Bearer <token>`) and the Gradio mount accepts it via `?token=…` so the printed startup URL is one-click. Set `RTIA_API_HOST` / `RTIA_API_PORT` to override the default `127.0.0.1:8000`.
+**API token (`RTIA_API_TOKEN`):** the `run_api.py` entrypoint mints a fresh URL-safe bearer token per process unless `RTIA_API_TOKEN` is set in `.env`. The token gates all `/pipeline*` and `/uploads/*` endpoints (`Authorization: Bearer <token>`) and the Gradio mount accepts it via `?token=…` so the printed startup URL is one-click. Set `RTIA_API_HOST` / `RTIA_API_PORT` to override the default `127.0.0.1:8000`.
 
-**Multi-story split (Phase 15.4):** when the Analyst's output has `implied_stories ≥ 2`, the PO checkpoint emits a different interrupt payload (`{"mode": "split", "implied_stories": [...], "critical_ambiguities": [...]}`) and resume value (`{"selected_story_titles": [...], "answers": {...}}`); the conditional edge routes to `split_node` (pure Python, no LLM) which writes `state["split_stories"]` and ends. Terminal status is `ThreadStatus.DONE_SPLIT`. The Story Writer / AC Generator / Test Case Writer / Reviewer are SKIPPED entirely on this path. Single-story requirements (`implied_stories ≤ 1`) still go through the deep flow unchanged.
+**Multi-story split:** when the Analyst's output has `implied_stories ≥ 2`, the PO checkpoint emits a different interrupt payload (`{"mode": "split", "implied_stories": [...], "critical_ambiguities": [...]}`) and resume value (`{"selected_story_titles": [...], "answers": {...}}`); the conditional edge routes to `split_node` (pure Python, no LLM) which writes `state["split_stories"]` and ends. Terminal status is `ThreadStatus.DONE_SPLIT`. The Story Writer / AC Generator / Test Case Writer / Reviewer are SKIPPED entirely on this path. Single-story requirements (`implied_stories ≤ 1`) still go through the deep flow unchanged.
 
 `agents.graph.picked_implied_story` (single picked story, used by Story Writer's scope-aware prompt block) and `agents.graph.deferred_implied_stories` (everything else, used by the Reviewer's scope-aware DEFERRED STORIES block) survive for the 1-implied-story deep case. Both degenerate cleanly when implied_stories is empty.
 
-**Exporters (Phase 15.2):** `POST /pipeline/{thread_id}/export` ships the full deep artifact to Jira (REST v3, ADF codeBlock body) or GitHub (Issues + optional Projects v2 via GraphQL). `POST /pipeline/{thread_id}/export-deferred` batch-creates one lightweight placeholder per deferred/split story. Both backends use `make_exporter("jira" | "github")` in `exporters/base.py`. `dry_run=true` returns the would-be payload - safe without credentials. Credentials: `JIRA_BASE_URL` / `JIRA_EMAIL` / `JIRA_API_TOKEN`, `GITHUB_TOKEN`.
+**Exporters:** `POST /pipeline/{thread_id}/export` ships the full deep artifact to Jira (REST v3, ADF codeBlock body) or GitHub (Issues + optional Projects v2 via GraphQL). `POST /pipeline/{thread_id}/export-deferred` batch-creates one lightweight placeholder per deferred/split story. Both backends use `make_exporter("jira" | "github")` in `exporters/base.py`. `dry_run=true` returns the would-be payload - safe without credentials. Credentials: `JIRA_BASE_URL` / `JIRA_EMAIL` / `JIRA_API_TOKEN`, `GITHUB_TOKEN`.
 
-**State schema version (`PIPELINE_STATE_VERSION`):** bumped 1 → 2 in Phase 15.4 (conditional edge + new state fields). **Clear `~/.rtia/state.db` after pulling 15.4** if any pre-15.4 paused threads existed locally - they're not auto-migrated.
+**State schema version (`PIPELINE_STATE_VERSION`):** bumped on every change to the persisted state shape. **Clear `~/.rtia/state.db` after a version bump** if any paused threads existed locally - they're not auto-migrated.
 
-**Environment mode (`RTIA_ENV`, Phase 12.4):** controls the production-tracing guard. Allowed values: `development` (default when unset), `ci`, `production`. When `RTIA_ENV=production` AND `LANGSMITH_TRACING=true`, the demo and any entry point calling `assert_safe_for_env()` refuse to start to prevent requirement text (potentially containing customer PII) from being persisted to LangSmith. See [docs/adr-0008-pii-langsmith.md](docs/adr-0008-pii-langsmith.md).
+**Environment mode (`RTIA_ENV`):** controls the production-tracing guard. Allowed values: `development` (default when unset), `ci`, `production`. When `RTIA_ENV=production` AND `LANGSMITH_TRACING=true`, the demo and any entry point calling `assert_safe_for_env()` refuse to start to prevent requirement text (potentially containing customer PII) from being persisted to LangSmith. See [docs/adr-0008-pii-langsmith.md](docs/adr-0008-pii-langsmith.md).
 
 ---
 
@@ -209,11 +209,11 @@ When designing or modifying any agent, start from: **which section of the final 
 |---|---|---|
 | Description | Story Writer | Live |
 | Objective | Story Writer | Live |
-| Acceptance Criteria | AC Generator | Phase 8 |
-| Test Cases | Test Case Agent | Phase 9 |
-| Review notes (optional) | Reviewer Agent | Phase 10 |
+| Acceptance Criteria | AC Generator | Live |
+| Test Cases | Test Case Agent | Live |
+| Review notes (optional) | Reviewer Agent | Live |
 
-`agents/user_story_writer.py` already produces `(description, objective, assumptions)` aligned with this contract. Future agents extend `FinalUserStory` (introduced in Phase 3) with their sections.
+`agents/user_story_writer.py` already produces `(description, objective, assumptions)` aligned with this contract. Future agents extend `FinalUserStory` with their sections.
 
 ---
 
@@ -236,7 +236,7 @@ Don't start work on a phase without first reading the relevant section of the pl
 - **Single-sample testing is overfitting** - always test prompt changes on all 3 sample types (well-structured, vague, multi-feature). The behavior on one sample is *not* the behavior on others.
 - **Worked examples beat prose rules** - when the model isn't following a prompt rule, add a concrete worked example with correct output. Far stronger than rule iteration.
 - **Worktrees can quietly switch** - Bash `cd` doesn't persist between tool calls in some Claude Code environments. Use absolute paths and `pwd && git status` at start of multi-step blocks.
-- **msgpack deserialization warning** - `AnalystOutput` etc. need to be registered for checkpointing. Phase 2.2 fixes; until then, the warning is benign noise.
+- **msgpack deserialization warning** - `AnalystOutput` etc. need to be registered for checkpointing. The current msgpack allowlist in `agents/graph.py:_allowlisted_serde()` handles this; until anything new lands, the warning is benign noise.
 - **`gemini-3.5-flash` is an alias** - not pinned to a date. When Google publishes dated suffixes for the 3.5 line, bump `DEFAULT_MODEL` for reproducibility. Same caveat applied to `gemini-2.5-flash` before the ADR-0007 switch.
 - **Gemini 503s are backend-pool specific, not global.** A Gemini model alias that 503s on GitHub-hosted runners can simultaneously respond fine from a maintainer laptop - Google routes runner IP ranges to a specific backend pool. When a 503 storm hits, probe sibling models live (`client.models.list()` + a 1-token `invoke`) before assuming Google is globally down. See ADR-0007 §"What we proved with live probing".
 

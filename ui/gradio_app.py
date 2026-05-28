@@ -508,7 +508,7 @@ def build_blocks(app: FastAPI) -> gr.Blocks:
             export_btn = gr.Button("Push to backlog", variant="primary")
             export_result_md = gr.Markdown("")
 
-        # Deferred-stories panel (Phase 15.3) - only visible when the
+        # Deferred-stories panel - only visible when the
         # Analyst flagged multiple implied stories and the PO scoped
         # the main artifact to one of them.
         with gr.Group(visible=False) as deferred_panel:

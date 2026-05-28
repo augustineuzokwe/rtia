@@ -1,4 +1,4 @@
-"""Structured JSON logging for RTIA (Phase 13.2).
+"""Structured JSON logging for RTIA.
 
 This module is intentionally separate from ``agents.observability`` (which
 owns the LangSmith integration). LangSmith is a *trace* sink - it can be

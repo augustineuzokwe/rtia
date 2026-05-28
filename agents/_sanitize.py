@@ -1,4 +1,4 @@
-"""Output sanitisation applied at the rendering boundary (Phase 12.2).
+"""Output sanitisation applied at the rendering boundary.
 
 Every consumer of an RTIA artifact (LangGraph PO checkpoint, demo script,
 future API) renders via ``FinalUserStory.as_markdown()``. This module

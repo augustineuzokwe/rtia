@@ -1,4 +1,4 @@
-"""Tests for ``POST /pipeline/{thread_id}/export-deferred`` (Phase 15.3)."""
+"""Tests for ``POST /pipeline/{thread_id}/export-deferred``."""
 
 from __future__ import annotations
 

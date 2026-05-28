@@ -161,14 +161,14 @@ def test_pipeline_flows_through_when_no_critical_ambiguities():
     # Composer runs after Story Review accept - final_artifact populated
     assert "final_artifact" in result
     assert result["final_artifact"].description == result["user_story"].description
-    # AC Generator (Phase 8) populates this slot from FAKE_AC_RESPONSE.
+    # AC Generator populates this slot from FAKE_AC_RESPONSE.
     assert len(result["final_artifact"].acceptance_criteria) == 1
     assert result["final_artifact"].acceptance_criteria[0].then == "outcome Y appears"
-    # Test Case Writer (Phase 9) populates this slot from FAKE_TEST_CASE_RESPONSE.
+    # Test Case Writer populates this slot from FAKE_TEST_CASE_RESPONSE.
     assert len(result["final_artifact"].test_cases) == 2
     types = {tc.type for tc in result["final_artifact"].test_cases}
     assert {"happy_path", "negative"} <= types
-    # Reviewer (Phase 10) populates this slot from FAKE_REVIEW_RESPONSE.
+    # Reviewer populates this slot from FAKE_REVIEW_RESPONSE.
     assert "review_report" in result
     assert result["review_report"].overall_quality == "strong"
     assert result["review_report"].coverage_gaps == []
@@ -316,7 +316,7 @@ def test_build_pipeline_accepts_injected_checkpointer():
 
 
 # ---------------------------------------------------------------------------
-# Story Review Checkpoint (Phase 4)
+# Story Review Checkpoint
 # ---------------------------------------------------------------------------
 
 

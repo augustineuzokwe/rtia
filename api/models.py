@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field, field_validator
 class ThreadStatus(StrEnum):
     """Where the pipeline is for a given thread.
 
-    ``DONE_SPLIT`` (Phase 15.4) is the terminal status for multi-story
+    ``DONE_SPLIT`` is the terminal status for multi-story
     requirements that branched into the split path instead of the
     deep flow. The payload carries ``split_stories`` (a list of
     lightweight placeholder stories) instead of ``final_artifact``.
@@ -52,7 +52,7 @@ class PipelineRequest(BaseModel):
 
 
 class SelectedStory(BaseModel):
-    """One implied-story selection in a split PO resume body (Phase 15.4 / #207).
+    """One implied-story selection in a split PO resume body.
 
     The PO checkpoint UI shows each implied story as a Checkbox + editable
     Textbox; on Submit the kept (checked) rows are serialised as
@@ -75,7 +75,7 @@ class ResumeRequest(BaseModel):
     Shape depends on which checkpoint the thread is paused at:
 
     - PO checkpoint, **deep mode**: ``answers`` is a ``dict[question, answer]``.
-    - PO checkpoint, **split mode** (Phase 15.4): preferred shape is
+    - PO checkpoint, **split mode**: preferred shape is
       ``selected_stories`` - a list of :class:`SelectedStory` carrying
       possibly-edited titles + matching summaries. Empty / missing
       ``selected_stories`` means "fan out every identified story" (Q2 default).
@@ -90,7 +90,7 @@ class ResumeRequest(BaseModel):
 
     # PO checkpoint, split mode - preferred shape (#207).
     selected_stories: list[SelectedStory] | None = None
-    # PO checkpoint, split mode - legacy shape (Phase 15.4). Deprecated
+    # PO checkpoint, split mode - legacy shape. Deprecated
     # but accepted; superseded by ``selected_stories`` when both present.
     selected_story_titles: list[str] | None = None
 

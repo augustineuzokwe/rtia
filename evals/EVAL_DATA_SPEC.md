@@ -37,7 +37,7 @@ Every sample file must contain all of the following sections in this order:
 ### Expected AC Count
 ### Out-of-Scope Behaviours
 ## Eval Notes
-## [Optional: Injection Test]                 ← required for security/adversarial samples (Phase 12.1)
+## [Optional: Injection Test]                 ← required for security/adversarial samples
 ### Injection Type
 ### Injection Vector
 ### Forbidden Patterns

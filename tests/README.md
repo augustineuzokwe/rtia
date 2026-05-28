@@ -84,7 +84,7 @@ not a unit test - it runs from `evals/run_evals.py` and is gated by the CI
 | [`test_evals_tc_metrics.py`](test_evals_tc_metrics.py) | Test-case-layer metrics (tc_coverage_breadth, tc_executability) |
 | [`test_evals_dataset.py`](test_evals_dataset.py) | Golden sample loader; ground-truth file validation |
 | [`test_evals_po_directive.py`](test_evals_po_directive.py) | PO-answer fixtures for unattended eval runs |
-| [`test_evals_per_agent_duration.py`](test_evals_per_agent_duration.py) | Per-agent telemetry capture (Phase 13.1) |
+| [`test_evals_per_agent_duration.py`](test_evals_per_agent_duration.py) | Per-agent telemetry capture |
 | [`test_evals_budgets.py`](test_evals_budgets.py) | `check_budgets.py` token + duration gate |
 | [`test_eval_gate.py`](test_eval_gate.py) | `check_thresholds.py` per-metric floor gate |
 | [`test_n_runs.py`](test_n_runs.py) | Stochastic AC validation: pass-rate aggregation, cache-disable invariant (#233 / ADR-0014) |
