@@ -117,13 +117,13 @@ Running the same input through the model N times and aggregating the results. Ca
 For stochastic tests, the percentage of N runs that must succeed for the test to "pass." E.g. "95% of N=100 runs must produce a valid `AnalystOutput`."
 
 ### Promptfoo
-An [open-source prompt-regression framework](https://www.promptfoo.dev/docs/intro/). RTIA's eval gate covers much of the same ground; promptfoo would help once prompt-iteration cadence increases. See [Issue #230](../../issues/230) for the caching-design ideas RTIA borrowed (without adopting promptfoo as a framework).
+An [open-source prompt-regression framework](https://www.promptfoo.dev/docs/intro/). RTIA's eval gate covers much of the same ground; promptfoo would help once prompt-iteration cadence increases. See [Issue #230](https://github.com/augustineuzokwe/rtia/issues/230) for the caching-design ideas RTIA borrowed (without adopting promptfoo as a framework).
 
 ### Regression test
 A test designed to catch when a change *makes things worse* (a "regression" from a known-good state). RTIA's regression job in CI is the eval gate: a prompt change that drops `ac_coverage` below the threshold fails the build.
 
 ### Stochastic AC validation
-Running each acceptance criterion check N times (instead of once) and judging the AC by its pass-rate. Distinct from a single deterministic check. Currently a gap in RTIA - captured in [Issue #230](../../issues/230) and the project plan.
+Running each acceptance criterion check N times (instead of once) and judging the AC by its pass-rate. Distinct from a single deterministic check. Currently a gap in RTIA - captured in [Issue #230](https://github.com/augustineuzokwe/rtia/issues/230) and the project plan.
 
 ### Tail behaviour
 The rare-event end of a probability distribution. For LLMs, the "tail" is "what does the model do in the unusual 1-in-50 case?" Tail behaviour is invisible to single-run testing and is exactly where security failures live.
@@ -133,7 +133,7 @@ The rare-event end of a probability distribution. For LLMs, the "tail" is "what 
 ## Cost & operations
 
 ### Cache hit / miss
-A cache hit returns the stored result for a given key without doing the underlying work. A miss means the key isn't found, so the underlying work runs and the result is stored. See RTIA's caching design in [Issue #230](../../issues/230).
+A cache hit returns the stored result for a given key without doing the underlying work. A miss means the key isn't found, so the underlying work runs and the result is stored. See RTIA's caching design in [Issue #230](https://github.com/augustineuzokwe/rtia/issues/230).
 
 ### Cache invalidation
 Removing or expiring entries so future calls don't return stale data. Strategies include TTL (time-based expiry), key-based (the key includes a content hash so any content change auto-invalidates), and manual flush.
@@ -145,7 +145,7 @@ A change that pushes the per-run LLM cost above a threshold without justificatio
 The hosted service running the model - Google AI Studio (Gemini), Anthropic (Claude), OpenAI (GPT), local (Ollama). RTIA is deliberately single-provider per [ADR-0006](adr-0006-provider-switch.md); a swap to Ollama is exploratory work tracked in the project plan.
 
 ### TTL (Time-To-Live)
-How long a cached or stored value remains valid before being considered stale. Measured in seconds. RTIA's planned LLM-response cache uses a 24-hour TTL - see [Issue #230](../../issues/230) for the rationale (vs. promptfoo's 14-day default).
+How long a cached or stored value remains valid before being considered stale. Measured in seconds. RTIA's planned LLM-response cache uses a 24-hour TTL - see [Issue #230](https://github.com/augustineuzokwe/rtia/issues/230) for the rationale (vs. promptfoo's 14-day default).
 
 ### Token budget
 A per-run or per-job ceiling on total tokens consumed. RTIA's are enforced in CI; exceeding them fails the build. Distinct from per-agent output ceilings (`MAX_OUTPUT_TOKENS_*` constants in [`agents/config.py`](../agents/config.py)) which bound individual calls.

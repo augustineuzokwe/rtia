@@ -11,7 +11,7 @@ a clean comparison target for the Ollama probe.
 
 - **Model:** `gemini-3.5-flash` (paid Google AI Studio tier)
 - **Judge:** `gemini-3.5-flash`
-- **Run report:** [`evals/reports/run-20260526T092027Z.json`](../evals/reports/run-20260526T092027Z.json)
+- **Run report:** `evals/reports/run-20260526T092027Z.json` (regenerated locally; eval reports are gitignored)
 - **Generated:** 2026-05-26T09:20:27Z
 - **Prompt hashes:** analyst `92967c18177b` · ac_generator `71f4e07b514e` · test_case_writer `5811bba6f6c8`
 - **Samples:** 7 (`sample-01-well-structured` through `sample-07-transcript-human-imperatives`)

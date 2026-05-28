@@ -4,8 +4,7 @@ Captured before the speed-up changes landed. Numbers are local-laptop
 runs against the paid Gemini 3.5 Flash tier; CI numbers track but are
 typically slower due to runner-pool variability.
 
-Full report: [`evals/reports/baseline-2026-05-24.json`](../evals/reports/baseline-2026-05-24.json).
-Post-change report: [`evals/reports/postchange-2026-05-24.json`](../evals/reports/postchange-2026-05-24.json) - see the PR body for the diff.
+Full reports: `evals/reports/baseline-2026-05-24.json` and `evals/reports/postchange-2026-05-24.json` (eval reports are gitignored - regenerate by running the eval suite). See the PR body for the diff.
 
 ## Aggregate (7 samples, production agents only, excludes judge time)
 
