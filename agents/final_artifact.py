@@ -1,9 +1,9 @@
 """FinalUserStory artifact: the v1 contract for what RTIA outputs.
 
-Every agent in the pipeline contributes to ONE final artifact that a PO
-or QA Lead pastes directly into a Jira ticket or GitHub Issue. The four
-sections (Description, Objective, Acceptance Criteria, Test Cases) come
-from different agents:
+Every agent in the pipeline contributes to ONE final artifact that a
+PO, PM, BA or QA pastes directly into a Jira ticket or GitHub Issue.
+The four sections (Description, Objective, Acceptance Criteria, Test
+Cases) come from different agents:
 
     Description         ← User Story Writer
     Objective           ← User Story Writer
