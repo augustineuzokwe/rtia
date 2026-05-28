@@ -10,8 +10,8 @@ path.
 - **Generator model:** `llama3.1:8b` (4.9 GB, pulled 2026-05-26)
 - **Generator runtime:** Ollama 0.24.0 on Apple M3 / 24 GB RAM, brew service
 - **Judge:** `gemini-3.5-flash` (unchanged - see [`evals/judge.py`](../evals/judge.py) `load_model()` for rationale)
-- **Probe report:** [`evals/reports/run-20260526T120906Z.json`](../evals/reports/run-20260526T120906Z.json)
-- **Gemini baseline:** [`evals/reports/run-20260526T092027Z.json`](../evals/reports/run-20260526T092027Z.json)
+- **Probe report:** `evals/reports/run-20260526T120906Z.json` (regenerated locally; eval reports are gitignored)
+- **Gemini baseline:** `evals/reports/run-20260526T092027Z.json` (regenerated locally; eval reports are gitignored)
 - **Samples:** all 7 (`sample-01` … `sample-07`)
 
 ## Headline
