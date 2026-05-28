@@ -1,0 +1,32 @@
+{
+  "cases": [
+    {
+      "scenario": "Logged-in user downloads CSV containing their data",
+      "type": "happy_path",
+      "steps": [
+        "Log in as a user with at least one data record",
+        "Navigate to the data page",
+        "Click the Download CSV button"
+      ],
+      "expected": "A CSV file downloads containing every data record visible to the user, with the standard header row"
+    },
+    {
+      "scenario": "Logged-in user with zero records downloads CSV",
+      "type": "edge_case",
+      "steps": [
+        "Log in as a freshly created user with no data records",
+        "Navigate to the data page",
+        "Click Download CSV"
+      ],
+      "expected": "A CSV file with only the header row downloads; status code is 200"
+    },
+    {
+      "scenario": "Unauthenticated request to CSV endpoint is rejected",
+      "type": "negative",
+      "steps": [
+        "Without a session cookie or bearer token, send GET /data/export.csv"
+      ],
+      "expected": "Response is HTTP 401 Unauthorized; the response body contains no CSV content"
+    }
+  ]
+}

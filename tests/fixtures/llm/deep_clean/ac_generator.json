@@ -1,0 +1,19 @@
+{
+  "criteria": [
+    {
+      "given": "I am logged in and viewing my data page",
+      "when": "I click the 'Download CSV' button",
+      "then": "a CSV file containing all my data records is downloaded to my device with HTTP 200"
+    },
+    {
+      "given": "I am logged in and have zero data records",
+      "when": "I click 'Download CSV'",
+      "then": "an empty CSV file with only the header row is downloaded"
+    },
+    {
+      "given": "I am not logged in",
+      "when": "I request the CSV download URL directly",
+      "then": "the server responds with HTTP 401 and no file is sent"
+    }
+  ]
+}

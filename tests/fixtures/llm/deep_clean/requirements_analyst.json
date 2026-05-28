@@ -1,0 +1,7 @@
+{
+  "intent": "Allow a logged-in user to download their own data as a CSV file for offline analysis.",
+  "actors": ["logged-in user"],
+  "ambiguities": [],
+  "implied_stories": [],
+  "suspicious_input": {"detected": false, "reason": "", "spans": []}
+}
