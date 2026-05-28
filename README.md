@@ -1,5 +1,11 @@
 # RTIA - Requirements & Test Intelligence Assistant
 
+[![CI](https://github.com/augustineuzokwe/rtia/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/augustineuzokwe/rtia/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 A multi-agent AI assistant that takes raw software requirements - feature requests, business requirements, PRD snippets, or meeting notes - and produces a structured user story, acceptance criteria (Given/When/Then), and test cases through a supervised pipeline.
 
 Two human-in-the-loop checkpoints keep a PO or QA Lead in control: one *before* story generation (to resolve critical ambiguities) and one *after* (to review the generated story before AC generation).
