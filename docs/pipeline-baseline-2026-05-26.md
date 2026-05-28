@@ -1,13 +1,13 @@
 # Pipeline baseline - 2026-05-26
 
-Fresh re-baseline run executed per the §7.0 step in
-`/Users/auzokwe/.claude/plans/before-we-draft-adr-declarative-leaf.md`.
+Fresh re-baseline run establishing the clean comparison target for the
+Ollama probe documented in [`ollama-probe-2026-05-26.md`](ollama-probe-2026-05-26.md).
 The prior pinned baseline ([`pipeline-baseline-2026-05-24.md`](pipeline-baseline-2026-05-24.md))
 was 2 days old; since then `main` landed 8 PRs touching the UI +
 exporters + title-derivation paths. Prompts themselves were not
 modified, but the `evals/` invocation path now carries the new ADF
 converter (#223) and updated title heuristics. This file establishes
-a clean comparison target for the Ollama probe (§7.3 of the same plan).
+a clean comparison target for the Ollama probe.
 
 - **Model:** `gemini-3.5-flash` (paid Google AI Studio tier)
 - **Judge:** `gemini-3.5-flash`

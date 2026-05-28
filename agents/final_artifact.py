@@ -5,14 +5,13 @@ or QA Lead pastes directly into a Jira ticket or GitHub Issue. The four
 sections (Description, Objective, Acceptance Criteria, Test Cases) come
 from different agents:
 
-    Description        ← User Story Writer (live)
-    Objective          ← User Story Writer (live)
-    Acceptance Criteria ← AC Generator agent (Phase 8 - not built yet)
-    Test Cases         ← Test Case agent (Phase 9 - not built yet)
+    Description         ← User Story Writer
+    Objective           ← User Story Writer
+    Acceptance Criteria ← AC Generator
+    Test Cases          ← Test Case Writer
 
-For sections whose agents have not yet been built, the renderer emits a
-clear placeholder so the artifact's shape is visible end-to-end from
-day one.
+The Reviewer agent runs last and attaches notes (coverage gaps, weak
+ACs) to the composed artifact without contributing a new section.
 
 See `docs/adr-0004-final-artifact.md` for the contract-first design
 rationale.

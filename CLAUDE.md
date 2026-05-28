@@ -72,7 +72,7 @@ uv run python scripts/run_pipeline_demo.py sample-03-multi-feature.md
 uv run python scripts/run_api.py                       # FastAPI + Gradio UI at http://127.0.0.1:8000/?token=…
 ```
 
-The demo requires `ANTHROPIC_API_KEY` in `.env` (see `.env.example`). LangSmith tracing is optional - set `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY=lsv2_pt_…` + `LANGSMITH_PROJECT=rtia` to enable.
+The demo requires `GOOGLE_API_KEY` in `.env` (see `.env.example`). LangSmith tracing is optional - set `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY=lsv2_pt_…` + `LANGSMITH_PROJECT=rtia` to enable.
 
 **Pre-commit secret scanner (`detect-secrets`, Phase 12.3.1 / #126):** committed alongside `.pre-commit-config.yaml`. Runs on every commit and in CI. New high-entropy strings (AWS keys, JWTs, private keys, base64 blobs above the default-entropy threshold) fail the hook. Legitimate fixtures live in `.secrets.baseline` - the file lists every flagged string the project already knows about (today: the test fixtures in `agents/_secret_scan.py` and `tests/test_secret_scan.py`). When a new finding is real, redact it; when it's an intentional fixture, refresh the baseline:
 
@@ -223,9 +223,9 @@ When designing or modifying any agent, start from: **which section of the final 
 
 ## 6. Where the roadmap lives
 
-The 16-phase road-to-production plan is in `/Users/auzokwe/.claude/plans/prancy-floating-tarjan.md`. If that path doesn't resolve in your environment, ask the user for the current plan location.
+The 16-phase road-to-production plan lives in the maintainer's local working notes (not in this repo). Ask the maintainer if you need the current plan location.
 
-The plan is ordered for the user's learning focus: **testing AI applications + integrating AI into QA processes**. Phases 4-6 (golden dataset → DeepEval suite → CI eval gate) come before remaining agent work so each new agent is built on calibrated test foundations, not retrofitted.
+The plan is ordered for the maintainer's learning focus: **testing AI applications + integrating AI into QA processes**. Phases 4-6 (golden dataset → DeepEval suite → CI eval gate) come before remaining agent work so each new agent is built on calibrated test foundations, not retrofitted.
 
 Don't start work on a phase without first reading the relevant section of the plan. If a question of priority or dependency arises mid-phase, the plan is the source of truth.
 

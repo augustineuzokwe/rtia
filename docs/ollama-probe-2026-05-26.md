@@ -1,10 +1,11 @@
 # Ollama local-model probe - 2026-05-26
 
-Executes §7.3 of the plan at
-`/Users/auzokwe/.claude/plans/before-we-draft-adr-declarative-leaf.md`.
 Generator swap to `llama3.1:8b` via Ollama; judge held constant on
 `gemini-3.5-flash` for apples-to-apples comparison against
 [`pipeline-baseline-2026-05-26.md`](pipeline-baseline-2026-05-26.md).
+This probe informed [ADR-0012](adr-0012-v1-single-user-local.md)'s
+decision to keep Gemini as the default while shipping an opt-in local
+path.
 
 - **Generator model:** `llama3.1:8b` (4.9 GB, pulled 2026-05-26)
 - **Generator runtime:** Ollama 0.24.0 on Apple M3 / 24 GB RAM, brew service
