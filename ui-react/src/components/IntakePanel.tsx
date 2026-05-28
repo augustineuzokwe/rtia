@@ -98,8 +98,14 @@ export function IntakePanel({ onStarted }: IntakePanelProps) {
     }
   };
 
+  // Run is enabled only when there's something to send. ``text`` is the
+  // single source of truth: a successful upload fills it with the
+  // extracted content, so this one check covers both "paste" and
+  // "upload" entry points. ``busy`` blocks double-submits.
+  const canRun = busy === null && text.trim().length > 0;
+
   return (
-    <Card>
+    <Card data-testid="intake-panel">
       <CardHeader>
         <CardTitle>Start a run</CardTitle>
         <CardDescription>
@@ -112,6 +118,7 @@ export function IntakePanel({ onStarted }: IntakePanelProps) {
           <Label htmlFor="requirement-text">Requirement text</Label>
           <Textarea
             id="requirement-text"
+            data-testid="intake-textarea"
             placeholder="Paste raw requirements here…"
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -124,6 +131,7 @@ export function IntakePanel({ onStarted }: IntakePanelProps) {
           <Label htmlFor="file-upload">…or upload a file</Label>
           <Input
             id="file-upload"
+            data-testid="intake-file"
             ref={fileInputRef}
             type="file"
             accept=".pdf,.md,.markdown,application/pdf,text/markdown"
@@ -132,24 +140,30 @@ export function IntakePanel({ onStarted }: IntakePanelProps) {
           />
         </div>
 
-        <p className="text-xs text-muted-foreground">{HELPER_TEXT}</p>
+        <p className="text-xs text-muted-foreground" data-testid="intake-helper">
+          {HELPER_TEXT}
+        </p>
 
         {uploadStatus && !error && (
-          <Alert>
+          <Alert data-testid="intake-upload-status">
             <AlertTitle>Upload complete</AlertTitle>
             <AlertDescription>{uploadStatus}</AlertDescription>
           </Alert>
         )}
 
         {error && (
-          <Alert variant="destructive" role="alert">
+          <Alert variant="destructive" role="alert" data-testid="intake-error">
             <AlertTitle>Something went wrong</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
         <div className="flex justify-end">
-          <Button onClick={onRun} disabled={busy !== null || !text.trim()}>
+          <Button
+            onClick={onRun}
+            disabled={!canRun}
+            data-testid="intake-run"
+          >
             {busy === "run" ? "Starting…" : "Run pipeline"}
           </Button>
         </div>
