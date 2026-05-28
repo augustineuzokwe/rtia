@@ -161,11 +161,13 @@ uv run pre-commit run --all-files
 
 > **What gets tested when:** the suite spans mocked unit tests (every PR), a live Gemini eval gate (PRs touching `agents/`, `prompts/`, or `evals/`), and a nightly N=10 adversarial regression at 02:00 UTC. See [docs/ci-and-testing.md](docs/ci-and-testing.md) for the full trigger map.
 
-## Workshop Context
+## Why this exists
 
-This project is a learning workshop for a QA Lead transitioning into AI-first quality engineering. It is used to:
+RTIA is a working demonstration of an AI-first QA toolchain: agentic pipeline design, LLM evaluation under nondeterminism, and CI-gated quality regression on every PR. Built end-to-end by a QA Lead as a reference for the patterns that LLM-feature ownership requires:
 
-- Practice agentic AI design (LangGraph multi-agent pipelines)
-- Practice prompt engineering (requirements → stories → ACs → tests)
-- Build and test an LLM evaluation pipeline (DeepEval + GitHub Actions)
-- Document a QA team AI adoption roadmap using this app as the test subject
+- **Agentic design** - LangGraph multi-agent orchestration with two human-in-the-loop checkpoints and a conditional split path for multi-story requirements.
+- **LLM evaluation under nondeterminism** - DeepEval suite, six per-sample metrics with calibrated thresholds, stochastic N-runs validation, nightly adversarial regression.
+- **CI-first quality gates** - GitHub Actions runs the live eval on every PR touching `agents/` / `prompts/` / `evals/`. The gate is a real cost (≈$0.03/run on Gemini Flash) and a real signal.
+- **Operational discipline** - two-layer secret scanning (pre-commit + runtime), production-tracing guard, durable LangGraph checkpointing, ADR-documented decisions.
+
+The repo is intentionally readable end-to-end - [USAGE.md](docs/USAGE.md) for the PO/QA flow, [docs/ci-and-testing.md](docs/ci-and-testing.md) for the trigger map, [docs/glossary.md](docs/glossary.md) for vocabulary, [docs/](docs/) for the ADR series.
