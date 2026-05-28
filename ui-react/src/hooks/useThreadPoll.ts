@@ -22,6 +22,10 @@ export interface UseThreadPollResult {
   lastError: string | null;
   /** True once status hits DONE / DONE_SPLIT / ERROR. */
   isTerminal: boolean;
+  /** Inject a fresh state without waiting for the next tick. Used by
+   *  the resume action so the badge updates the moment the server
+   *  acknowledges. Calls also reset backoff and resume polling. */
+  applyState: (next: ThreadState) => void;
 }
 
 /**
@@ -144,10 +148,24 @@ export function useThreadPoll(threadId: string | null): UseThreadPollResult {
     };
   }, [threadId]);
 
+  const applyState = (next: ThreadState) => {
+    setState(next);
+    setLastError(null);
+    consecutiveFailuresRef.current = 0;
+    if (TERMINAL_STATUSES.includes(next.status)) {
+      isTerminalRef.current = true;
+      setPhase("stopped");
+    } else {
+      isTerminalRef.current = false;
+      setPhase("polling");
+    }
+  };
+
   return {
     state,
     phase,
     lastError,
     isTerminal: isTerminalRef.current,
+    applyState,
   };
 }
