@@ -142,35 +142,134 @@ def test_fake_chat_model_error_scenario_raises_for_analyst(
     assert "error" in str(excinfo.value).lower()
 
 
-def test_all_deep_clean_fixtures_validate_against_their_schemas(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Every fixture in the deep_clean scenario must parse cleanly.
-
-    Drift between Pydantic schemas and fixtures would otherwise show up
-    only when the relevant agent runs end-to-end. This test catches it
-    at PR review time.
-    """
-    monkeypatch.setenv(FAKE_SCENARIO_ENV_VAR, "deep_clean")
-    # Lazy import so test fixtures aren't a hard dep at module load time.
+def _schemas_by_agent() -> dict[str, type]:
+    """Lazy import so test fixtures aren't a hard dep at module-load time."""
     from agents.ac_generator import AcGeneratorOutput
     from agents.reviewer import ReviewReport
     from agents.test_case_writer import TestCaseWriterOutput
     from agents.user_story_writer import UserStory
 
-    fixtures_to_schemas: dict[str, type] = {
+    return {
         "requirements_analyst": AnalystOutput,
         "user_story_writer": UserStory,
         "ac_generator": AcGeneratorOutput,
         "test_case_writer": TestCaseWriterOutput,
         "reviewer": ReviewReport,
     }
-    for agent_name, schema in fixtures_to_schemas.items():
+
+
+# Per-scenario agent coverage. Drives the schema-validation test below.
+# Adding a new scenario: append it here AND in VALID_SCENARIOS.
+#
+# - deep_clean / deep_with_po: full pipeline runs; every agent has a fixture.
+# - split: terminates at split_node (pure Python) after the Analyst; only the
+#   Analyst fixture is consumed.
+# - error: FakeChatModel raises in the Analyst before any file read; no
+#   fixtures are loaded for any agent in this scenario.
+_SCENARIO_AGENT_COVERAGE: dict[str, list[str]] = {
+    "deep_clean": [
+        "requirements_analyst",
+        "user_story_writer",
+        "ac_generator",
+        "test_case_writer",
+        "reviewer",
+    ],
+    "deep_with_po": [
+        "requirements_analyst",
+        "user_story_writer",
+        "ac_generator",
+        "test_case_writer",
+        "reviewer",
+    ],
+    "split": ["requirements_analyst"],
+    "error": [],
+}
+
+
+@pytest.mark.parametrize("scenario", sorted(VALID_SCENARIOS))
+def test_every_scenario_in_coverage_matrix(scenario: str) -> None:
+    """The agent-coverage matrix above must list every VALID_SCENARIO.
+
+    Catches the case where a new scenario lands in :data:`VALID_SCENARIOS`
+    without a matching entry here - the schema validation test would then
+    silently skip it.
+    """
+    assert scenario in _SCENARIO_AGENT_COVERAGE, (
+        f"Scenario {scenario!r} is in VALID_SCENARIOS but not in "
+        "_SCENARIO_AGENT_COVERAGE. Update the matrix in tests/test_fake_llm.py."
+    )
+
+
+@pytest.mark.parametrize("scenario", sorted(VALID_SCENARIOS))
+def test_all_scenario_fixtures_validate_against_their_schemas(
+    monkeypatch: pytest.MonkeyPatch, scenario: str
+) -> None:
+    """Every fixture in every scenario must parse cleanly against its schema.
+
+    Drift between Pydantic schemas and fixtures would otherwise only show
+    up when the relevant agent runs end-to-end. This test catches it at
+    PR review time. Parameterised so each scenario is its own assertion.
+    """
+    monkeypatch.setenv(FAKE_SCENARIO_ENV_VAR, scenario)
+    schemas = _schemas_by_agent()
+    for agent_name in _SCENARIO_AGENT_COVERAGE[scenario]:
         llm = FakeChatModel(agent_name=agent_name)
         response = llm.invoke(messages=[], config=None)
+        schema = schemas[agent_name]
         try:
             schema.model_validate(json.loads(response.content))
         except ValidationError as exc:
             pytest.fail(
-                f"deep_clean fixture for {agent_name} does not match {schema.__name__}: {exc}"
+                f"Fixture {scenario}/{agent_name}.json does not match {schema.__name__}: {exc}"
             )
+
+
+def test_split_scenario_has_two_or_more_implied_stories(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The split scenario only triggers the split path when ``implied_stories ≥ 2``.
+
+    A drift in the fixture (e.g. someone trims to one story) would silently
+    re-route the test through the deep path. Pin the contract here.
+    """
+    monkeypatch.setenv(FAKE_SCENARIO_ENV_VAR, "split")
+    llm = FakeChatModel(agent_name="requirements_analyst")
+    response = llm.invoke(messages=[], config=None)
+    parsed = AnalystOutput.model_validate(json.loads(response.content))
+    assert len(parsed.implied_stories) >= 2, (
+        "split scenario fixture must have ≥2 implied_stories to route through "
+        "split_node; got "
+        f"{len(parsed.implied_stories)}."
+    )
+
+
+def test_deep_with_po_has_at_least_one_critical_ambiguity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``deep_with_po`` only pauses the PO checkpoint when at least one
+    critical ambiguity is present. Pin the contract.
+    """
+    monkeypatch.setenv(FAKE_SCENARIO_ENV_VAR, "deep_with_po")
+    llm = FakeChatModel(agent_name="requirements_analyst")
+    response = llm.invoke(messages=[], config=None)
+    parsed = AnalystOutput.model_validate(json.loads(response.content))
+    critical = [a for a in parsed.ambiguities if a.severity == "critical"]
+    assert critical, (
+        "deep_with_po scenario fixture must include ≥1 critical ambiguity to "
+        "pause the PO checkpoint."
+    )
+
+
+def test_deep_clean_has_no_critical_ambiguities_and_no_implied_stories(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``deep_clean`` must flow straight through the PO checkpoint without
+    pausing AND must not trigger the split path. This is the happiest path.
+    """
+    monkeypatch.setenv(FAKE_SCENARIO_ENV_VAR, "deep_clean")
+    llm = FakeChatModel(agent_name="requirements_analyst")
+    response = llm.invoke(messages=[], config=None)
+    parsed = AnalystOutput.model_validate(json.loads(response.content))
+    critical = [a for a in parsed.ambiguities if a.severity == "critical"]
+    assert critical == []
+    assert parsed.implied_stories == []

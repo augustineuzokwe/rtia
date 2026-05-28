@@ -1,0 +1,16 @@
+{
+  "intent": "Allow an administrator to export user data for compliance reporting.",
+  "actors": ["administrator"],
+  "ambiguities": [
+    {
+      "question": "Should the export include users that have been soft-deleted, or only active users?",
+      "severity": "critical"
+    },
+    {
+      "question": "What file format should the export use?",
+      "severity": "normal"
+    }
+  ],
+  "implied_stories": [],
+  "suspicious_input": {"detected": false, "reason": "", "spans": []}
+}
