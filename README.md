@@ -62,7 +62,7 @@ A PO or BA has raw requirements. Instead of manually writing user stories, ACs, 
 | LLM evaluation | DeepEval |
 | Tracing | LangSmith (opt-in) |
 | API | FastAPI + bearer-token auth |
-| UI | Gradio Blocks (mounted at `/`) |
+| UI | React + Tailwind + shadcn/ui (mounted at `/`); Gradio Blocks at `/legacy` during the Epic 6 migration |
 | Exporters | Jira REST v3 (ADF) · GitHub Issues + Projects v2 (GraphQL) |
 | CI/CD | GitHub Actions |
 
@@ -73,7 +73,8 @@ rtia/
 ├── agents/          # LangGraph agent definitions (Analyst, Story Writer, AC Gen, Test Case, Reviewer, Composer)
 ├── prompts/         # Prompt templates (one module per agent; versioned with code)
 ├── api/             # FastAPI routes + bearer-token auth + exporter bridge
-├── ui/              # Gradio Blocks frontend (mounted at /)
+├── ui-react/        # Vite + React + TS + Tailwind + shadcn/ui SPA (mounted at /)
+├── ui/              # Legacy Gradio Blocks frontend (mounted at /legacy; removed in US-26)
 ├── exporters/       # Jira + GitHub backends behind one Exporter Protocol
 ├── evals/           # Golden samples + DeepEval suite + N-runs runner
 ├── scripts/         # Demo + API entry points (run_pipeline_demo.py, run_api.py)
@@ -156,7 +157,7 @@ The demo runs the pipeline against `evals/sample-requirements/sample-01-well-str
 uv run python scripts/run_api.py
 ```
 
-Starts a FastAPI server on `127.0.0.1:8000` with a Gradio UI mounted at `/`. The startup banner prints a tokenized URL (`http://127.0.0.1:8000/?token=…`) - open it in a browser to paste a requirement or upload a PDF/Markdown file and step through the PO and review checkpoints. All API endpoints require `Authorization: Bearer <token>`; set `RTIA_API_TOKEN` in `.env` to pin a stable token across restarts.
+Starts a FastAPI server on `127.0.0.1:8000`. The React SPA is served at `/` from `ui-react/dist/` (run `cd ui-react && npm install && npm run build` once); the legacy Gradio UI stays mounted at `/legacy` during the Epic 6 migration. The startup banner prints a tokenized URL (`http://127.0.0.1:8000/?token=…`) - open it in a browser to paste a requirement or upload a PDF/Markdown file and step through the PO and review checkpoints. All API endpoints require `Authorization: Bearer <token>`; set `RTIA_API_TOKEN` in `.env` to pin a stable token across restarts.
 
 ### Run the tests
 

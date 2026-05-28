@@ -267,6 +267,32 @@ under a new directory, (b) append the name to `VALID_SCENARIOS` in
 The fake provider is purely additive — production runs (`RTIA_LLM_PROVIDER`
 unset or `=google`) are unchanged.
 
+## 12. UI mounts: React (current) vs Gradio (legacy)
+
+Epic 6 (#291) introduces a React + Tailwind + shadcn/ui SPA. While the
+migration is in flight both UIs ship in the same process behind the same
+bearer token:
+
+| Path | UI | Owner |
+|---|---|---|
+| `/` | React SPA (`ui-react/dist/`) | Epic 6 |
+| `/legacy` | Gradio Blocks (`ui/gradio_app.py`) | Removed in US-26 |
+
+The React app is built from `ui-react/` (Vite + React 18 + TypeScript +
+Tailwind + shadcn/ui). For day-to-day development:
+
+```bash
+cd ui-react
+npm install
+npm run dev     # Vite dev server on :5173 with /pipeline /uploads /legacy
+                # proxied to RTIA_API_ORIGIN (default http://127.0.0.1:8000)
+npm run build   # writes ui-react/dist/ — what run_api.py serves at /
+```
+
+`run_api.py` serves `ui-react/dist/index.html` at `/`. If you haven't run
+`npm run build` yet, `GET /` returns a 500 with the build command instead
+of a stack trace. The `/legacy` Gradio mount keeps working either way.
+
 ## See also
 
 - [README](../README.md) - setup, architecture, contributing.

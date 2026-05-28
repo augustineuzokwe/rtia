@@ -3,6 +3,10 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# Node / Vite (ui-react)
+node_modules/
+ui-react/dist/
+
 # C extensions
 *.so
 
