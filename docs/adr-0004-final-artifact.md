@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-05-19)
 **Author:** augustineuzokwe
-**Decision driver:** Phase 3 of the prod-readiness roadmap. Every agent in the pipeline contributes to ONE final artifact that a PO or QA Lead pastes directly into Jira or GitHub Issue. The artifact contract must exist BEFORE the AC Generator (Phase 8) and Test Case Agent (Phase 9) land, so each new agent has a stable shape to populate.
+**Decision driver:** Phase 3 of the prod-readiness roadmap. Every agent in the pipeline contributes to ONE final artifact that a PO, PM, BA or QA pastes directly into Jira or GitHub Issue. The artifact contract must exist BEFORE the AC Generator (Phase 8) and Test Case Agent (Phase 9) land, so each new agent has a stable shape to populate.
 
 ## Context
 

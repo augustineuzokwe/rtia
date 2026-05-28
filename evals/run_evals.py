@@ -478,7 +478,7 @@ _COST_DISCLOSURE = (
     "calls per sample (actor synonym tiebreaks, ambiguity category mapping, "
     "AC→category classification). The two TC-layer metrics are programmatic "
     "and add zero judge cost. Default scope is 3 samples ≈ 24–30 total "
-    "Gemini 2.5 Flash calls. Estimated paid-tier spend ≈$0.03–0.04 per full "
+    "Gemini 3.5 Flash calls. Estimated paid-tier spend ≈$0.03–0.04 per full "
     "run. Free-tier accounts will hit the 20-RPD cap mid-run - use paid "
     "tier for routine eval work. See docs/adr-0006-provider-switch.md."
 )

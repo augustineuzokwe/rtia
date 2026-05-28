@@ -4,9 +4,9 @@ First node in the RTIA pipeline. Takes raw requirement text and returns a
 structured analysis (intent, actors, ambiguities) for the User Story Writer
 to consume.
 
-Provider: Gemini 2.5 Flash on Google AI Studio's free tier. See ADR-0006
-for the cost-driven cutover from Claude Opus 4.7. All four agents share
-this provider as of the cutover.
+Provider: Gemini 3.5 Flash on Google AI Studio's paid tier. See ADR-0006
+for the cost-driven cutover from Claude Opus 4.7 and ADR-0007 for the
+2.5 → 3.5 switch. All four agents share this provider as of the cutover.
 """
 
 from __future__ import annotations

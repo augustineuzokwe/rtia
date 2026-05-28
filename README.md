@@ -8,7 +8,7 @@
 
 A multi-agent AI assistant that takes raw software requirements - feature requests, business requirements, PRD snippets, or meeting notes - and produces a structured user story, acceptance criteria (Given/When/Then), and test cases through a supervised pipeline.
 
-Two human-in-the-loop checkpoints keep a PO or QA Lead in control: one *before* story generation (to resolve critical ambiguities) and one *after* (to review the generated story before AC generation).
+Two human-in-the-loop checkpoints keep a PO, PM, BA or QA in control: one *before* story generation (to resolve critical ambiguities) and one *after* (to review the generated story before AC generation).
 
 ## How It Works
 
@@ -48,7 +48,7 @@ A PO or BA has raw requirements. Instead of manually writing user stories, ACs, 
 **Input formats:** Free text · PDF · Markdown (uploaded through the UI or sent as JSON to the API).
 **Output destinations:** JSON download · Gradio UI render · push to a Jira project · push to a GitHub repository's Issues + Projects v2 board.
 
-> **End-user guide:** if you're a PO, BA, or QA lead using RTIA rather than building it, read [docs/USAGE.md](docs/USAGE.md) - it walks you from "I have a requirement" to "I have a backlog-ready artifact" without assuming any developer knowledge.
+> **End-user guide:** if you're a PO, PM, BA or QA using RTIA rather than building it, read [docs/USAGE.md](docs/USAGE.md) - it walks you from "I have a requirement" to "I have a backlog-ready artifact" without assuming any developer knowledge.
 
 ## Stack
 
@@ -169,7 +169,7 @@ uv run pre-commit run --all-files
 
 ## Why this exists
 
-RTIA is a working demonstration of an AI-first QA toolchain: agentic pipeline design, LLM evaluation under nondeterminism, and CI-gated quality regression on every PR. Built end-to-end by a QA Lead as a reference for the patterns that LLM-feature ownership requires:
+RTIA is a working demonstration of an AI-first QA toolchain: agentic pipeline design, LLM evaluation under nondeterminism, and CI-gated quality regression on every PR. Built end-to-end as a reference for the patterns that LLM-feature ownership requires:
 
 - **Agentic design** - LangGraph multi-agent orchestration with two human-in-the-loop checkpoints and a conditional split path for multi-story requirements.
 - **LLM evaluation under nondeterminism** - DeepEval suite, six per-sample metrics with calibrated thresholds, stochastic N-runs validation, nightly adversarial regression.
@@ -177,3 +177,5 @@ RTIA is a working demonstration of an AI-first QA toolchain: agentic pipeline de
 - **Operational discipline** - two-layer secret scanning (pre-commit + runtime), production-tracing guard, durable LangGraph checkpointing, ADR-documented decisions.
 
 The repo is intentionally readable end-to-end - [USAGE.md](docs/USAGE.md) for the PO/QA flow, [docs/ci-and-testing.md](docs/ci-and-testing.md) for the trigger map, [docs/glossary.md](docs/glossary.md) for vocabulary, [docs/](docs/) for the ADR series.
+
+> **Coming soon:** a companion case study mapping a real-world 7-stage QA process (Requirements → Observability) to the 8 AI-specific augmentations RTIA demonstrates — eval-first design, prompt-architecture review, stochastic AC validation, adversarial/safety regression, PII-aware tracing, and the others. Watch this space.

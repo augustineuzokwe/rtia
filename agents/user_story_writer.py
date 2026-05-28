@@ -12,7 +12,8 @@ artifact (Phase 3 of the prod-readiness plan): description and objective
 become the corresponding sections of the final artifact, with
 Acceptance Criteria and Test Cases populated by later agents.
 
-Provider: Gemini 2.5 Flash. See ADR-0006.
+Provider: Gemini 3.5 Flash. See ADR-0006 (Anthropic → Gemini) and
+ADR-0007 (2.5 → 3.5 switch).
 """
 
 from __future__ import annotations

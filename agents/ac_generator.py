@@ -9,7 +9,8 @@ Schema-wise it produces ``list[AcceptanceCriterion]`` - the same
 ``AcceptanceCriterion`` model already declared on the FinalUserStory
 contract, so the composer just slots the list straight into the artifact.
 
-Provider: Gemini 2.5 Flash. See ADR-0006.
+Provider: Gemini 3.5 Flash. See ADR-0006 (Anthropic → Gemini) and
+ADR-0007 (2.5 → 3.5 switch).
 """
 
 from __future__ import annotations
