@@ -33,6 +33,7 @@ from agents.config import (
     MAX_OUTPUT_TOKENS_TEST_CASE_WRITER,
     OLLAMA_MODEL_ENV_VAR,
     prompt_hash,
+    use_fake,
     use_ollama,
 )
 from agents.final_artifact import AcceptanceCriterion, TestCase
@@ -96,7 +97,12 @@ def write_test_cases(
     if temperature is not None:
         llm_kwargs["temperature"] = temperature
 
-    if use_ollama():
+    if use_fake():
+        from agents._fake_llm import FakeChatModel, current_scenario
+
+        llm = FakeChatModel(agent_name="test_case_writer")
+        cache_model_id = f"fake:{current_scenario()}"
+    elif use_ollama():
         from langchain_ollama import ChatOllama
 
         actual_model = os.environ.get(OLLAMA_MODEL_ENV_VAR, DEFAULT_OLLAMA_MODEL)

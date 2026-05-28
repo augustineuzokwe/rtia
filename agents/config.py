@@ -11,13 +11,23 @@ import os
 from pathlib import Path
 
 LLM_PROVIDER_ENV_VAR = "RTIA_LLM_PROVIDER"
-"""Selects the chat-LLM provider. Values: ``google`` (default) or ``ollama``.
+"""Selects the chat-LLM provider. Values: ``google`` (default), ``ollama``,
+or ``fake``.
 
-Supports the local-model probe in ``docs/ollama-probe-2026-05-26.md``
-without introducing a provider-abstraction factory. ADR-0006 chose
-"one provider, one consumer per import site"; promote to a real factory
-only when a third provider lands.
+- ``google`` → ``ChatGoogleGenerativeAI`` (Gemini Flash); production default.
+- ``ollama`` → ``ChatOllama`` against a local Ollama server; see
+  ``docs/ollama-probe-2026-05-26.md``.
+- ``fake`` → :class:`agents._fake_llm.FakeChatModel`; deterministic, zero-cost
+  canned-fixture responses for UI/E2E testing. See
+  ``docs/adr-0015-fake-llm-provider.md``.
+
+Any other value raises ``ValueError`` at provider-check time (fail fast on
+typos rather than silently falling back to Google). ADR-0006 originally
+picked "one consumer per import site"; ADR-0015 keeps that shape when
+adding the third value.
 """
+
+_VALID_PROVIDERS = frozenset({"google", "ollama", "fake"})
 
 OLLAMA_MODEL_ENV_VAR = "RTIA_OLLAMA_MODEL"
 """Picks the Ollama model when the provider is ``ollama``. Default
@@ -46,12 +56,35 @@ _OLLAMA_JUDGE_TRUTHY = {"1", "true", "yes", "on"}
 
 
 def _llm_provider() -> str:
-    return os.environ.get(LLM_PROVIDER_ENV_VAR, "google").strip().lower()
+    """Return the configured provider name, lowercased, with strict validation.
+
+    Raises ``ValueError`` if the env var is set to anything outside
+    :data:`_VALID_PROVIDERS`. Unset / empty falls back to ``"google"``
+    (production default unchanged from v1.0.0). Validation happens here
+    (one place) so every caller of :func:`use_ollama` / :func:`use_fake`
+    benefits without each agent re-validating.
+    """
+    raw = os.environ.get(LLM_PROVIDER_ENV_VAR, "google").strip().lower()
+    if raw not in _VALID_PROVIDERS:
+        raise ValueError(
+            f"Invalid {LLM_PROVIDER_ENV_VAR}={raw!r}; valid values: {sorted(_VALID_PROVIDERS)}"
+        )
+    return raw
 
 
 def use_ollama() -> bool:
     """Return True when the process is configured to use the Ollama provider."""
     return _llm_provider() == "ollama"
+
+
+def use_fake() -> bool:
+    """Return True when the process is configured to use the fake provider.
+
+    See :mod:`agents._fake_llm` and ``docs/adr-0015-fake-llm-provider.md``.
+    Each agent's ``_build_llm`` checks this first; falls through to the
+    existing Ollama / Google branches when not set.
+    """
+    return _llm_provider() == "fake"
 
 
 def use_ollama_judge() -> bool:

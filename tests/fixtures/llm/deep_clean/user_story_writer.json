@@ -1,0 +1,5 @@
+{
+  "description": "As a logged-in user, I want to download my own data as a CSV file.",
+  "objective": "I can open and analyze my data offline using standard spreadsheet software.",
+  "assumptions": []
+}

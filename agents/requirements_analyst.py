@@ -30,6 +30,7 @@ from agents.config import (
     MAX_OUTPUT_TOKENS_ANALYST,
     OLLAMA_MODEL_ENV_VAR,
     prompt_hash,
+    use_fake,
     use_ollama,
 )
 from prompts.requirements_analyst_prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
@@ -173,7 +174,14 @@ def analyze_requirement(
     if temperature is not None:
         llm_kwargs["temperature"] = temperature
 
-    if use_ollama():
+    if use_fake():
+        from agents._fake_llm import FakeChatModel, current_scenario
+
+        llm = FakeChatModel(agent_name="requirements_analyst")
+        # Scenario in cache_model_id so different scenarios don't share
+        # cache entries when the disk cache is enabled.
+        cache_model_id = f"fake:{current_scenario()}"
+    elif use_ollama():
         from langchain_ollama import ChatOllama
 
         actual_model = os.environ.get(OLLAMA_MODEL_ENV_VAR, DEFAULT_OLLAMA_MODEL)
