@@ -22,12 +22,11 @@ LLM_PROVIDER_ENV_VAR = "RTIA_LLM_PROVIDER"
 Accepted values (case-insensitive): ``google`` (default) or ``ollama``.
 When unset or anything else, the production Gemini path runs unchanged.
 
-This knob exists to support the local-model probe in §7.3 of the
-plan at ``~/.claude/plans/before-we-draft-adr-declarative-leaf.md``
-without introducing a provider-abstraction factory. ADR-0006 chose
-"one provider, one consumer per import site"; the per-site ``if/else``
-branches honour that intent. Promote to a proper factory only when a
-third provider lands.
+This knob exists to support the local-model probe documented in
+``docs/ollama-probe-2026-05-26.md`` without introducing a
+provider-abstraction factory. ADR-0006 chose "one provider, one consumer
+per import site"; the per-site ``if/else`` branches honour that intent.
+Promote to a proper factory only when a third provider lands.
 """
 
 OLLAMA_MODEL_ENV_VAR = "RTIA_OLLAMA_MODEL"

@@ -136,7 +136,7 @@ together correctly end-to-end" smoke test. Burns real Gemini tokens.
 - **Mock per import-site, not per class** - when two modules import the same LLM class, patch the symbol *at each import site*, not the class itself. See CLAUDE.md §4.7 + the working pattern in [`test_graph.py`](test_graph.py).
 - **Tests assume cache disabled** - `conftest.py` sets `RTIA_LLM_CACHE=disabled` autouse. Cache-specific tests (`test_llm_cache.py`) re-enable it explicitly within the test.
 - **Eval / regression jobs are not pytest** - they run from `evals/run_evals.py` and gate via `evals/check_thresholds.py` + `evals/check_budgets.py`. The pytest suite covers their *scaffolding*; the live run is the CI `regression` workflow job.
-- **`test_integration_smoke.py` is opt-in** - it requires `ANTHROPIC_API_KEY` and burns real tokens. Skipped by default in CI.
+- **`test_integration_smoke.py` is offline** - it imports the smoke script as a module and unit-tests its non-LLM helpers (invariant checks, token-sum logic, budget enforcement). The live smoke run lives in `scripts/run_integration_smoke.py` and is invoked from the nightly integration workflow, not from pytest.
 
 ## Common navigation needs
 

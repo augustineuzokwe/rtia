@@ -88,4 +88,3 @@ Out of scope **and not on any current Task** (would need a new issue first):
 
 - [pipeline-baseline-2026-05-26.md](pipeline-baseline-2026-05-26.md) - the calibrated quality + cost numbers the v1 README will cite.
 - [ollama-probe-2026-05-26.md](ollama-probe-2026-05-26.md) - the local-model fallback evaluation that justifies "Gemini stays default" in v1.
-- Plan at `/Users/auzokwe/.claude/plans/before-we-draft-adr-declarative-leaf.md` - the working document this ADR codifies.
