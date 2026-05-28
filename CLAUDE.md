@@ -131,7 +131,7 @@ If you don't have the API key needed for end-to-end verification: open the PR as
 
 - Before opening a PR: find an existing GitHub issue (US-01..US-16 user stories or numbered issues) that the PR fulfills, or **create a new issue** describing the work.
 - Add `Closes #N` to the PR body (so merge auto-closes the issue).
-- Add the issue to **Project #5** (https://github.com/users/augustineuzokwe/projects/5/views/1) and set status:
+- Add the issue to the maintainer's GitHub Project board and set status:
   - **Backlog** → no work scheduled
   - **In Progress** → branch cut, work underway
   - **In Review** → PR opened
@@ -139,11 +139,7 @@ If you don't have the API key needed for end-to-end verification: open the PR as
 
 Native project workflows are enabled: "Item closed → Status: Done" and "Pull request merged → Status: Done". The `Closes #N` link triggers issue auto-close on merge, which fires the Done workflow.
 
-**Project + status IDs** (verify with `gh project field-list 5 --owner augustineuzokwe --format json` if they drift):
-
-- Project ID: `PVT_kwHOAJNgAc4BX0uG`
-- Status field ID: `PVTSSF_lAHOAJNgAc4BX0uGzhS-8g4`
-- Status option IDs: Backlog `77c213cc` | In Progress `f5a71b2c` | In Review `b2b2b3d6` | Done `8e946b9e`
+The board's project ID, status field ID, and per-status option IDs live in the maintainer's local notes. Look them up with `gh project list --owner <maintainer>` and `gh project field-list <project-number> --owner <maintainer> --format json`.
 
 ### 4.5 Verify facts before recommending
 
@@ -267,9 +263,9 @@ Append, don't replace. Lead with the lesson, not the task that produced it. One 
 ```bash
 # Create issue + link to project board + set status
 gh issue create --title "..." --body "..." --label "agent"
-gh project item-add 5 --owner augustineuzokwe --url <issue-url>
-gh project item-edit --id <item-id> --project-id PVT_kwHOAJNgAc4BX0uG \
-  --field-id PVTSSF_lAHOAJNgAc4BX0uGzhS-8g4 --single-select-option-id f5a71b2c
+gh project item-add <project-number> --owner <maintainer> --url <issue-url>
+gh project item-edit --id <item-id> --project-id <project-id> \
+  --field-id <status-field-id> --single-select-option-id <in-progress-option-id>
 
 # Live demo with a specific sample
 uv run python scripts/run_pipeline_demo.py sample-02-vague-ambiguous.md
