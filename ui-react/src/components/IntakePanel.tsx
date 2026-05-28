@@ -26,29 +26,46 @@ interface IntakePanelProps {
 }
 
 const HELPER_TEXT =
-  "PDF · max 10 MB · pasted/extracted text capped at 200,000 characters";
+  "PDF or Markdown · max 10 MB · pasted/extracted text capped at 200,000 characters";
 
 type UploadKind = "pdf" | "md";
+
+/** Pick the right endpoint from filename + MIME. Returns null for unsupported files. */
+function detectUploadKind(file: File): UploadKind | null {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf") || file.type === "application/pdf") return "pdf";
+  if (name.endsWith(".md") || name.endsWith(".markdown") || file.type === "text/markdown") {
+    return "md";
+  }
+  return null;
+}
 
 export function IntakePanel({ onStarted }: IntakePanelProps) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState<"upload" | "run" | null>(null);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
-  const mdInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const onUpload = async (kind: UploadKind, file: File | undefined) => {
+  const onUpload = async (file: File | undefined) => {
     if (!file) return;
     setError(null);
     setUploadStatus(null);
+    const kind = detectUploadKind(file);
+    if (!kind) {
+      setError(
+        `Unsupported file type "${file.name}". Upload a .pdf or .md file, or paste the requirement directly.`,
+      );
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     setBusy("upload");
     try {
       const result =
         kind === "pdf" ? await uploadPdf(file) : await uploadMarkdown(file);
-      // Both endpoints return the extracted text. PDF flow surfaces a
-      // confirmation message like the Gradio version did; Markdown flow
-      // also fills the textbox so the PO can edit before running.
+      // Both endpoints return the extracted text — fill the textbox so the
+      // PO can edit before running. Surface a count confirmation that says
+      // which path ran so a misrouted upload is obvious.
       setText(result.text);
       setUploadStatus(
         kind === "pdf"
@@ -60,8 +77,7 @@ export function IntakePanel({ onStarted }: IntakePanelProps) {
     } finally {
       setBusy(null);
       // Reset the file input so re-selecting the same file fires onChange again.
-      if (kind === "pdf" && pdfInputRef.current) pdfInputRef.current.value = "";
-      if (kind === "md" && mdInputRef.current) mdInputRef.current.value = "";
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -104,29 +120,16 @@ export function IntakePanel({ onStarted }: IntakePanelProps) {
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="pdf-upload">…or upload a PDF</Label>
-            <Input
-              id="pdf-upload"
-              ref={pdfInputRef}
-              type="file"
-              accept=".pdf,application/pdf"
-              disabled={busy !== null}
-              onChange={(e) => onUpload("pdf", e.target.files?.[0])}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="md-upload">…or upload Markdown</Label>
-            <Input
-              id="md-upload"
-              ref={mdInputRef}
-              type="file"
-              accept=".md,text/markdown"
-              disabled={busy !== null}
-              onChange={(e) => onUpload("md", e.target.files?.[0])}
-            />
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="file-upload">…or upload a file</Label>
+          <Input
+            id="file-upload"
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.md,.markdown,application/pdf,text/markdown"
+            disabled={busy !== null}
+            onChange={(e) => onUpload(e.target.files?.[0])}
+          />
         </div>
 
         <p className="text-xs text-muted-foreground">{HELPER_TEXT}</p>
