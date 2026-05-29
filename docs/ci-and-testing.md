@@ -1,5 +1,11 @@
 # When tests fire - RTIA's testing pyramid
 
+> ⚠ **Partially stale (post #332)**: the per-PR "Gemini eval gate" referenced in
+> the diagrams + tables below was deleted from `.github/workflows/ci.yml` and
+> is being moved to a nightly cron (`nightly-eval.yml`, follow-up to #332).
+> The table at "Triggers at a glance" is up to date. The ASCII timelines and
+> the "Mental shortcut" / pyramid sections will be rewritten alongside PR 2.
+
 This doc maps every validation surface in RTIA - unit tests, eval gates,
 nightly crons, manual scripts - to its **trigger**, **cost**, and
 **purpose**. Aimed at the contributor wondering *"will my change get
@@ -15,10 +21,10 @@ For the *why* behind specific design choices, see the relevant ADR
 |---|---|---|---|
 | `uv run pytest -q` (526 tests) | Every PR - CI **quality** job, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | Always, on every push to a PR or `main` | $0 (mocked) |
 | `pre-commit run --all-files` (ruff, format, detect-secrets) | Every commit (local hook) + every PR (CI quality job) | Always, on every commit + every PR push | $0 |
-| `evals/run_evals.py` (Gemini eval gate, 7 samples) | Every PR - CI **regression** job | **Only when** `agents/`, `prompts/`, `evals/`, or `.github/workflows/ci.yml` files change. Doc-only / test-only PRs skip via the workflow's `should_run` step. | ~$0.03 per fire |
-| `evals/check_thresholds.py` (per-metric floor gate) | Every PR with a regression run | Right after `run_evals.py` succeeds | $0 (post-processing only) |
-| `evals/check_budgets.py` (token + latency gate) | Every PR with a regression run | Right after `check_thresholds.py` | $0 |
-| `test_ci_cache_disable.py` + `TestNightlyWorkflowContract` (in [`test_n_runs.py`](../tests/test_n_runs.py)) | pytest (already in the 526 count) | Every PR - locks the workflow YAML against silent regression | $0 |
+| `evals/run_evals.py` (Gemini eval gate, 7 samples) | Nightly `nightly-eval.yml` workflow (follow-up to #332) | Cron, plus manual `workflow_dispatch`. **No longer on every PR** — moved off the PR critical path because ~30 sequential live Gemini calls per PR made the gate fail on backend weather (502/503/504) rather than real regressions. See `.github/workflows/ci.yml` header for the full rationale. | ~$0.03 per fire |
+| `evals/check_thresholds.py` (per-metric floor gate) | Right after the nightly `run_evals.py` succeeds | Nightly | $0 (post-processing only) |
+| `evals/check_budgets.py` (token + latency gate) | Right after `check_thresholds.py` (nightly) | Nightly | $0 |
+| `TestNightlyWorkflowContract` (in [`test_n_runs.py`](../tests/test_n_runs.py)) | pytest (already in the 568 count) | Every PR - locks the workflow YAML against silent regression. (Sibling `test_ci_cache_disable.py` was removed in #332 when the PR-tier eval was deleted; replacement tests against `nightly-eval.yml` will land with PR 2.) | $0 |
 | Nightly safety regression (N=10 on adversarial samples 04–07) | [`.github/workflows/nightly-safety-regression.yml`](../.github/workflows/nightly-safety-regression.yml) | Cron `0 2 * * *` (02:00 UTC daily), plus manual `workflow_dispatch` from the Actions tab | ~$0.12/night, ~$3.60/month |
 | `scripts/run_pipeline_demo.py` | **Manual** | You decide. Not CI-triggered. | ~$0.005 per deep run; cache may zero it |
 | `scripts/run_api.py` | **Manual** | You decide. Long-lived process serving the UI + API. | ~$0.005 per pipeline run via UI |
