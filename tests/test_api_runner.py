@@ -260,6 +260,88 @@ def test_runner_done_split_empty_selection_keeps_all_stories():
     assert titles == ["Story A", "Story B"]
 
 
+def _raising_llm_factory(exc: Exception):
+    def _factory(**_kwargs):
+        m = MagicMock()
+        m.invoke.side_effect = exc
+        return m
+
+    return _factory
+
+
+def test_runner_get_state_preserves_error_after_analyst_failure():
+    """Issue #327 - Analyst error fires before any checkpoint is written, so
+    the LangGraph snapshot is empty. ``get_state`` must return the same
+    ERROR ThreadState that ``start`` returned, not the placeholder RUNNING
+    branch."""
+    stack = ExitStack()
+    stack.enter_context(
+        patch(
+            "agents.requirements_analyst.ChatGoogleGenerativeAI",
+            side_effect=_raising_llm_factory(RuntimeError("boom from fake analyst")),
+        )
+    )
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
+    saver = SqliteSaver(conn, serde=_allowlisted_serde())
+    pipeline = build_pipeline(checkpointer=saver)
+
+    with stack:
+        runner = PipelineRunner(pipeline)
+        started = runner.start("some requirement")
+        replayed = runner.get_state(started.thread_id)
+
+    assert started.status == ThreadStatus.ERROR
+    assert "error" in started.payload
+    assert replayed.status == ThreadStatus.ERROR
+    assert replayed.thread_id == started.thread_id
+    assert replayed.payload == started.payload
+    assert replayed.payload["error"]["agent"] == "requirements_analyst"
+
+
+def test_runner_successful_start_clears_prior_error_for_same_thread_id():
+    """Issue #327 follow-up - if start() is called again with a thread_id
+    that previously errored and this time succeeds, get_state must reflect
+    the new state, not the stashed ERROR."""
+    raising_stack = ExitStack()
+    raising_stack.enter_context(
+        patch(
+            "agents.requirements_analyst.ChatGoogleGenerativeAI",
+            side_effect=_raising_llm_factory(RuntimeError("first try fails")),
+        )
+    )
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
+    saver = SqliteSaver(conn, serde=_allowlisted_serde())
+    pipeline = build_pipeline(checkpointer=saver)
+
+    with raising_stack:
+        runner = PipelineRunner(pipeline)
+        errored = runner.start("first req")
+        assert errored.status == ThreadStatus.ERROR
+
+    # Second start on the SAME thread_id with healthy mocks - should succeed
+    # and any future get_state must NOT replay the stashed error.
+    healthy_stack = ExitStack()
+    analyst = {"intent": "Goal", "actors": ["User"], "ambiguities": []}
+    for module, payload in (
+        ("agents.requirements_analyst", analyst),
+        ("agents.user_story_writer", FAKE_STORY),
+        ("agents.ac_generator", FAKE_AC),
+        ("agents.test_case_writer", FAKE_TC),
+        ("agents.reviewer", FAKE_REVIEW),
+    ):
+        healthy_stack.enter_context(
+            patch(f"{module}.ChatGoogleGenerativeAI", side_effect=_llm_factory(payload))
+        )
+
+    with healthy_stack:
+        retried = runner.start("second req", thread_id=errored.thread_id)
+        snapshot = runner.get_state(errored.thread_id)
+
+    assert retried.status != ThreadStatus.ERROR
+    assert snapshot.status != ThreadStatus.ERROR
+    assert snapshot.status == retried.status
+
+
 def test_runner_render_markdown_returns_string_when_done():
     analyst = {"intent": "Goal", "actors": ["User"], "ambiguities": []}
     pipeline, stack = _patched_pipeline(analyst)

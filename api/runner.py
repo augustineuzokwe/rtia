@@ -43,6 +43,13 @@ class PipelineRunner:
         Tests pass an in-memory-checkpointed compiled graph in.
         """
         self._pipeline = pipeline if pipeline is not None else build_pipeline()
+        # Sidecar for pre-checkpoint failures (issue #327). When an agent
+        # raises before LangGraph writes its first checkpoint - e.g. an
+        # Analyst-level PipelineStepError - the thread has no snapshot to
+        # read back via get_state. Stash the ERROR ThreadState here so a
+        # later GET can recover the full error payload instead of falling
+        # through to the placeholder RUNNING branch.
+        self._error_states: dict[str, ThreadState] = {}
 
     @staticmethod
     def _new_thread_id() -> str:
@@ -66,7 +73,12 @@ class PipelineRunner:
                 {"requirement_text": requirement_text}, config=self._config(tid)
             )
         except PipelineStepError as exc:
-            return self._error_state(tid, exc)
+            state = self._error_state(tid, exc)
+            self._error_states[tid] = state
+            return state
+        # Symmetric with resume: a successful start on a reused thread_id
+        # invalidates any prior stashed error.
+        self._error_states.pop(tid, None)
         return self._translate(tid, result)
 
     def resume(self, thread_id: str, resume_value: Any) -> ThreadState:
@@ -76,7 +88,12 @@ class PipelineRunner:
                 Command(resume=resume_value), config=self._config(thread_id)
             )
         except PipelineStepError as exc:
-            return self._error_state(thread_id, exc)
+            state = self._error_state(thread_id, exc)
+            self._error_states[thread_id] = state
+            return state
+        # Successful resume invalidates any prior stashed error for this
+        # thread - the latest persisted snapshot is authoritative again.
+        self._error_states.pop(thread_id, None)
         return self._translate(thread_id, result)
 
     def get_state(self, thread_id: str) -> ThreadState:
@@ -86,6 +103,13 @@ class PipelineRunner:
         page reload. Reads the LangGraph checkpointer directly - no LLM
         call, free.
         """
+        # Pre-checkpoint errors (issue #327): the Analyst can raise before
+        # LangGraph writes its first checkpoint, so the snapshot below
+        # would be empty. Replay the stashed ERROR state instead.
+        cached_error = self._error_states.get(thread_id)
+        if cached_error is not None:
+            return cached_error
+
         snapshot = self._pipeline.get_state(self._config(thread_id))
         values: dict[str, Any] = snapshot.values or {}
 
