@@ -138,11 +138,12 @@ jobs:
       #
       # Issue #329 - the retry is now classified by exit code so a 429
       # RESOURCE_EXHAUSTED (project spend cap) does NOT consume the
-      # retry budget. run_evals.py exits 76 on a transient 503 and 75
-      # on a cap-exhausted 429; retry_on_exit_code=76 means only the
-      # 503 path retries. Three main runs (US-23/24/25 on 2026-05-29)
-      # blindly burnt ~3min each on cap-exhausted retries before this
-      # was wired up.
+      # retry budget. run_evals.py exits 76 on a transient Gemini 5xx
+      # (502/503/504; see _TRANSIENT_HTTP_STATUSES) and 75 on a
+      # cap-exhausted 429; retry_on_exit_code=76 means only the
+      # transient path retries. Three main runs (US-23/24/25 on
+      # 2026-05-29) blindly burnt ~3min each on cap-exhausted retries
+      # before this was wired up. 504 added after PR #330's first run.
       #
       # timeout_minutes bumped to 10 (was 5) on PR #162: Gemini latency
       # on GitHub-hosted runners exceeded the original 300s ceiling on

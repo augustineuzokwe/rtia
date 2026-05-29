@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from evals.run_evals import (
     _EXIT_GEMINI_429,
-    _EXIT_GEMINI_503,
+    _EXIT_GEMINI_TRANSIENT,
     _classify_exit_code,
 )
 
@@ -36,7 +36,17 @@ class _FakeAPIError(Exception):
 
 
 def test_classify_503_returns_retry_exit_code():
-    assert _classify_exit_code(_FakeLLMPipelineError(503)) == _EXIT_GEMINI_503
+    assert _classify_exit_code(_FakeLLMPipelineError(503)) == _EXIT_GEMINI_TRANSIENT
+
+
+def test_classify_504_returns_retry_exit_code():
+    """504 DEADLINE_EXCEEDED observed live on PR #330 first run - same class
+    of transient Gemini failure as 503."""
+    assert _classify_exit_code(_FakeLLMPipelineError(504)) == _EXIT_GEMINI_TRANSIENT
+
+
+def test_classify_502_returns_retry_exit_code():
+    assert _classify_exit_code(_FakeLLMPipelineError(502)) == _EXIT_GEMINI_TRANSIENT
 
 
 def test_classify_429_returns_fail_fast_exit_code():
@@ -44,7 +54,11 @@ def test_classify_429_returns_fail_fast_exit_code():
 
 
 def test_classify_raw_genai_api_error_code_503():
-    assert _classify_exit_code(_FakeAPIError(503)) == _EXIT_GEMINI_503
+    assert _classify_exit_code(_FakeAPIError(503)) == _EXIT_GEMINI_TRANSIENT
+
+
+def test_classify_raw_genai_api_error_code_504():
+    assert _classify_exit_code(_FakeAPIError(504)) == _EXIT_GEMINI_TRANSIENT
 
 
 def test_classify_raw_genai_api_error_code_429():
@@ -55,6 +69,14 @@ def test_classify_unrelated_exception_returns_generic_failure():
     assert _classify_exit_code(ValueError("unrelated")) == 1
 
 
+def test_classify_500_is_not_retried():
+    """500 INTERNAL is in the 5xx range but isn't on the retry allow-list
+    because it usually indicates a real Google-side regression that won't
+    clear in 30s. Pin the boundary so adding 500 to the retry set is an
+    explicit decision, not a silent expansion."""
+    assert _classify_exit_code(_FakeLLMPipelineError(500)) == 1
+
+
 def test_classify_walks_chained_cause():
     """A 503 wrapped behind a generic re-raise still classifies as transient."""
     try:
@@ -63,7 +85,7 @@ def test_classify_walks_chained_cause():
         except Exception as inner:
             raise RuntimeError("eval runner re-raised") from inner
     except RuntimeError as exc:
-        assert _classify_exit_code(exc) == _EXIT_GEMINI_503
+        assert _classify_exit_code(exc) == _EXIT_GEMINI_TRANSIENT
 
 
 def test_exit_codes_match_workflow_contract():
@@ -72,5 +94,5 @@ def test_exit_codes_match_workflow_contract():
     If you change either, change the other (search the workflow for
     ``retry_on_exit_code``).
     """
-    assert _EXIT_GEMINI_503 == 76
+    assert _EXIT_GEMINI_TRANSIENT == 76
     assert _EXIT_GEMINI_429 == 75
