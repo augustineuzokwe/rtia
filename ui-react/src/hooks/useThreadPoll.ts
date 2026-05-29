@@ -43,8 +43,11 @@ export interface UseThreadPollResult {
  * - One in-flight request at a time (guarded by ``inFlight``) so a slow
  *   request can't fan out duplicates when the interval fires again.
  */
-export function useThreadPoll(threadId: string | null): UseThreadPollResult {
-  const [state, setState] = useState<ThreadState | null>(null);
+export function useThreadPoll(
+  threadId: string | null,
+  initial?: ThreadState | null,
+): UseThreadPollResult {
+  const [state, setState] = useState<ThreadState | null>(initial ?? null);
   const [phase, setPhase] = useState<PollPhase>("idle");
   const [lastError, setLastError] = useState<string | null>(null);
 
@@ -61,6 +64,19 @@ export function useThreadPoll(threadId: string | null): UseThreadPollResult {
       setLastError(null);
       isTerminalRef.current = false;
       consecutiveFailuresRef.current = 0;
+      return;
+    }
+
+    // Terminal initial states never poll: the server's ``get_state`` returns
+    // a "running" placeholder for threads it has no checkpoint for
+    // (errors-before-first-checkpoint never get persisted), which would
+    // clobber a correct ERROR / DONE / DONE_SPLIT initial state on the
+    // first tick. Trust the POST/resume response and short-circuit.
+    if (initial && TERMINAL_STATUSES.includes(initial.status)) {
+      setState(initial);
+      isTerminalRef.current = true;
+      setPhase("stopped");
+      setLastError(null);
       return;
     }
 
@@ -146,6 +162,11 @@ export function useThreadPoll(threadId: string | null): UseThreadPollResult {
       clearPending();
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
+    // We intentionally don't include ``initial`` in the dep array — the
+    // hook reads it on mount and on threadId changes, but a polled
+    // update mutating ``initial`` upstream would otherwise restart the
+    // whole effect mid-run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId]);
 
   const applyState = (next: ThreadState) => {
