@@ -132,6 +132,22 @@ export async function resumeThread(
   );
 }
 
+/**
+ * ``GET /pipeline/{thread_id}/export.md`` — fetch the final artifact as
+ * a markdown blob. The server emits ``Content-Disposition: attachment``,
+ * but we still need to fetch with a bearer header (the static link
+ * can't carry the token), so return the body so the caller can build a
+ * download. 404 means \"no artifact yet\" — surfaced via ``ApiError``.
+ */
+export async function downloadArtifactMarkdown(threadId: string): Promise<Blob> {
+  const response = await fetch(
+    `/pipeline/${encodeURIComponent(threadId)}/export.md`,
+    { method: "GET", headers: authHeaders() },
+  );
+  if (!response.ok) throw await decodeError(response);
+  return response.blob();
+}
+
 /** ``POST /uploads/pdf`` — server extracts text and returns it + char count. */
 export async function uploadPdf(file: File): Promise<UploadResult> {
   const form = new FormData();

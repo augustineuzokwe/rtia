@@ -17,7 +17,11 @@ export default function App() {
           </p>
         </header>
 
-        {thread ? <RunPanel initial={thread} /> : <IntakePanel onStarted={setThread} />}
+        {thread ? (
+          <RunPanel initial={thread} onStartOver={() => setThread(null)} />
+        ) : (
+          <IntakePanel onStarted={setThread} />
+        )}
 
         <footer className="text-xs text-muted-foreground">
           Legacy Gradio UI available at{" "}

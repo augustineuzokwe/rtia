@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { PoCheckpointDeep } from "@/components/PoCheckpointDeep";
 import { PoCheckpointSplit, type ImpliedStory } from "@/components/PoCheckpointSplit";
+import { ResultPanel } from "@/components/ResultPanel";
 import { StatusBadge } from "@/components/StatusBadge";
 import { StoryReviewPanel } from "@/components/StoryReviewPanel";
 import { useThreadPoll } from "@/hooks/useThreadPoll";
@@ -16,6 +17,8 @@ import type { ThreadState } from "@/lib/types";
 interface RunPanelProps {
   /** Initial state returned from the POST /pipeline call. */
   initial: ThreadState;
+  /** Called when the user wants to kick off a fresh run. */
+  onStartOver?: () => void;
 }
 
 /**
@@ -25,7 +28,7 @@ interface RunPanelProps {
  * US-19 … US-23 — for now we just show the badge + raw status line so
  * the polling loop has something to render.
  */
-export function RunPanel({ initial }: RunPanelProps) {
+export function RunPanel({ initial, onStartOver }: RunPanelProps) {
   const { state, phase, lastError, applyState } = useThreadPoll(
     initial.thread_id,
   );
@@ -45,6 +48,7 @@ export function RunPanel({ initial }: RunPanelProps) {
   const isPoSplit =
     current.status === "paused_po" && payload.mode === "split";
   const isStoryReview = current.status === "paused_review";
+  const isDone = current.status === "done";
 
   return (
     <div className="space-y-6" data-testid="run-panel">
@@ -98,14 +102,14 @@ export function RunPanel({ initial }: RunPanelProps) {
               </AlertDescription>
             </Alert>
           )}
-          {!isPoDeep && !isPoSplit && !isStoryReview && (
+          {!isPoDeep && !isPoSplit && !isStoryReview && !isDone && (
             <p className="text-sm text-muted-foreground">
-              Result and export panels land in US-22 onward. In the meantime
-              the legacy{" "}
+              Backlog target + export panels land in US-23 onward. In the
+              meantime the legacy{" "}
               <a className="underline" href="/legacy">
                 Gradio UI
               </a>{" "}
-              still drives the final artifact + export phases to completion.
+              still drives the Jira / GitHub export flow.
             </p>
           )}
         </CardContent>
@@ -132,6 +136,13 @@ export function RunPanel({ initial }: RunPanelProps) {
           description={payload.description ?? ""}
           objective={payload.objective ?? ""}
           onResumed={applyState}
+        />
+      )}
+      {isDone && (
+        <ResultPanel
+          threadId={current.thread_id}
+          renderedArtifact={payload.rendered_artifact ?? ""}
+          onStartOver={onStartOver}
         />
       )}
     </div>
