@@ -621,5 +621,132 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
+# Exit-code contract for CI retry classification (issue #329). The
+# nick-fields/retry@v4 step in .github/workflows/ci.yml sets
+# retry_on_exit_code=76, so:
+#
+#   76 = transient Gemini server-side failure (502/503/504) → CI retries.
+#   75 = Gemini 429 RESOURCE_EXHAUSTED (project spend cap)  → CI should
+#        fail fast; retrying buys nothing until the cap is raised or rolls
+#        over (observed in 2026-05-29 main runs after PR #325/#326).
+#    1 = any other failure (real regression, code bug, etc.) → no retry.
+#
+# Keep the constants here, not in agents/_llm_errors.py: they're a CI
+# contract, not a domain concept.
+_EXIT_GEMINI_TRANSIENT = 76
+_EXIT_GEMINI_429 = 75
+
+# Server-side 5xx statuses that are worth retrying once. 502 = Bad
+# Gateway, 503 = UNAVAILABLE (overload), 504 = DEADLINE_EXCEEDED. All
+# three are emitted by Gemini under load and have historically cleared
+# within seconds (504 observed on PR #330 first run, 503 on the failed
+# main runs documented in issue #329, 502 is a sibling failure mode
+# documented by Google).
+_TRANSIENT_HTTP_STATUSES = frozenset({502, 503, 504})
+
+
+def _extract_http_status(exc: BaseException) -> int | None:
+    """Walk the exception chain looking for a Gemini-style HTTP status.
+
+    Returns the first matching status, or ``None`` if nothing in the chain
+    exposes one. Looks at both ``LLMPipelineError.detail.http_status``
+    (RTIA's wrapped form) and ``google.genai.errors.APIError.code`` (the
+    raw form, in case a future code path skips the wrapper).
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        detail = getattr(current, "detail", None)
+        status = getattr(detail, "http_status", None) if detail is not None else None
+        if status is None:
+            status = getattr(current, "code", None)
+        if isinstance(status, int):
+            return status
+        current = current.__cause__ or current.__context__
+    return None
+
+
+def _classify_exit_code(exc: BaseException) -> int:
+    """Classify an exception into a CI-meaningful exit code.
+
+    Returns 76 for a transient 5xx (502/503/504), 75 for a 429, 1 for
+    anything else.
+    """
+    status = _extract_http_status(exc)
+    if status in _TRANSIENT_HTTP_STATUSES:
+        return _EXIT_GEMINI_TRANSIENT
+    if status == 429:
+        return _EXIT_GEMINI_429
+    return 1
+
+
+def _append_step_summary(markdown: str) -> None:
+    """Append a Markdown block to ``$GITHUB_STEP_SUMMARY``, if set.
+
+    GitHub Actions renders that file on the run page so a failed job's
+    cause is visible without scraping the step log. No-op outside CI
+    (env var unset) and on any IO failure - the summary is a UX nicety,
+    never load-bearing.
+    """
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path:
+        return
+    try:
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(markdown.rstrip() + "\n\n")
+    except OSError:
+        # Swallow - failing to write the summary must never mask the
+        # real failure that prompted the write.
+        pass
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except SystemExit:
+        raise
+    except BaseException as exc:
+        status = _extract_http_status(exc)
+        code = _classify_exit_code(exc)
+        exc_name = type(exc).__name__
+        if code == _EXIT_GEMINI_TRANSIENT:
+            print(
+                f"\n[eval-gate] Gemini transient {status} ({exc_name}). "
+                f"Exiting {code} for CI retry.",
+                file=sys.stderr,
+            )
+            _append_step_summary(
+                f"### 🟡 Eval gate failed — transient Gemini {status}\n\n"
+                f"- Status: `{status}` ({exc_name})\n"
+                f"- Exit code: `{code}` (`_EXIT_GEMINI_TRANSIENT`)\n"
+                f"- Action: CI retries once on `{code}`. If both attempts log this, "
+                f"it's a Gemini-side outage — re-run after Google clears.\n"
+            )
+        elif code == _EXIT_GEMINI_429:
+            print(
+                f"\n[eval-gate] Gemini 429 RESOURCE_EXHAUSTED ({exc_name}) - "
+                f"project spend cap. Exiting {code} to skip retry (see issue #329).",
+                file=sys.stderr,
+            )
+            _append_step_summary(
+                f"### 🔴 Eval gate failed — Gemini 429 RESOURCE_EXHAUSTED\n\n"
+                f"- Project monthly spend cap exhausted "
+                f"(<https://ai.studio/spend>).\n"
+                f"- Exit code: `{code}` (`_EXIT_GEMINI_429`) — no retry.\n"
+                f"- Re-running won't help until the cap is raised or rolls over.\n"
+            )
+        else:
+            # Preserve the traceback for unclassified failures - real
+            # regressions should look exactly like they did before. The
+            # summary block flags it as "not the known Gemini flake" so
+            # a reader knows to dig into the traceback.
+            _append_step_summary(
+                f"### 🔴 Eval gate failed — unclassified failure\n\n"
+                f"- Exception: `{exc_name}`\n"
+                f"- This is not a known Gemini transient (502/503/504) or "
+                f"cap-exhausted (429) failure.\n"
+                f"- See the step log for the full traceback.\n"
+            )
+            raise
+        raise SystemExit(code) from exc
