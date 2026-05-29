@@ -7,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { PoCheckpointDeep } from "@/components/PoCheckpointDeep";
+import { PoCheckpointSplit, type ImpliedStory } from "@/components/PoCheckpointSplit";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useThreadPoll } from "@/hooks/useThreadPoll";
 import type { ThreadState } from "@/lib/types";
@@ -33,9 +34,12 @@ export function RunPanel({ initial }: RunPanelProps) {
   const payload = (current.payload ?? {}) as {
     mode?: string;
     critical_ambiguities?: string[];
+    implied_stories?: ImpliedStory[];
   };
   const isPoDeep =
     current.status === "paused_po" && (payload.mode ?? "deep") === "deep";
+  const isPoSplit =
+    current.status === "paused_po" && payload.mode === "split";
 
   return (
     <div className="space-y-6" data-testid="run-panel">
@@ -89,14 +93,14 @@ export function RunPanel({ initial }: RunPanelProps) {
               </AlertDescription>
             </Alert>
           )}
-          {!isPoDeep && (
+          {!isPoDeep && !isPoSplit && (
             <p className="text-sm text-muted-foreground">
-              Remaining checkpoint and result panels land in US-20 onward.
+              Remaining checkpoint and result panels land in US-21 onward.
               In the meantime the legacy{" "}
               <a className="underline" href="/legacy">
                 Gradio UI
               </a>{" "}
-              still drives split / story-review / result phases to completion.
+              still drives story-review and result phases to completion.
             </p>
           )}
         </CardContent>
@@ -106,6 +110,13 @@ export function RunPanel({ initial }: RunPanelProps) {
         <PoCheckpointDeep
           threadId={current.thread_id}
           questions={payload.critical_ambiguities ?? []}
+          onResumed={applyState}
+        />
+      )}
+      {isPoSplit && (
+        <PoCheckpointSplit
+          threadId={current.thread_id}
+          stories={payload.implied_stories ?? []}
           onResumed={applyState}
         />
       )}
