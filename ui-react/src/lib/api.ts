@@ -10,6 +10,9 @@
 // human-readable text instead of raw JSON.
 
 import type {
+  DeferredExportResponse,
+  ExportRequest,
+  ExportResult,
   ThreadState,
   ThreadStatus,
   UploadResult,
@@ -124,6 +127,43 @@ export async function resumeThread(
 ): Promise<ThreadState> {
   return jsonRequest<ThreadState>(
     `/pipeline/${encodeURIComponent(threadId)}/resume`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+/** ``POST /pipeline/{thread_id}/export`` — push the deep artifact to Jira/GitHub. */
+export async function exportArtifact(
+  threadId: string,
+  body: ExportRequest,
+): Promise<ExportResult> {
+  return jsonRequest<ExportResult>(
+    `/pipeline/${encodeURIComponent(threadId)}/export`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+/**
+ * ``POST /pipeline/{thread_id}/export-deferred`` — fan out one
+ * placeholder issue per deferred / split-mode implied story.
+ */
+export async function exportDeferred(
+  threadId: string,
+  body: {
+    target: ExportRequest["target"];
+    include?: string[] | null;
+    dry_run?: boolean;
+  },
+): Promise<DeferredExportResponse> {
+  return jsonRequest<DeferredExportResponse>(
+    `/pipeline/${encodeURIComponent(threadId)}/export-deferred`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

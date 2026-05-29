@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ExportPanel } from "@/components/ExportPanel";
 import { PoCheckpointDeep } from "@/components/PoCheckpointDeep";
 import { PoCheckpointSplit, type ImpliedStory } from "@/components/PoCheckpointSplit";
 import { ResultPanel } from "@/components/ResultPanel";
@@ -49,6 +50,10 @@ export function RunPanel({ initial, onStartOver }: RunPanelProps) {
     current.status === "paused_po" && payload.mode === "split";
   const isStoryReview = current.status === "paused_review";
   const isDone = current.status === "done";
+  const isDoneSplit = current.status === "done_split";
+  // Gradio-era ``backlog_visible`` flag (#186 §6.1): nothing useful to
+  // push on ERROR. Both terminal-success states get the panel.
+  const showExport = isDone || isDoneSplit;
 
   return (
     <div className="space-y-6" data-testid="run-panel">
@@ -102,14 +107,14 @@ export function RunPanel({ initial, onStartOver }: RunPanelProps) {
               </AlertDescription>
             </Alert>
           )}
-          {!isPoDeep && !isPoSplit && !isStoryReview && !isDone && (
+          {!isPoDeep && !isPoSplit && !isStoryReview && !isDone && !isDoneSplit && (
             <p className="text-sm text-muted-foreground">
-              Backlog target + export panels land in US-23 onward. In the
-              meantime the legacy{" "}
+              Error / polish UI lands in US-24 onward. In the meantime the
+              legacy{" "}
               <a className="underline" href="/legacy">
                 Gradio UI
               </a>{" "}
-              still drives the Jira / GitHub export flow.
+              still drives any remaining edge-case flows.
             </p>
           )}
         </CardContent>
@@ -144,6 +149,9 @@ export function RunPanel({ initial, onStartOver }: RunPanelProps) {
           renderedArtifact={payload.rendered_artifact ?? ""}
           onStartOver={onStartOver}
         />
+      )}
+      {showExport && (
+        <ExportPanel threadId={current.thread_id} status={current.status} />
       )}
     </div>
   );
