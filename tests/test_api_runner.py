@@ -298,6 +298,50 @@ def test_runner_get_state_preserves_error_after_analyst_failure():
     assert replayed.payload["error"]["agent"] == "requirements_analyst"
 
 
+def test_runner_successful_start_clears_prior_error_for_same_thread_id():
+    """Issue #327 follow-up - if start() is called again with a thread_id
+    that previously errored and this time succeeds, get_state must reflect
+    the new state, not the stashed ERROR."""
+    raising_stack = ExitStack()
+    raising_stack.enter_context(
+        patch(
+            "agents.requirements_analyst.ChatGoogleGenerativeAI",
+            side_effect=_raising_llm_factory(RuntimeError("first try fails")),
+        )
+    )
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
+    saver = SqliteSaver(conn, serde=_allowlisted_serde())
+    pipeline = build_pipeline(checkpointer=saver)
+
+    with raising_stack:
+        runner = PipelineRunner(pipeline)
+        errored = runner.start("first req")
+        assert errored.status == ThreadStatus.ERROR
+
+    # Second start on the SAME thread_id with healthy mocks - should succeed
+    # and any future get_state must NOT replay the stashed error.
+    healthy_stack = ExitStack()
+    analyst = {"intent": "Goal", "actors": ["User"], "ambiguities": []}
+    for module, payload in (
+        ("agents.requirements_analyst", analyst),
+        ("agents.user_story_writer", FAKE_STORY),
+        ("agents.ac_generator", FAKE_AC),
+        ("agents.test_case_writer", FAKE_TC),
+        ("agents.reviewer", FAKE_REVIEW),
+    ):
+        healthy_stack.enter_context(
+            patch(f"{module}.ChatGoogleGenerativeAI", side_effect=_llm_factory(payload))
+        )
+
+    with healthy_stack:
+        retried = runner.start("second req", thread_id=errored.thread_id)
+        snapshot = runner.get_state(errored.thread_id)
+
+    assert retried.status != ThreadStatus.ERROR
+    assert snapshot.status != ThreadStatus.ERROR
+    assert snapshot.status == retried.status
+
+
 def test_runner_render_markdown_returns_string_when_done():
     analyst = {"intent": "Goal", "actors": ["User"], "ambiguities": []}
     pipeline, stack = _patched_pipeline(analyst)

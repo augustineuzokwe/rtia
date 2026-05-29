@@ -76,6 +76,9 @@ class PipelineRunner:
             state = self._error_state(tid, exc)
             self._error_states[tid] = state
             return state
+        # Symmetric with resume: a successful start on a reused thread_id
+        # invalidates any prior stashed error.
+        self._error_states.pop(tid, None)
         return self._translate(tid, result)
 
     def resume(self, thread_id: str, resume_value: Any) -> ThreadState:
