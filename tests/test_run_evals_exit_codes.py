@@ -13,6 +13,7 @@ from evals.run_evals import (
     _EXIT_GEMINI_429,
     _EXIT_GEMINI_TRANSIENT,
     _classify_exit_code,
+    _extract_http_status,
 )
 
 
@@ -86,6 +87,14 @@ def test_classify_walks_chained_cause():
             raise RuntimeError("eval runner re-raised") from inner
     except RuntimeError as exc:
         assert _classify_exit_code(exc) == _EXIT_GEMINI_TRANSIENT
+
+
+def test_extract_http_status_returns_raw_code_for_diagnostics():
+    """The friendly eval-gate message prints the actual status so triage
+    doesn't have to guess between 502/503/504."""
+    assert _extract_http_status(_FakeLLMPipelineError(504)) == 504
+    assert _extract_http_status(_FakeAPIError(429)) == 429
+    assert _extract_http_status(ValueError("nothing http about this")) is None
 
 
 def test_exit_codes_match_workflow_contract():

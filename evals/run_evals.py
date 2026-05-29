@@ -645,11 +645,11 @@ _EXIT_GEMINI_429 = 75
 _TRANSIENT_HTTP_STATUSES = frozenset({502, 503, 504})
 
 
-def _classify_exit_code(exc: BaseException) -> int:
-    """Walk the exception chain looking for a Gemini-classifiable status.
+def _extract_http_status(exc: BaseException) -> int | None:
+    """Walk the exception chain looking for a Gemini-style HTTP status.
 
-    Returns 76 for a transient 5xx (502/503/504), 75 for a 429, 1 for
-    anything else. Looks at both ``LLMPipelineError.detail.http_status``
+    Returns the first matching status, or ``None`` if nothing in the chain
+    exposes one. Looks at both ``LLMPipelineError.detail.http_status``
     (RTIA's wrapped form) and ``google.genai.errors.APIError.code`` (the
     raw form, in case a future code path skips the wrapper).
     """
@@ -657,17 +657,27 @@ def _classify_exit_code(exc: BaseException) -> int:
     current: BaseException | None = exc
     while current is not None and id(current) not in seen:
         seen.add(id(current))
-        # RTIA's wrapped form.
         detail = getattr(current, "detail", None)
         status = getattr(detail, "http_status", None) if detail is not None else None
-        # google.genai.errors.APIError exposes .code (HTTP status).
         if status is None:
             status = getattr(current, "code", None)
-        if status in _TRANSIENT_HTTP_STATUSES:
-            return _EXIT_GEMINI_TRANSIENT
-        if status == 429:
-            return _EXIT_GEMINI_429
+        if isinstance(status, int):
+            return status
         current = current.__cause__ or current.__context__
+    return None
+
+
+def _classify_exit_code(exc: BaseException) -> int:
+    """Classify an exception into a CI-meaningful exit code.
+
+    Returns 76 for a transient 5xx (502/503/504), 75 for a 429, 1 for
+    anything else.
+    """
+    status = _extract_http_status(exc)
+    if status in _TRANSIENT_HTTP_STATUSES:
+        return _EXIT_GEMINI_TRANSIENT
+    if status == 429:
+        return _EXIT_GEMINI_429
     return 1
 
 
@@ -677,16 +687,19 @@ if __name__ == "__main__":
     except SystemExit:
         raise
     except BaseException as exc:
+        status = _extract_http_status(exc)
         code = _classify_exit_code(exc)
+        exc_name = type(exc).__name__
         if code == _EXIT_GEMINI_TRANSIENT:
             print(
-                f"\n[eval-gate] Gemini transient 5xx (502/503/504). Exiting {code} for CI retry.",
+                f"\n[eval-gate] Gemini transient {status} ({exc_name}). "
+                f"Exiting {code} for CI retry.",
                 file=sys.stderr,
             )
         elif code == _EXIT_GEMINI_429:
             print(
-                f"\n[eval-gate] Gemini 429 RESOURCE_EXHAUSTED - project spend cap. "
-                f"Exiting {code} to skip retry (see issue #329).",
+                f"\n[eval-gate] Gemini 429 RESOURCE_EXHAUSTED ({exc_name}) - "
+                f"project spend cap. Exiting {code} to skip retry (see issue #329).",
                 file=sys.stderr,
             )
         else:
