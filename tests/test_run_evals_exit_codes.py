@@ -12,6 +12,7 @@ from __future__ import annotations
 from evals.run_evals import (
     _EXIT_GEMINI_429,
     _EXIT_GEMINI_TRANSIENT,
+    _append_step_summary,
     _classify_exit_code,
     _extract_http_status,
 )
@@ -95,6 +96,38 @@ def test_extract_http_status_returns_raw_code_for_diagnostics():
     assert _extract_http_status(_FakeLLMPipelineError(504)) == 504
     assert _extract_http_status(_FakeAPIError(429)) == 429
     assert _extract_http_status(ValueError("nothing http about this")) is None
+
+
+def test_append_step_summary_writes_when_env_set(tmp_path, monkeypatch):
+    """When ``$GITHUB_STEP_SUMMARY`` is set, the helper appends Markdown
+    to that file. The eval-gate handler uses this to surface the failure
+    reason on the GitHub run page."""
+    summary_path = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary_path))
+    _append_step_summary("### first block\nbody")
+    _append_step_summary("### second block")
+    contents = summary_path.read_text(encoding="utf-8")
+    assert "### first block" in contents
+    assert "### second block" in contents
+    # Each block separated by a blank line so they render as distinct
+    # Markdown sections.
+    assert "body\n\n### second block" in contents
+
+
+def test_append_step_summary_noop_when_env_unset(tmp_path, monkeypatch):
+    """Outside CI the env var is missing - the helper must do nothing
+    (no exception, no file created)."""
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    # Should simply return None.
+    assert _append_step_summary("anything") is None
+
+
+def test_append_step_summary_swallows_io_errors(monkeypatch):
+    """A summary write failure must never mask the real failure that
+    prompted the write."""
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", "/nonexistent/dir/summary.md")
+    # Should not raise even though the path is unwritable.
+    _append_step_summary("anything")
 
 
 def test_exit_codes_match_workflow_contract():

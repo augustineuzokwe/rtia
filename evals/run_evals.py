@@ -681,6 +681,26 @@ def _classify_exit_code(exc: BaseException) -> int:
     return 1
 
 
+def _append_step_summary(markdown: str) -> None:
+    """Append a Markdown block to ``$GITHUB_STEP_SUMMARY``, if set.
+
+    GitHub Actions renders that file on the run page so a failed job's
+    cause is visible without scraping the step log. No-op outside CI
+    (env var unset) and on any IO failure - the summary is a UX nicety,
+    never load-bearing.
+    """
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path:
+        return
+    try:
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(markdown.rstrip() + "\n\n")
+    except OSError:
+        # Swallow - failing to write the summary must never mask the
+        # real failure that prompted the write.
+        pass
+
+
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
@@ -696,14 +716,37 @@ if __name__ == "__main__":
                 f"Exiting {code} for CI retry.",
                 file=sys.stderr,
             )
+            _append_step_summary(
+                f"### 🟡 Eval gate failed — transient Gemini {status}\n\n"
+                f"- Status: `{status}` ({exc_name})\n"
+                f"- Exit code: `{code}` (`_EXIT_GEMINI_TRANSIENT`)\n"
+                f"- Action: CI retries once on `{code}`. If both attempts log this, "
+                f"it's a Gemini-side outage — re-run after Google clears.\n"
+            )
         elif code == _EXIT_GEMINI_429:
             print(
                 f"\n[eval-gate] Gemini 429 RESOURCE_EXHAUSTED ({exc_name}) - "
                 f"project spend cap. Exiting {code} to skip retry (see issue #329).",
                 file=sys.stderr,
             )
+            _append_step_summary(
+                f"### 🔴 Eval gate failed — Gemini 429 RESOURCE_EXHAUSTED\n\n"
+                f"- Project monthly spend cap exhausted "
+                f"(<https://ai.studio/spend>).\n"
+                f"- Exit code: `{code}` (`_EXIT_GEMINI_429`) — no retry.\n"
+                f"- Re-running won't help until the cap is raised or rolls over.\n"
+            )
         else:
             # Preserve the traceback for unclassified failures - real
-            # regressions should look exactly like they did before.
+            # regressions should look exactly like they did before. The
+            # summary block flags it as "not the known Gemini flake" so
+            # a reader knows to dig into the traceback.
+            _append_step_summary(
+                f"### 🔴 Eval gate failed — unclassified failure\n\n"
+                f"- Exception: `{exc_name}`\n"
+                f"- This is not a known Gemini transient (502/503/504) or "
+                f"cap-exhausted (429) failure.\n"
+                f"- See the step log for the full traceback.\n"
+            )
             raise
         raise SystemExit(code) from exc
