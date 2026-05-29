@@ -621,5 +621,68 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
+# Exit-code contract for CI retry classification (issue #329). The
+# nick-fields/retry@v4 step in .github/workflows/ci.yml sets
+# retry_on_exit_code=76, so:
+#
+#   76 = transient Gemini 503 / overload → CI should retry once.
+#   75 = Gemini 429 RESOURCE_EXHAUSTED (project spend cap)  → CI should
+#        fail fast; retrying buys nothing until the cap is raised or rolls
+#        over (observed in 2026-05-29 main runs after PR #325/#326).
+#    1 = any other failure (real regression, code bug, etc.) → no retry.
+#
+# Keep the constants here, not in agents/_llm_errors.py: they're a CI
+# contract, not a domain concept.
+_EXIT_GEMINI_503 = 76
+_EXIT_GEMINI_429 = 75
+
+
+def _classify_exit_code(exc: BaseException) -> int:
+    """Walk the exception chain looking for a Gemini-classifiable status.
+
+    Returns 76 for 503, 75 for 429, 1 for anything else. Looks at both
+    ``LLMPipelineError.detail.http_status`` (RTIA's wrapped form) and
+    ``google.genai.errors.APIError.code`` (the raw form, in case a future
+    code path skips the wrapper).
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        # RTIA's wrapped form.
+        detail = getattr(current, "detail", None)
+        status = getattr(detail, "http_status", None) if detail is not None else None
+        # google.genai.errors.APIError exposes .code (HTTP status).
+        if status is None:
+            status = getattr(current, "code", None)
+        if status == 503:
+            return _EXIT_GEMINI_503
+        if status == 429:
+            return _EXIT_GEMINI_429
+        current = current.__cause__ or current.__context__
+    return 1
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except SystemExit:
+        raise
+    except BaseException as exc:
+        code = _classify_exit_code(exc)
+        if code == _EXIT_GEMINI_503:
+            print(
+                f"\n[eval-gate] Gemini 503 UNAVAILABLE - transient. Exiting {code} for CI retry.",
+                file=sys.stderr,
+            )
+        elif code == _EXIT_GEMINI_429:
+            print(
+                f"\n[eval-gate] Gemini 429 RESOURCE_EXHAUSTED - project spend cap. "
+                f"Exiting {code} to skip retry (see issue #329).",
+                file=sys.stderr,
+            )
+        else:
+            # Preserve the traceback for unclassified failures - real
+            # regressions should look exactly like they did before.
+            raise
+        raise SystemExit(code) from exc
