@@ -9,6 +9,7 @@ import {
 import { PoCheckpointDeep } from "@/components/PoCheckpointDeep";
 import { PoCheckpointSplit, type ImpliedStory } from "@/components/PoCheckpointSplit";
 import { StatusBadge } from "@/components/StatusBadge";
+import { StoryReviewPanel } from "@/components/StoryReviewPanel";
 import { useThreadPoll } from "@/hooks/useThreadPoll";
 import type { ThreadState } from "@/lib/types";
 
@@ -35,11 +36,15 @@ export function RunPanel({ initial }: RunPanelProps) {
     mode?: string;
     critical_ambiguities?: string[];
     implied_stories?: ImpliedStory[];
+    rendered_artifact?: string;
+    description?: string;
+    objective?: string;
   };
   const isPoDeep =
     current.status === "paused_po" && (payload.mode ?? "deep") === "deep";
   const isPoSplit =
     current.status === "paused_po" && payload.mode === "split";
+  const isStoryReview = current.status === "paused_review";
 
   return (
     <div className="space-y-6" data-testid="run-panel">
@@ -93,14 +98,14 @@ export function RunPanel({ initial }: RunPanelProps) {
               </AlertDescription>
             </Alert>
           )}
-          {!isPoDeep && !isPoSplit && (
+          {!isPoDeep && !isPoSplit && !isStoryReview && (
             <p className="text-sm text-muted-foreground">
-              Remaining checkpoint and result panels land in US-21 onward.
-              In the meantime the legacy{" "}
+              Result and export panels land in US-22 onward. In the meantime
+              the legacy{" "}
               <a className="underline" href="/legacy">
                 Gradio UI
               </a>{" "}
-              still drives story-review and result phases to completion.
+              still drives the final artifact + export phases to completion.
             </p>
           )}
         </CardContent>
@@ -117,6 +122,15 @@ export function RunPanel({ initial }: RunPanelProps) {
         <PoCheckpointSplit
           threadId={current.thread_id}
           stories={payload.implied_stories ?? []}
+          onResumed={applyState}
+        />
+      )}
+      {isStoryReview && (
+        <StoryReviewPanel
+          threadId={current.thread_id}
+          renderedArtifact={payload.rendered_artifact ?? ""}
+          description={payload.description ?? ""}
+          objective={payload.objective ?? ""}
           onResumed={applyState}
         />
       )}

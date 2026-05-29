@@ -109,7 +109,13 @@ export type ResumeBody =
       answers?: Record<string, string>;
     } // paused_po, split mode
   | { accepted: true } // paused_review, accept
-  | { accepted: false; description: string; objective: string }; // paused_review, override
+  | {
+      accepted: false;
+      // Empty fields go as ``null`` per the API contract; the server
+      // falls back to the Story Writer's value when null is supplied.
+      description: string | null;
+      objective: string | null;
+    }; // paused_review, override
 
 /** ``POST /pipeline/{thread_id}/resume`` — returns the post-resume state. */
 export async function resumeThread(
