@@ -1,28 +1,40 @@
 name: CI
 
-# Single-stage pipeline: `quality` (lint, format, unit tests; ~30-60s).
+# Two-stage pipeline:
+#   1. quality    - lint, format, unit tests (always runs; fast; ~30s)
+#   2. regression - full eval suite against the 3 golden samples + gate
+#                   on per-metric thresholds.
 #
-# The former `regression` job — full live-Gemini eval against the 3
-# golden samples + threshold/budget gates — was deleted in issue #332.
-# Rationale: ~30 sequential live Gemini calls on every PR meant the gate
-# failed structurally on Gemini's hourly weather (502/503/504) rather
-# than on real regressions. The retry-classifier in `760999d` correctly
+# ────────────────────────────────────────────────────────────────────────
+# regression is currently DISABLED via `if: false` on the job (#332).
+#
+# Why: ~30 sequential live Gemini calls on every PR made the gate fail
+# structurally on Gemini's hourly weather (502/503/504) rather than on
+# real regressions. The retry classifier in `760999d` correctly
 # distinguished transient 5xx vs cap-exhausted 429 but couldn't fix the
-# underlying brittleness.
+# underlying brittleness of gating PRs on a third-party model's uptime.
 #
-# We now follow the industry-standard two-tier eval pattern (mirrored in
-# Anthropic's evals, LangSmith experiments, OpenAI's `evals` framework):
+# Why keep the job (instead of deleting it): preserves the full, working
+# configuration — cache disable, threshold gate, budget gate, retry
+# classifier, Dependabot carve-out, secret references — so the live eval
+# can be re-enabled by flipping `if: false` → `if: true` if/when the
+# replacement nightly cron doesn't land or needs to be reverted. The
+# `tests/test_ci_cache_disable.py` contract tests still apply to the YAML
+# shape (the job's still there, just inert) so a future refactor can't
+# silently strip the cache-disable env or `--no-cache` flag.
 #
-#   - PR + push-to-main: deterministic offline checks only (this job).
-#     `tests/test_graph.py` already covers the full LangGraph pipeline
-#     end-to-end via `RTIA_LLM_PROVIDER=fake` (Epic 8) plus per-branch
-#     coverage for split / PO checkpoint / story review / error paths.
-#   - Nightly cron: live Gemini eval runs on a schedule with its own
-#     retry budget and alerting (tracked separately as the PR 2 of #332).
+# The live eval is moving to a nightly cron workflow (`nightly-eval.yml`,
+# PR 2 of #332). When that ships, this disabled job can be deleted; until
+# then it stays as a flip-switch fallback.
+# ────────────────────────────────────────────────────────────────────────
 #
-# Net effect: PR CI is now ~30-60s, free, and 100% reliable. Live-model
-# quality drift surfaces within 24h via the nightly run instead of in
-# the middle of a PR review.
+# regression `needs: quality` - if lint or unit tests fail, the eval
+# never starts. No point spending Gemini API calls on a PR that has a
+# syntax error or a unit-test regression.
+#
+# Cost (when enabled): each `regression` run is ≈$0.03 of paid Gemini
+# Flash. The path filter keeps doc-only and CI-config PRs free of API
+# spend.
 
 on:
   pull_request:
@@ -59,3 +71,155 @@ jobs:
 
       - name: Run tests
         run: uv run pytest -q
+
+  regression:
+    name: Regression (eval gate, Gemini Flash, 3 samples, 6 metrics)
+    # DISABLED per #332. See the header comment for rationale and re-enable
+    # instructions. To re-enable: change `false` → `true` (no other edit
+    # needed; the rest of this job is intact).
+    if: false
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # Need history to diff against base ref for the path filter.
+          fetch-depth: 0
+
+      # Path filter - done with native git diff to avoid pulling in a
+      # third-party action. We treat a `push` to main as always relevant
+      # (the eval should run on every merge so baselines.md stays
+      # honest). For PRs, we diff against the PR's base SHA.
+      #
+      # Dependabot carve-out (Phase 13.5): GitHub blocks Dependabot PRs
+      # from accessing repository secrets, so the Gemini API key is
+      # empty and the eval cannot run. Rather than hard-fail those PRs,
+      # we skip the eval at the PR stage and rely on the
+      # always-runs-on-push-to-main branch above as the safety net.
+      # Documented carve-out - see GUARDRAILS.md "eval gate coverage".
+      # Risks accepted: a regression introduced by a major GH Action
+      # bump is caught one step late (post-merge on main, requires a
+      # revert) rather than pre-merge. Action-bump cadence is low and
+      # main's eval acts as the backstop.
+      - name: Detect agent / prompt / eval changes
+        id: should_run
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "::notice::push to main - regression always runs."
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
+            echo "::notice::Dependabot PR - secrets are not exposed to this run; the eval cannot execute. Skipping at PR stage. Push-to-main will run the eval and catch any regression introduced by this dependency."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if git diff --quiet "$BASE" -- agents/ prompts/ evals/ .github/workflows/ci.yml; then
+            echo "::notice::No changes to agents/, prompts/, evals/, or this workflow - regression not applicable on this PR. Subsequent steps will skip."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Key presence is mandatory whenever the eval is meant to run.
+      # A missing key always hard-fails - silently passing without the
+      # eval would defeat the gate's purpose. The previous fork-PR skip
+      # branch was removed (#107 review): RTIA is a personal repo, no
+      # fork PRs to handle, and the failure mode is sharper without it.
+      # If this ever becomes a multi-contributor project, reintroduce
+      # the fork branch with a real motivating example.
+      - name: Verify Gemini API key
+        if: steps.should_run.outputs.run == 'true'
+        env:
+          KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEY:-}" ]; then
+            echo "::error::No Gemini API key available. Set GOOGLE_API_KEY_CI (preferred) or GOOGLE_API_KEY in repo secrets."
+            exit 1
+          fi
+
+      - name: Install uv
+        if: steps.should_run.outputs.run == 'true'
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        if: steps.should_run.outputs.run == 'true'
+        run: uv sync --all-groups
+
+      # Wrapped in nick-fields/retry to ride out transient Gemini 503s
+      # (observed on PR #107 first live run - Gemini returned 503
+      # UNAVAILABLE during a high-demand spike and the in-library
+      # tenacity retries exhausted before the spike cleared).
+      #
+      # 2 attempts × 30s wait. Worst-case cost: 2 × $0.03 = $0.06 per
+      # CI run, and only on actually-flaky days. Median run still costs
+      # $0.03. Threshold enforcement does NOT retry - a metric below
+      # floor is a real signal worth investigating, not transient noise.
+      #
+      # Issue #329 - the retry is now classified by exit code so a 429
+      # RESOURCE_EXHAUSTED (project spend cap) does NOT consume the
+      # retry budget. run_evals.py exits 76 on a transient Gemini 5xx
+      # (502/503/504; see _TRANSIENT_HTTP_STATUSES) and 75 on a
+      # cap-exhausted 429; retry_on_exit_code=76 means only the
+      # transient path retries. Three main runs (US-23/24/25 on
+      # 2026-05-29) blindly burnt ~3min each on cap-exhausted retries
+      # before this was wired up. 504 added after PR #330's first run.
+      #
+      # timeout_minutes bumped to 10 (was 5) on PR #162: Gemini latency
+      # on GitHub-hosted runners exceeded the original 300s ceiling on
+      # consecutive runs, and the budget gate's 240s aggregate ceiling
+      # is the real quality signal. Workflow wall-clock now has ~360s
+      # slack over the budget, so a real budget regression still fails
+      # the next step (check_budgets.py) even though the workflow itself
+      # has more breathing room.
+      - name: Run eval suite (with retry for transient 503s)
+        if: steps.should_run.outputs.run == 'true'
+        uses: nick-fields/retry@v4
+        env:
+          # Keep this in sync with the Verify Gemini API key step above.
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
+          # Issue #230 - the CI regression job MUST run with the LLM
+          # response cache disabled. The cache exists to speed up local
+          # iteration; on the gate we need a fresh live measurement on
+          # every PR so a warm cache cannot mask model drift ("false-green
+          # CI" trap). The `--no-cache` CLI flag below sets the same env;
+          # both are set so the disable survives whether `command:` is
+          # invoked directly or through a wrapper that might strip flags.
+          RTIA_LLM_CACHE: disabled
+        with:
+          timeout_minutes: 10
+          max_attempts: 2
+          retry_wait_seconds: 30
+          # Issue #329 - only retry on the transient-503 exit code (76).
+          # 75 (cap-exhausted 429) and 1 (real failure) fail fast.
+          retry_on_exit_code: 76
+          command: uv run python evals/run_evals.py --no-cache --report-path evals/reports/ci-run.json
+
+      - name: Enforce metric floors
+        if: steps.should_run.outputs.run == 'true'
+        run: uv run python evals/check_thresholds.py evals/reports/ci-run.json
+
+      # Phase 13.1 - cost + latency gate. Reads the same eval report
+      # check_thresholds.py just consumed, plus [tool.rtia.budgets] in
+      # pyproject.toml. Separate step (not bundled with floors) so the
+      # PR-status check name surfaces "budget regression" distinctly
+      # from "quality regression" - different signals, different fixes.
+      - name: Enforce cost + latency budgets
+        if: steps.should_run.outputs.run == 'true'
+        run: uv run python evals/check_budgets.py evals/reports/ci-run.json
+
+      - name: Upload eval report
+        if: always() && steps.should_run.outputs.run == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: eval-report-${{ github.event.pull_request.number || github.run_id }}
+          path: evals/reports/ci-run.json
+          if-no-files-found: ignore
+          retention-days: 14
