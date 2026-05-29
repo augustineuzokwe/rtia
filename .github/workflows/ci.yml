@@ -3,15 +3,38 @@ name: CI
 # Two-stage pipeline:
 #   1. quality    - lint, format, unit tests (always runs; fast; ~30s)
 #   2. regression - full eval suite against the 3 golden samples + gate
-#                   on per-metric thresholds (only runs when agent code,
-#                   prompts, evals, or this workflow itself changed; ~60-90s)
+#                   on per-metric thresholds.
+#
+# ────────────────────────────────────────────────────────────────────────
+# regression is currently DISABLED via `if: false` on the job (#332).
+#
+# Why: ~30 sequential live Gemini calls on every PR made the gate fail
+# structurally on Gemini's hourly weather (502/503/504) rather than on
+# real regressions. The retry classifier in `760999d` correctly
+# distinguished transient 5xx vs cap-exhausted 429 but couldn't fix the
+# underlying brittleness of gating PRs on a third-party model's uptime.
+#
+# Why keep the job (instead of deleting it): preserves the full, working
+# configuration — cache disable, threshold gate, budget gate, retry
+# classifier, Dependabot carve-out, secret references — so the live eval
+# can be re-enabled by flipping `if: false` → `if: true` if/when the
+# replacement nightly cron doesn't land or needs to be reverted. The
+# `tests/test_ci_cache_disable.py` contract tests still apply to the YAML
+# shape (the job's still there, just inert) so a future refactor can't
+# silently strip the cache-disable env or `--no-cache` flag.
+#
+# The live eval is moving to a nightly cron workflow (`nightly-eval.yml`,
+# PR 2 of #332). When that ships, this disabled job can be deleted; until
+# then it stays as a flip-switch fallback.
+# ────────────────────────────────────────────────────────────────────────
 #
 # regression `needs: quality` - if lint or unit tests fail, the eval
 # never starts. No point spending Gemini API calls on a PR that has a
 # syntax error or a unit-test regression.
 #
-# Cost: each `regression` run is ≈$0.03 of paid Gemini Flash. The path
-# filter keeps doc-only and CI-config PRs free of API spend.
+# Cost (when enabled): each `regression` run is ≈$0.03 of paid Gemini
+# Flash. The path filter keeps doc-only and CI-config PRs free of API
+# spend.
 
 on:
   pull_request:
@@ -51,6 +74,10 @@ jobs:
 
   regression:
     name: Regression (eval gate, Gemini Flash, 3 samples, 6 metrics)
+    # DISABLED per #332. See the header comment for rationale and re-enable
+    # instructions. To re-enable: change `false` → `true` (no other edit
+    # needed; the rest of this job is intact).
+    if: false
     needs: quality
     runs-on: ubuntu-latest
     timeout-minutes: 15

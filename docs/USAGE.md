@@ -165,9 +165,11 @@ You almost never need to think about this. The two times you do:
    `--no-cache` to `evals/run_evals.py` or `scripts/run_pipeline_demo.py`,
    or export `RTIA_LLM_CACHE=disabled` for the session.
 
-The CI regression job (`.github/workflows/ci.yml`) always disables the
-cache so the eval gate measures live behaviour on every PR. See
-[ADR-0013](adr-0013-llm-response-cache.md) for the design rationale,
+The CI `regression` job (`.github/workflows/ci.yml`) always disables the
+cache so the eval gate measures live behaviour. (As of #332 the job is
+preserved with `if: false` while the live eval moves to a nightly cron;
+the cache-disable contract still applies whenever the job is re-enabled.)
+See [ADR-0013](adr-0013-llm-response-cache.md) for the design rationale,
 including why the 24h TTL is deliberately shorter than Promptfoo's
 14-day default.
 

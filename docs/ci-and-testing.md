@@ -15,9 +15,9 @@ For the *why* behind specific design choices, see the relevant ADR
 |---|---|---|---|
 | `uv run pytest -q` (526 tests) | Every PR - CI **quality** job, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | Always, on every push to a PR or `main` | $0 (mocked) |
 | `pre-commit run --all-files` (ruff, format, detect-secrets) | Every commit (local hook) + every PR (CI quality job) | Always, on every commit + every PR push | $0 |
-| `evals/run_evals.py` (Gemini eval gate, 7 samples) | Every PR - CI **regression** job | **Only when** `agents/`, `prompts/`, `evals/`, or `.github/workflows/ci.yml` files change. Doc-only / test-only PRs skip via the workflow's `should_run` step. | ~$0.03 per fire |
-| `evals/check_thresholds.py` (per-metric floor gate) | Every PR with a regression run | Right after `run_evals.py` succeeds | $0 (post-processing only) |
-| `evals/check_budgets.py` (token + latency gate) | Every PR with a regression run | Right after `check_thresholds.py` | $0 |
+| `evals/run_evals.py` (Gemini eval gate, 7 samples) | **DISABLED on CI (#332).** The `regression` job is preserved in `.github/workflows/ci.yml` with `if: false` so it can be flipped back on if the nightly replacement (PR 2 of #332) doesn't ship. | $0 while disabled; ~$0.03 per fire if re-enabled |
+| `evals/check_thresholds.py` (per-metric floor gate) | Inactive on PR while regression is disabled | — | $0 |
+| `evals/check_budgets.py` (token + latency gate) | Inactive on PR while regression is disabled | — | $0 |
 | `test_ci_cache_disable.py` + `TestNightlyWorkflowContract` (in [`test_n_runs.py`](../tests/test_n_runs.py)) | pytest (already in the 526 count) | Every PR - locks the workflow YAML against silent regression | $0 |
 | Nightly safety regression (N=10 on adversarial samples 04–07) | [`.github/workflows/nightly-safety-regression.yml`](../.github/workflows/nightly-safety-regression.yml) | Cron `0 2 * * *` (02:00 UTC daily), plus manual `workflow_dispatch` from the Actions tab | ~$0.12/night, ~$3.60/month |
 | `scripts/run_pipeline_demo.py` | **Manual** | You decide. Not CI-triggered. | ~$0.005 per deep run; cache may zero it |

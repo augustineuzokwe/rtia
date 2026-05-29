@@ -75,7 +75,9 @@ The eval suite is RTIA's quality gate. These tests cover its **scaffolding**:
 metric implementations, dataset loaders, threshold/budget gates. The
 **live** eval run (which actually invokes Gemini against the 7 samples) is
 not a unit test - it runs from `evals/run_evals.py` and is gated by the CI
-`regression` job, not by pytest.
+`regression` job. (As of #332 the `regression` job is preserved with
+`if: false` while the live eval moves to a nightly cron — `test_ci_cache_disable.py`
+still asserts the YAML shape so re-enabling stays one line.)
 
 | File | Covers |
 |---|---|
@@ -121,7 +123,7 @@ together correctly end-to-end" smoke test. Burns real Gemini tokens.
 
 | File | Covers |
 |---|---|
-| [`test_ci_cache_disable.py`](test_ci_cache_disable.py) | Parses `.github/workflows/ci.yml`; asserts regression job has both `RTIA_LLM_CACHE=disabled` env AND `--no-cache` flag (#230 belt-and-suspenders) |
+| [`test_ci_cache_disable.py`](test_ci_cache_disable.py) | Parses `.github/workflows/ci.yml`; asserts regression job has both `RTIA_LLM_CACHE=disabled` env AND `--no-cache` flag (#230 belt-and-suspenders). The job is currently `if: false`-disabled (#332) but the YAML contract still holds for whenever it's flipped back on. |
 
 ### Shared scaffolding
 
@@ -135,7 +137,7 @@ together correctly end-to-end" smoke test. Burns real Gemini tokens.
 - **No async tests** - RTIA's agent functions are synchronous; the few async surfaces (FastAPI handlers) are tested through their sync entry points.
 - **Mock per import-site, not per class** - when two modules import the same LLM class, patch the symbol *at each import site*, not the class itself. See CLAUDE.md §4.7 + the working pattern in [`test_graph.py`](test_graph.py).
 - **Tests assume cache disabled** - `conftest.py` sets `RTIA_LLM_CACHE=disabled` autouse. Cache-specific tests (`test_llm_cache.py`) re-enable it explicitly within the test.
-- **Eval / regression jobs are not pytest** - they run from `evals/run_evals.py` and gate via `evals/check_thresholds.py` + `evals/check_budgets.py`. The pytest suite covers their *scaffolding*; the live run is the CI `regression` workflow job.
+- **Eval / regression jobs are not pytest** - they run from `evals/run_evals.py` and gate via `evals/check_thresholds.py` + `evals/check_budgets.py`. The pytest suite covers their *scaffolding*; the live run is the CI `regression` workflow job (currently `if: false`-disabled per #332; replacement nightly cron is the PR 2 follow-up).
 - **`test_integration_smoke.py` is offline** - it imports the smoke script as a module and unit-tests its non-LLM helpers (invariant checks, token-sum logic, budget enforcement). The live smoke run lives in `scripts/run_integration_smoke.py` and is invoked from the nightly integration workflow, not from pytest.
 
 ## Common navigation needs
