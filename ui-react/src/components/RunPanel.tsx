@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ErrorPanel, type PipelineErrorDetail } from "@/components/ErrorPanel";
 import { ExportPanel } from "@/components/ExportPanel";
 import { PoCheckpointDeep } from "@/components/PoCheckpointDeep";
 import { PoCheckpointSplit, type ImpliedStory } from "@/components/PoCheckpointSplit";
@@ -32,6 +33,7 @@ interface RunPanelProps {
 export function RunPanel({ initial, onStartOver }: RunPanelProps) {
   const { state, phase, lastError, applyState } = useThreadPoll(
     initial.thread_id,
+    initial,
   );
   // Until the first poll lands, use the state we already have so the
   // badge doesn't flash an empty slot.
@@ -43,6 +45,7 @@ export function RunPanel({ initial, onStartOver }: RunPanelProps) {
     rendered_artifact?: string;
     description?: string;
     objective?: string;
+    error?: PipelineErrorDetail | Record<string, unknown> | null;
   };
   const isPoDeep =
     current.status === "paused_po" && (payload.mode ?? "deep") === "deep";
@@ -51,6 +54,7 @@ export function RunPanel({ initial, onStartOver }: RunPanelProps) {
   const isStoryReview = current.status === "paused_review";
   const isDone = current.status === "done";
   const isDoneSplit = current.status === "done_split";
+  const isError = current.status === "error";
   // Gradio-era ``backlog_visible`` flag (#186 §6.1): nothing useful to
   // push on ERROR. Both terminal-success states get the panel.
   const showExport = isDone || isDoneSplit;
@@ -107,16 +111,20 @@ export function RunPanel({ initial, onStartOver }: RunPanelProps) {
               </AlertDescription>
             </Alert>
           )}
-          {!isPoDeep && !isPoSplit && !isStoryReview && !isDone && !isDoneSplit && (
-            <p className="text-sm text-muted-foreground">
-              Error / polish UI lands in US-24 onward. In the meantime the
-              legacy{" "}
-              <a className="underline" href="/legacy">
-                Gradio UI
-              </a>{" "}
-              still drives any remaining edge-case flows.
-            </p>
-          )}
+          {!isPoDeep &&
+            !isPoSplit &&
+            !isStoryReview &&
+            !isDone &&
+            !isDoneSplit &&
+            !isError && (
+              <p className="text-sm text-muted-foreground">
+                Polish UI lands in US-25. In the meantime the legacy{" "}
+                <a className="underline" href="/legacy">
+                  Gradio UI
+                </a>{" "}
+                stays available for fallback flows.
+              </p>
+            )}
         </CardContent>
       </Card>
 
@@ -152,6 +160,14 @@ export function RunPanel({ initial, onStartOver }: RunPanelProps) {
       )}
       {showExport && (
         <ExportPanel threadId={current.thread_id} status={current.status} />
+      )}
+      {isError && (
+        <ErrorPanel
+          threadId={current.thread_id}
+          error={payload.error ?? null}
+          stubArtifact={payload.rendered_artifact}
+          onStartOver={onStartOver}
+        />
       )}
     </div>
   );
