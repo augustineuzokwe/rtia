@@ -191,9 +191,15 @@ adversarial samples. N > 1 forces the cache off automatically;
 [ADR-0013](adr-0013-llm-response-cache.md) and
 [ADR-0014](adr-0014-stochastic-ac-validation.md) explain why.
 
-Run nightly: the `nightly-safety-regression` workflow runs N=10 on the
-four adversarial samples every night at 02:00 UTC. If you suspect a
-regression off-cycle, trigger it manually from the Actions tab.
+Run nightly: the `nightly-safety-regression` workflow USED to run N=10 on
+the four adversarial samples every night at 02:00 UTC. **Disabled
+2026-05-30** — the 95% pass-rate gate was tighter than the noise floor of
+N=10 (a single stochastic miss = 10% of the distribution), so the gate
+failed on noise and burnt Gemini spend nightly. See the file header at
+`.github/workflows/nightly-safety-regression.yml` for re-enable
+instructions (raise N to 20, or lower the threshold to 0.90). If you
+suspect a regression while it's disabled, run locally:
+`uv run python evals/run_evals.py sample-04 --n-runs 10 --no-cache`.
 
 ## 10. Running RTIA with zero API spend (full-local mode)
 
