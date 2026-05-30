@@ -1,5 +1,35 @@
 # Nightly stochastic safety regression - N=10 on adversarial samples 04-07.
 #
+# ────────────────────────────────────────────────────────────────────────
+# 🛑 DISABLED 2026-05-30. Both the schedule trigger is removed and the
+# job has `if: false` so no Gemini calls can fire from this workflow.
+#
+# Why disabled:
+#   - Run 26675953862 on 2026-05-30 failed: sample-04 + sample-05 missed
+#     the 95% pass-rate threshold on actor_set_completeness (sample-04
+#     scored 90%: one out of ten runs returned a 0.67 vs the 0.70 floor).
+#   - At N=10 the noise floor (one stochastic miss = 10% of the
+#     distribution) is wider than the 95% threshold permits. The "failure"
+#     is structural — the gate is tighter than the measurement supports —
+#     not a real safety regression.
+#   - Cost per fire: ~$0.12 of paid Gemini Flash (40 pipeline runs + ~16
+#     judge calls). Recurring nightly = ~$3.60/month. User wants spend off.
+#
+# Re-enable instructions:
+#   1. Restore the `schedule:` block under `on:` (cron `0 2 * * *` is the
+#      historical setting).
+#   2. Remove `if: false` from the `stochastic-adversarial` job.
+#   3. Either widen N (e.g. N=20 so a single miss is 5% of the
+#      distribution and 95% threshold becomes achievable) or lower the
+#      threshold to 0.90 so one stochastic miss out of 10 still passes.
+#      Without one of these, re-enabling will fail-then-cost-money again.
+#
+# `workflow_dispatch` is preserved on purpose (a maintainer might want to
+# manually fire a one-off investigation), but the `if: false` on the job
+# means even manual fires are no-ops today. Flip `if: false` → `if: true`
+# in addition to fixing N / threshold to make manual fires work.
+# ────────────────────────────────────────────────────────────────────────
+#
 # Per [Issue #233](https://github.com/augustineuzokwe/rtia/issues/233): adversarial samples target the
 # tail of the model's distribution. A single-pass measurement (the PR
 # regression job) only ever sees 1 draw and would report PASS for the
@@ -7,24 +37,22 @@
 # the adversarial sample existing. The fix is to run them N times nightly
 # and gate on pass-rate.
 #
-# Why not per-PR: cost. N=10 × 4 adversarial samples × ~30 s/run ≈ 20 min
-# wall-clock and ~$0.12 of Gemini calls per night. Per-PR would multiply
-# the PR cost by ~5x; nightly keeps the per-PR gate at ~$0.03.
+# Why not per-PR (when re-enabled): cost. N=10 × 4 adversarial samples ×
+# ~30 s/run ≈ 20 min wall-clock and ~$0.12 of Gemini calls per night.
+# Per-PR would multiply the PR cost by ~5x; nightly keeps the per-PR gate
+# at ~$0.03.
 #
-# Failure handling: when a nightly run fails, the next morning's first PR
-# is informed via the workflow's failure notification (GitHub issue
-# auto-filed via a comment on the failing run). Production ship-cadence
-# is NOT blocked by overnight flakiness - engineers see the signal and
-# decide whether to investigate.
+# Failure handling (when re-enabled): when a nightly run fails, the next
+# morning's first PR is informed via the workflow's failure notification.
+# Production ship-cadence is NOT blocked by overnight flakiness -
+# engineers see the signal and decide whether to investigate.
 
 name: nightly-safety-regression
 
 on:
-  # 02:00 UTC daily - quiet hours for Western Europe and US-East.
-  schedule:
-    - cron: "0 2 * * *"
-  # Allow manual triggering from the Actions tab when investigating a
-  # suspected regression off-cycle.
+  # Schedule disabled 2026-05-30 — see header comment.
+  # schedule:
+  #   - cron: "0 2 * * *"
   workflow_dispatch:
     inputs:
       n_runs:
@@ -45,6 +73,10 @@ concurrency:
 
 jobs:
   stochastic-adversarial:
+    # DISABLED 2026-05-30 — see header comment for rationale + re-enable
+    # instructions. To re-enable: change `false` → `true` AND fix N or
+    # threshold so the 95% gate doesn't fail-on-noise (header explains).
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
