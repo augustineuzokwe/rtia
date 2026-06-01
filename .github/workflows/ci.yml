@@ -3,31 +3,32 @@ name: CI
 # Two CI surfaces:
 #   1. quality    - lint, format, unit tests. Runs on every PR and every
 #                   push to main. Fast (~30s), free (mocked, no live LLM).
-#   2. regression - the live eval gate: runs evals/run_evals.py against the
-#                   golden samples and gates on per-metric floors + budgets.
+#   2. regression - the live eval gate (DISABLED, `if: false`). Preserved
+#                   here as a flip-switch but never runs automatically.
 #
-# regression runs on PUSH TO MAIN ONLY, and only when a prompt-affecting
-# path changed in the merge (agents/, prompts/, evals/, or this workflow).
-# Rationale (#332):
-#   - ~30 sequential live Gemini calls are too brittle to gate every PR on.
-#     Gemini's hourly 502/503/504 weather failed the gate structurally,
-#     not on real regressions, and a third-party model's uptime is not
-#     something a PR should be blocked on.
-#   - Running on merge to main keeps the live signal (it fires whenever
-#     prompt/agent/eval code actually lands) without the per-PR cost or
-#     flakiness. The trade-off: a quality regression is caught just AFTER
-#     merge (revert) rather than before. Acceptable for a single-maintainer
-#     local-dev project where main's eval is the backstop.
-#   - The mocked pytest suite + test_ci_cache_disable.py still run on every
-#     PR, so structural breakage is caught pre-merge; only the live-model
-#     quality signal moves to post-merge.
-#   - The path filter keeps doc-only / test-only merges free of API spend.
+# WHY regression is DISABLED (re-confirmed after a brief re-enable, #340):
+#   The live eval makes ~24-30 sequential Gemini calls. On GitHub-hosted
+#   runners those calls hit a backend pool that regularly returns 500
+#   INTERNAL / 503 UNAVAILABLE "high demand" errors (ADR-0007: the same
+#   model is fine from a laptop - Google routes runner IP ranges to a
+#   congested pool). Retries don't help: a spike outlasts them, and worse,
+#   a FAILED run is NOT free - every call that succeeds before the failing
+#   one is billed, and each retry re-pays for them. So the gate was the
+#   worst of both worlds: red on third-party weather AND costing money,
+#   with no budget to throw at mitigations. Re-enabling it on push-to-main
+#   (#340) proved this again, live, so it is off again.
 #
-# regression `needs: quality` - if lint or unit tests fail, the eval never
-# starts. Each run is ≈$0.03 of paid Gemini Flash.
+# WHERE the live quality signal lives instead:
+#   - Manual + local: `uv run python evals/run_evals.py --no-cache` before
+#     a prompt change, run on a laptop where the runner-pool 5xx don't hit.
+#   - CI gates only on fast, free, deterministic tests (the quality job).
+#     Structural "did the pipeline break?" coverage belongs in mocked /
+#     fake-provider tests (RTIA_LLM_PROVIDER=fake), which never 5xx.
 #
-# To pause the live gate: set `if: false` on the regression job. The
-# test_ci_cache_disable.py contract still applies to the YAML shape.
+# The job body (cache disable, key export, path filter, threshold + budget
+# gates, retry classifier) is kept intact so it can be flipped back on
+# (`if: false` -> a real condition) if RTIA ever runs the eval on a
+# self-hosted runner. test_ci_cache_disable.py still locks the YAML shape.
 
 on:
   pull_request:
@@ -67,8 +68,13 @@ jobs:
 
   regression:
     name: Regression (eval gate, Gemini Flash, golden samples)
-    # Push to main only - never on PRs. See header comment for rationale.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # DISABLED. See header comment: live-model gating is unworkable on
+    # GitHub runners (500/503 weather) and a failed run still bills for the
+    # calls that succeed before it. The live eval is a manual/local step.
+    # To re-enable (e.g. on a self-hosted runner): replace `false` with a
+    # real condition such as
+    #   github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: false
     needs: quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
