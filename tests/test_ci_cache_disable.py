@@ -65,3 +65,23 @@ def test_regression_eval_command_passes_no_cache_flag() -> None:
         "command line as belt-and-suspenders for the env-var disable. "
         "See ADR-0013 §'CI always disables'."
     )
+
+
+def test_regression_eval_step_exports_google_api_key() -> None:
+    """The eval step must export GOOGLE_API_KEY into the subprocess env.
+
+    A "Verify Gemini API key" step earlier in the job checks that the
+    secret is *present*, but presence is not export: the eval subprocess
+    only sees env vars set on its own step. Drop this and the live run
+    fails at ``ChatGoogleGenerativeAI`` construction (judge init) with
+    "API key required for Gemini Developer API" - which no contract test
+    that checks only the cache disable would catch.
+    """
+    workflow = _load_ci_workflow()
+    step = _find_regression_eval_step(workflow)
+    env = step.get("env") or {}
+    assert "GOOGLE_API_KEY" in env, (
+        "CI regression eval step must export GOOGLE_API_KEY (from "
+        "secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY) so the eval "
+        "subprocess can construct the Gemini client and the judge."
+    )
