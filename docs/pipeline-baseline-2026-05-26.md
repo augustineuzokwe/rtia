@@ -20,7 +20,7 @@ A 503 spike on Gemini's backend interrupted the first two runs (per
 [ADR-0007](adr-0007-gemini-3-5-flash-switch.md) §"Live probing"); the
 third attempt at 09:20Z succeeded cleanly with no in-flight retries.
 
-## Aggregate - 7 samples, production agents only (excludes judge)
+## Aggregate - 7 samples, pipeline agents only (excludes judge)
 
 | Metric | 2026-05-24 baseline | 2026-05-26 baseline | Delta |
 |---|---|---|---|

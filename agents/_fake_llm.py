@@ -1,6 +1,6 @@
 """Fake-LLM provider for deterministic, zero-cost UI testing.
 
-When ``RTIA_LLM_PROVIDER=fake`` is set, all five production agents
+When ``RTIA_LLM_PROVIDER=fake`` is set, all five pipeline agents
 construct a :class:`FakeChatModel` instead of a real chat-LLM. The fake
 reads canned JSON fixtures from
 ``tests/fixtures/llm/<scenario>/<agent_name>.json`` and returns them as

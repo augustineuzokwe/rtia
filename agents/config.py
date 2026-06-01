@@ -124,7 +124,7 @@ DEFAULT_CACHE_DIR = Path("~/.rtia/cache").expanduser()
 DEFAULT_CACHE_TTL_SECONDS = 86400  # 24 hours
 
 DEFAULT_MODEL = "gemini-3.5-flash"
-"""Canonical Gemini model used by all production agents.
+"""Canonical Gemini model used by all pipeline agents.
 
 Switched from ``gemini-2.5-flash`` on 2026-05-21 after the 2.5-flash
 alias hit repeated 503s on GitHub-hosted CI runners (PRs #107, #109).

@@ -7,7 +7,7 @@
 ## Context
 
 ADR-0006 settled on `gemini-2.5-flash` on the paid Google AI Studio
-tier as the default for all four production agents and the eval judge.
+tier as the default for all four pipeline agents and the eval judge.
 That choice held for ~one workshop day before two CI failures forced
 a re-look.
 
@@ -69,7 +69,7 @@ will likely work on #109 too. But:
 ## Decision
 
 1. **`agents.config.DEFAULT_MODEL = "gemini-3.5-flash"`.** All four
-   production agents and the eval judge follow the constant - no
+   pipeline agents and the eval judge follow the constant - no
    per-agent overrides.
 2. **No provider abstraction.** Same as ADR-0006 §4 - one provider,
    one model, one consumer per import site. If a fallback model

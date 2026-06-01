@@ -32,7 +32,7 @@ baseline, with no daily quota ceiling.
 
 ## Decision
 
-1. **All four production agents** (`requirements_analyst`, `user_story_writer`, `ac_generator`, `test_case_writer`) run on `gemini-2.5-flash` via `langchain_google_genai.ChatGoogleGenerativeAI`. `agents.config.DEFAULT_MODEL = "gemini-2.5-flash"`.
+1. **All four pipeline agents** (`requirements_analyst`, `user_story_writer`, `ac_generator`, `test_case_writer`) run on `gemini-2.5-flash` via `langchain_google_genai.ChatGoogleGenerativeAI`. `agents.config.DEFAULT_MODEL = "gemini-2.5-flash"`.
 2. **The eval-suite LLM judge** (`evals/judge.py`) also runs on `gemini-2.5-flash`. Renamed `ClaudeJudge` → `GeminiJudge`.
 3. **GEval-style metrics are deleted.** Specifically: `intent_faithfulness` (from `evals/metrics.py`) and `ac_faithfulness` (from `evals/ac_metrics.py`). The remaining 4 metrics (`actor_set_completeness`, `ambiguity_discipline`, `ac_coverage`, `ac_testability`) are all classification or programmatic - appropriate for free Gemini Flash.
 4. **No provider abstraction added.** Per CLAUDE.md §4.6 - one provider, one consumer per import site. If we ever need a multi-provider strategy, extract `build_chat_llm()` then.
