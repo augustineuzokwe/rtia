@@ -220,7 +220,7 @@ Prerequisites: Ollama installed (`brew install ollama` then
 (`ollama pull llama3.1:8b` - the default).
 
 The two switches are independent on purpose. Setting only
-`RTIA_LLM_PROVIDER=ollama` swaps the **generator** (5 production agents)
+`RTIA_LLM_PROVIDER=ollama` swaps the **generator** (5 pipeline agents)
 but keeps the deepeval **judge** on Gemini - useful for the
 apples-to-apples comparison documented in
 [ollama-probe-2026-05-26.md](ollama-probe-2026-05-26.md). Setting both

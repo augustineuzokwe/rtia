@@ -81,7 +81,7 @@ Phase 4 will insert a Story Review Checkpoint between Story Writer and the compo
 
 **Positive**
 - Future agent PRs are smaller: each agent populates a known section instead of negotiating with the rest of the pipeline.
-- The demo output IS the v1 production output - no separate "format for humans" step.
+- The demo output IS the v1 output - no separate "format for humans" step.
 - `as_json()` is the natural API response shape if/when Phase 14's FastAPI surface lands.
 - LangGraph state versioning (ADR-0002) extends naturally: `final_artifact` is a v1 field.
 

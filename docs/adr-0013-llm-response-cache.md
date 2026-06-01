@@ -70,14 +70,14 @@ Promptfoo's cache design ([docs](https://www.promptfoo.dev/docs/configuration/ca
 ### Trade-offs
 
 - **Adds `diskcache` as a runtime dep.** Pure Python, no native deps, single-file storage, small surface area. Cost is acceptable.
-- **First production run after a code refactor is the same cost as today.** Cache benefit only kicks in on the second and later runs of the same input.
+- **First run after a code refactor is the same cost as today.** Cache benefit only kicks in on the second and later runs of the same input.
 - **24-hour TTL means batched experiments across days can't reuse a cache across a day boundary.** Acceptable: extending the TTL would re-introduce the false-green window.
 - **CI regression cost is unchanged.** This ADR explicitly preserves it that way; do not "optimise" by removing the CI disable.
 
 ## How this ships
 
 - `agents/_llm_utils.cached_invoke()` is the single entry point.
-- All five production agents route their `llm.invoke(messages, config=…)` through `cached_invoke()`.
+- All five pipeline agents route their `llm.invoke(messages, config=…)` through `cached_invoke()`.
 - `tests/test_llm_cache.py` asserts every invariant in the table above. New cache behaviour requires a new test in that file.
 - `tests/test_ci_cache_disable.py` parses `.github/workflows/ci.yml` and asserts the regression job environment includes `RTIA_LLM_CACHE: disabled` and the eval command includes `--no-cache`. A future CI refactor that drops either will fail this test.
 

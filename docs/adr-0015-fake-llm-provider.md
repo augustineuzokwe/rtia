@@ -6,7 +6,7 @@
 
 ## Context
 
-The provider switch already lives in `agents/config.py` ([ADR-0006](adr-0006-provider-switch.md) chose "one switch, two providers" via `RTIA_LLM_PROVIDER=google|ollama`). All five production agents — `requirements_analyst`, `user_story_writer`, `ac_generator`, `test_case_writer`, `reviewer` — branch on `use_ollama()` at `_build_llm()` time, instantiating either `ChatGoogleGenerativeAI` or `ChatOllama`. Same `.invoke(messages)` contract, same `AIMessage` return shape, same Pydantic-validated parse downstream.
+The provider switch already lives in `agents/config.py` ([ADR-0006](adr-0006-provider-switch.md) chose "one switch, two providers" via `RTIA_LLM_PROVIDER=google|ollama`). All five pipeline agents — `requirements_analyst`, `user_story_writer`, `ac_generator`, `test_case_writer`, `reviewer` — branch on `use_ollama()` at `_build_llm()` time, instantiating either `ChatGoogleGenerativeAI` or `ChatOllama`. Same `.invoke(messages)` contract, same `AIMessage` return shape, same Pydantic-validated parse downstream.
 
 The seam is exactly where a third provider should slot in.
 
@@ -115,7 +115,7 @@ The fail-fast on invalid values is a small behaviour change but defensible: an i
 ## References
 
 - [ADR-0006: Provider switch](adr-0006-provider-switch.md) — original Google ↔ Ollama seam this ADR extends.
-- [ADR-0007: Gemini 3.5 Flash switch](adr-0007-gemini-3-5-flash-switch.md) — current production default.
+- [ADR-0007: Gemini 3.5 Flash switch](adr-0007-gemini-3-5-flash-switch.md) — current default model.
 - [ADR-0012: v1 = single-user local](adr-0012-v1-single-user-local.md) — establishes that adding deterministic test infra doesn't change the adopter profile.
 - `feedback_mock_class_per_module` — the per-import-site mock-patching pain this provider partially replaces.
 - v1.1.0 plan: `~/.claude/plans/prepare-prepare-the-v2-deep-liskov.md`.

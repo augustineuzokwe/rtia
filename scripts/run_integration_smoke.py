@@ -133,7 +133,7 @@ def _strip_json_fences(raw: str) -> str:
     that. Haiku/Sonnet are less reliable on this exact instruction, so the
     smoke script (which deliberately runs against a cheaper model) strips
     them defensively rather than treating a wrapped-but-valid JSON response
-    as a failure. The production agent path keeps strict parsing.
+    as a failure. The pipeline agent path keeps strict parsing.
     """
     text = raw.strip()
     if text.startswith("```"):

@@ -6,7 +6,7 @@ typically slower due to runner-pool variability.
 
 Full reports: `evals/reports/baseline-2026-05-24.json` and `evals/reports/postchange-2026-05-24.json` (eval reports are gitignored - regenerate by running the eval suite). See the PR body for the diff.
 
-## Aggregate (7 samples, production agents only, excludes judge time)
+## Aggregate (7 samples, pipeline agents only, excludes judge time)
 
 | Metric | Baseline | Post-change | Delta |
 |---|---|---|---|
@@ -16,7 +16,7 @@ Full reports: `evals/reports/baseline-2026-05-24.json` and `evals/reports/postch
 | Total tokens (in+out) | 98 008 | 98 062 | flat |
 | Budget gate | PASS | PASS | - |
 
-Production-agent wall-clock is essentially unchanged - `max_output_tokens`
+Pipeline-agent wall-clock is essentially unchanged - `max_output_tokens`
 caps only kick in on truncation, and the retry trim only helps on
 transient errors (neither run hit any). The speed-up payoff lives in
 the **judge phase**, which the eval report doesn't currently surface as
@@ -82,7 +82,7 @@ are intentionally excluded from `capture_agent_telemetry`). Three of
 the eight base metrics are LLM-judge calls per sample
 (`actor_set_completeness`, `ambiguity_discipline`, `ac_coverage`). At
 ~3-10 s per judge call × 3 judges × 7 samples = **roughly 60-200 s of
-serial judge time**, on top of the 150 s of production-agent time.
+serial judge time**, on top of the 150 s of pipeline-agent time.
 
 That puts the **total eval wall-clock at ~210-350 s** today - straddling
 the Phase 13.1 budget ceiling (240 s aggregate, per
