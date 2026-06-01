@@ -143,6 +143,10 @@ jobs:
         if: steps.should_run.outputs.run == 'true'
         uses: nick-fields/retry@v4
         env:
+          # Keep in sync with the "Verify Gemini API key" step above. The
+          # subprocess needs the key exported into its environment - the
+          # verify step only checks presence, it does not export it.
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
           RTIA_LLM_CACHE: disabled
         with:
           timeout_minutes: 10
