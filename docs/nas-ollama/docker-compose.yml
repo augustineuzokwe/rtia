@@ -1,0 +1,126 @@
+# RTIA local-LLM stack: Ollama behind a Caddy Bearer-token proxy.
+#
+# Two services on a private bridge network. Only Caddy exposes a host
+# port; Ollama itself is unreachable from outside the bridge - the
+# Bearer-token check happens at Caddy, not Ollama, because Ollama has
+# no native auth (https://github.com/ollama/ollama/issues/849).
+#
+# Why this file is checked in standalone (not inlined in the .md guide):
+# UGOS Docker Compose UI imports YAML files directly, and copy-pasting
+# from a markdown code fence is error-prone (loses indentation, smuggles
+# stray backticks). Import this file as-is.
+#
+# Before bringing it up:
+#   1. CHANGE /CHANGE-ME/ollama-models on the volumes line below to a
+#      path on your fast disk (M.2 SSD if you have one). Cold loads of
+#      4-8 GB models from HDD are slow enough to matter.
+#   2. export OLLAMA_AUTH_TOKEN=<your-token>  (see docs/nas-ollama-setup.md)
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: rtia-ollama
+    # No `ports:` block on purpose. Ollama is only reachable inside the
+    # internal bridge; Caddy proxies to it via the service name `ollama`.
+    # This is what makes the "Caddy in front" claim true - bypassing
+    # Caddy is not possible without `docker exec`.
+    volumes:
+      # Model storage. CHANGE THE LEFT SIDE to a directory on your fast
+      # disk (SSD / M.2). Models are 4-8 GB each; cold load latency from
+      # spinning disk is noticeable.
+      - /CHANGE-ME/ollama-models:/root/.ollama
+    environment:
+      # CRITICAL: Ollama defaults to listening on 127.0.0.1 only, which
+      # means Caddy in a sibling container CANNOT reach it (different
+      # network namespace = different loopback). Bind to 0.0.0.0 so the
+      # internal bridge sees a listener. Safe because the bridge is
+      # private and Ollama has no host port (Caddy is the only path in).
+      - OLLAMA_HOST=0.0.0.0:11434
+    # Hardening flags. Each one shrinks the blast radius of a
+    # compromised Ollama process. None of them are required for Ollama
+    # to function.
+    #
+    # NOT used here: `read_only: true`. Ollama writes runtime state
+    # (SSH-style keys, lock files, libraries) in places that aren't
+    # always covered by a single bind mount + tmpfs - see
+    # https://github.com/ollama/ollama/issues/7471 and adjacent reports
+    # on immutable-OS / read-only-FS setups. Dropping `read_only` keeps
+    # the container working in exchange for less strict isolation; the
+    # other hardening flags below carry the rest of the weight.
+    #
+    # NOT used here: `user: "1000:1000"` or similar. The official Ollama
+    # image runs as root and doesn't honor LinuxServer.io-style
+    # PUID/PGID env vars. UGOS Pro's "set PUID/PGID" hint in the GUI is
+    # generic advice for LinuxServer.io images; it does not apply to
+    # this one. Root inside the container is fine because cap_drop +
+    # no-new-privileges + no host port + network isolation make the
+    # root user inside the container much weaker than UID 0 on the NAS.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Resource limits. Tune for your NAS's RAM/CPU. The numbers below
+    # assume a 32 GB NAS - leave at least 4 GB for the OS + other
+    # services. Without these, a misbehaving model could OOM the NAS.
+    mem_limit: 24g
+    cpus: "4"
+    restart: unless-stopped
+    networks:
+      - rtia-llm
+
+  caddy:
+    image: caddy:latest
+    container_name: rtia-caddy
+    # Port :11435 is deliberately distinct from Ollama's default :11434.
+    # A misconfiguration that exposes raw Ollama would be visibly wrong
+    # (different port). If you must expose on a different port, change
+    # both this line and RTIA_OLLAMA_HOST on the client.
+    ports:
+      - "11435:11435"
+    volumes:
+      # Caddyfile is mounted read-only so a compromised Caddy can't
+      # rewrite its own config to disable the auth gate. Keep
+      # docker-compose.yml and Caddyfile in the same directory on the
+      # NAS so this relative path resolves correctly.
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Caddy writes TLS state + config snapshots here. Named volumes
+      # are writable; that's why read_only: true on Caddy itself is
+      # safe to use (writes land in the named volumes, not on the
+      # locked root FS).
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      # Token value is injected from the operator's environment. Don't
+      # hardcode it in Caddyfile or commit it. See
+      # docs/nas-ollama-setup.md "Generating the token" for the
+      # openssl recipe.
+      - OLLAMA_AUTH_TOKEN
+    cap_drop:
+      - ALL
+    cap_add:
+      # Required to bind a privileged port if you ever move :11435 →
+      # :443. Drop if staying on high ports.
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      # Caddy uses /tmp for short-lived scratch files (template
+      # rendering, occasional debug dumps).
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - rtia-llm
+    depends_on:
+      - ollama
+
+networks:
+  rtia-llm:
+    # Private bridge - only the two services on it can see each other.
+    # No external connectivity in either direction for ollama; caddy
+    # bridges the inbound side via its host port.
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
