@@ -1,0 +1,53 @@
+# Caddy reverse proxy for the RTIA Ollama stack.
+#
+# Listens on :11435 inside the container; the docker-compose.yml maps
+# that to :11435 on the NAS host. Forwards authenticated requests to
+# ollama:11434 (Docker service name) over the private bridge.
+#
+# Auth gate: every request must carry `Authorization: Bearer <token>`.
+# A request without the header (or with the wrong token) gets 401 - no
+# proxy pass happens, Ollama never sees the request.
+#
+# The token value is read from the OLLAMA_AUTH_TOKEN env var at
+# config-load time, so this file does NOT contain the actual token.
+# That's deliberate - the file is mounted read-only in the container
+# and may end up in backups; the env var is process-local.
+
+:11435 {
+    # Structured logging so you can audit who hit what and when. Caddy
+    # redacts the Authorization header by default, so the token itself
+    # is never logged - only the request line and status.
+    log {
+        output stdout
+        format console
+        level INFO
+    }
+
+    # Bearer-token gate. The matcher checks the request's Authorization
+    # header against the expected value (literal "Bearer <token>",
+    # built from the OLLAMA_AUTH_TOKEN env var via Caddy's {$VAR}
+    # substitution at config-load time).
+    #
+    # Anything that matches goes through to Ollama via the `handle`
+    # block below; anything that doesn't drops to the catch-all
+    # `handle` and gets a bare 401.
+    @authorized header Authorization "Bearer {$OLLAMA_AUTH_TOKEN}"
+
+    handle @authorized {
+        reverse_proxy ollama:11434 {
+            # Pass through long-lived streaming responses. Ollama's
+            # /api/generate and /api/chat endpoints stream tokens as
+            # they're produced; flush_interval -1 tells Caddy to flush
+            # every write rather than buffering until the response
+            # ends. Without this, RTIA would see the full response
+            # delivered as one blob at the end of inference.
+            flush_interval -1
+        }
+    }
+
+    handle {
+        # Anything not matching @authorized gets 401. Don't include the
+        # token in the error body - just a bare 401, no hint about why.
+        respond "Unauthorized" 401
+    }
+}
