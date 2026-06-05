@@ -35,6 +35,7 @@ from agents.config import (
     DEFAULT_TIMEOUT_SECONDS,
     MAX_OUTPUT_TOKENS_STORY_WRITER,
     OLLAMA_MODEL_ENV_VAR,
+    ollama_remote_kwargs,
     prompt_hash,
     use_fake,
     use_ollama,
@@ -152,6 +153,7 @@ def write_user_story(
             temperature=0 if temperature is None else temperature,
             num_predict=max_output_tokens,
             format="json",
+            **ollama_remote_kwargs(),
         )
         cache_model_id = f"ollama:{actual_model}"
     else:

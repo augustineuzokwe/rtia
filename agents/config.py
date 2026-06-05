@@ -52,6 +52,30 @@ Defaults to ``DEFAULT_OLLAMA_MODEL``. Override for an asymmetric stack
 (e.g. 8B generator + 14B judge to recover precision).
 """
 
+OLLAMA_HOST_ENV_VAR = "RTIA_OLLAMA_HOST"
+"""Optional remote Ollama URL (e.g. ``http://nas.local:11435``).
+
+When unset, ``langchain-ollama`` defaults to ``http://localhost:11434`` -
+the historical behaviour since ADR-0007 introduced the Ollama path.
+Set this to point RTIA at a remote Ollama server such as a NAS-hosted
+deployment behind a reverse proxy. See ``docs/nas-ollama-setup.md`` for
+the canonical remote setup.
+"""
+
+OLLAMA_AUTH_TOKEN_ENV_VAR = "RTIA_OLLAMA_AUTH_TOKEN"
+"""Optional Bearer token for the remote Ollama URL.
+
+Ollama itself has no auth - this token is meant for a reverse proxy
+(e.g. Caddy) sitting in front of Ollama. When set together with
+``RTIA_OLLAMA_HOST``, RTIA adds ``Authorization: Bearer <token>`` to
+outgoing requests via langchain-ollama's ``client_kwargs`` hook
+(verified against langchain-ollama 1.1.0's ``chat_models.py:715``).
+
+Setting this without ``RTIA_OLLAMA_HOST`` is a no-op - the localhost
+default has no proxy to authenticate against, and silently adding the
+header to a localhost request would surprise the operator.
+"""
+
 _OLLAMA_JUDGE_TRUTHY = {"1", "true", "yes", "on"}
 
 
@@ -95,6 +119,31 @@ def use_ollama_judge() -> bool:
     """
     raw = os.environ.get(OLLAMA_JUDGE_ENV_VAR, "").strip().lower()
     return raw in _OLLAMA_JUDGE_TRUTHY
+
+
+def ollama_remote_kwargs() -> dict:
+    """Build optional ChatOllama kwargs for a remote, authenticated Ollama.
+
+    Returns ``{}`` when ``RTIA_OLLAMA_HOST`` is unset so the localhost
+    default behaviour (historical since ADR-0007) is preserved
+    byte-identically. When the host is set, returns ``base_url=<host>``.
+    When ``RTIA_OLLAMA_AUTH_TOKEN`` is *also* set, adds the Bearer header
+    via langchain-ollama's ``client_kwargs`` plumbing (verified against
+    langchain-ollama 1.1.0's ``chat_models.py:693, 715``).
+
+    Token-without-host is a deliberate no-op - the localhost default has
+    no proxy to authenticate against, and silently adding a header to a
+    request to ``localhost:11434`` would surprise the operator. The
+    operator must opt into the remote path before the token is sent.
+    """
+    host = os.environ.get(OLLAMA_HOST_ENV_VAR, "").strip()
+    token = os.environ.get(OLLAMA_AUTH_TOKEN_ENV_VAR, "").strip()
+    if not host:
+        return {}
+    kwargs: dict = {"base_url": host}
+    if token:
+        kwargs["client_kwargs"] = {"headers": {"Authorization": f"Bearer {token}"}}
+    return kwargs
 
 
 LLM_CACHE_ENABLED_ENV_VAR = "RTIA_LLM_CACHE"
