@@ -234,6 +234,31 @@ on three Analyst-side metrics (`ambiguity_discipline`,
 generation tolerated the swap within ±3 %. Treat full-local mode as
 exploratory until you've run the probe on your own dataset.
 
+### 10.1 Remote Ollama (with auth) — NAS / reverse-proxy setups
+
+Local Ollama (above) assumes the daemon is on the same host as RTIA. For a
+NAS-hosted or otherwise remote Ollama, point RTIA at the remote URL and
+(optionally) authenticate via a Bearer token added to outgoing requests:
+
+```bash
+export RTIA_LLM_PROVIDER=ollama
+export RTIA_OLLAMA_HOST=https://nas.local:11435   # remote Ollama URL
+export RTIA_OLLAMA_AUTH_TOKEN=<token>             # only if a proxy fronts Ollama
+uv run python scripts/run_pipeline_demo.py
+```
+
+Ollama itself has no auth; the token is for a reverse proxy (Caddy,
+nginx, etc.) sitting in front of Ollama. When `RTIA_OLLAMA_HOST` is set
+and `RTIA_OLLAMA_AUTH_TOKEN` is also set, RTIA adds
+`Authorization: Bearer <token>` to every outgoing request via
+`langchain-ollama`'s `client_kwargs` plumbing. Setting the token alone
+(without the host) is a deliberate no-op so the header can't leak to a
+localhost request by accident.
+
+The canonical NAS-hosted recipe — Docker compose for Ollama + Caddy,
+hardening flags, router firewall guidance, three end-to-end verification
+probes — lives in [`nas-ollama-setup.md`](nas-ollama-setup.md).
+
 ## 11. Deterministic UI testing with the fake provider
 
 A third provider value, `RTIA_LLM_PROVIDER=fake`, returns canned JSON

@@ -42,6 +42,7 @@ from agents.config import (
     DEFAULT_OLLAMA_MODEL,
     DEFAULT_TIMEOUT_SECONDS,
     OLLAMA_JUDGE_MODEL_ENV_VAR,
+    ollama_remote_kwargs,
     use_ollama_judge,
 )
 
@@ -84,6 +85,7 @@ class GeminiJudge(DeepEvalBaseLLM):
                 model=judge_model,
                 temperature=0,
                 format="json",
+                **ollama_remote_kwargs(),
             )
         return ChatGoogleGenerativeAI(
             model=self._model_id,

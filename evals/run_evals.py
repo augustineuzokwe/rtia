@@ -50,6 +50,7 @@ from agents.config import (  # noqa: E402
     DEFAULT_OLLAMA_MODEL,
     DEFAULT_TIMEOUT_SECONDS,
     OLLAMA_MODEL_ENV_VAR,
+    ollama_remote_kwargs,
     use_ollama,
 )
 from agents.requirements_analyst import _PROMPT_HASH, AnalystOutput  # noqa: E402
@@ -155,6 +156,7 @@ def _run_analyst_capturing_usage(text: str) -> tuple[AnalystOutput, UsageTelemet
             model=os.environ.get(OLLAMA_MODEL_ENV_VAR, DEFAULT_OLLAMA_MODEL),
             temperature=0,
             format="json",
+            **ollama_remote_kwargs(),
         )
     else:
         llm = ChatGoogleGenerativeAI(
