@@ -41,7 +41,7 @@ rtia/
 ├── tests/                 # Mocked unit tests
 ├── scripts/               # Live demo entry points (run_pipeline_demo.py)
 ├── evals/                 # Golden datasets + eval runner
-│   ├── sample-requirements/  # 3 sample inputs (well-structured, vague, multi-feature)
+│   ├── sample-requirements/  # 7 sample inputs (3 baseline + 4 adversarial)
 │   ├── EVAL_DATA_SPEC.md     # Contract for ground-truth files
 │   └── validate_samples.py   # Sample structural validator
 ├── .github/workflows/     # CI (lint + format + tests)
@@ -69,6 +69,8 @@ uv run pre-commit run --all-files    # format + lint everything
 uv run python scripts/run_pipeline_demo.py            # default sample-01
 uv run python scripts/run_pipeline_demo.py sample-02-vague-ambiguous.md
 uv run python scripts/run_pipeline_demo.py sample-03-multi-feature.md
+# Samples 04-07 are adversarial (injection / data-extraction / human-imperative)
+# and are exercised by evals/run_evals.py rather than the interactive demo.
 uv run python scripts/run_api.py                       # FastAPI + Gradio UI at http://127.0.0.1:8000/?token=…
 ```
 
@@ -95,6 +97,10 @@ This is the *commit-time* layer; the runtime layer (`agents/_secret_scan.py`, #1
 
 **Environment mode (`RTIA_ENV`):** controls the production-tracing guard. Allowed values: `development` (default when unset), `ci`, `production`. When `RTIA_ENV=production` AND `LANGSMITH_TRACING=true`, the demo and any entry point calling `assert_safe_for_env()` refuse to start to prevent requirement text (potentially containing customer PII) from being persisted to LangSmith. See [docs/adr-0008-pii-langsmith.md](docs/adr-0008-pii-langsmith.md).
 
+**LLM provider (`RTIA_LLM_PROVIDER`):** chooses which backend serves the four pipeline agents and the eval judge. Allowed values: `google` (default — paid Gemini Flash via `langchain-google-genai`, per §4.9), `ollama` (local model via a reachable Ollama server; set `OLLAMA_HOST` + an Ollama-pulled `OLLAMA_MODEL`), or `fake` (canned fixtures, zero LLM calls — for graph-level tests; shipped via #312–#316). An invalid value raises rather than silently falling back. The optional `RTIA_OLLAMA_JUDGE=1` flips just the eval judge to Ollama while leaving the pipeline on the primary provider (#243 / PR #244).
+
+**CI gates:** the live regression eval gate is currently **disabled on CI** (`if: false` in `.github/workflows/ci.yml`, shipped via #348 after the brief #340 re-enable proved runner-pool 5xx weather wins). CI gates only on the free deterministic `quality` job (lint + ~570 mocked tests). Live eval is a manual/local step: `uv run python evals/run_evals.py --no-cache`. Full context, the why, and the flip-switch contract live in [docs/ci-and-testing.md](docs/ci-and-testing.md).
+
 ---
 
 ## 4. Hard rules (non-negotiable)
@@ -109,7 +115,7 @@ Unit tests with mocks validate the *contract*. They do not validate behavior. Be
 2. `uv run pre-commit run --all-files` - necessary, not sufficient
 3. **Live exercise** of the change as a user would invoke it
 
-For agent or prompt changes specifically: **run the live demo on all 3 samples** (sample-01, sample-02, sample-03) and eyeball the output for the expected behavior shift. Mocked tests cannot detect prompt-level regressions.
+For agent or prompt changes specifically: **run the live demo on the 3 baseline samples** (`sample-01`, `sample-02`, `sample-03`) and eyeball the output for the expected behavior shift, *and* run `evals/run_evals.py` locally so the 4 adversarial samples (`sample-04`..`sample-07`) get exercised too. Mocked tests cannot detect prompt-level regressions, and a single sample is not the same shape as the other six.
 
 For external integrations (LangSmith, durable checkpointer, GH Actions): trigger the integration with real credentials and confirm the external system shows the expected effect.
 
@@ -131,7 +137,7 @@ If you don't have the API key needed for end-to-end verification: open the PR as
 
 - Before opening a PR: find an existing GitHub issue (US-01..US-16 user stories or numbered issues) that the PR fulfills, or **create a new issue** describing the work.
 - Add `Closes #N` to the PR body (so merge auto-closes the issue).
-- Add the issue to the maintainer's GitHub Project board and set status:
+- Add the issue to the maintainer's **GitHub Project #5** and set status:
   - **Backlog** → no work scheduled
   - **In Progress** → branch cut, work underway
   - **In Review** → PR opened
@@ -139,7 +145,7 @@ If you don't have the API key needed for end-to-end verification: open the PR as
 
 Native project workflows are enabled: "Item closed → Status: Done" and "Pull request merged → Status: Done". The `Closes #N` link triggers issue auto-close on merge, which fires the Done workflow.
 
-The board's project ID, status field ID, and per-status option IDs live in the maintainer's local notes. Look them up with `gh project list --owner <maintainer>` and `gh project field-list <project-number> --owner <maintainer> --format json`.
+Project #5's status field ID and per-status option IDs live in the maintainer's local notes. Look them up with `gh project field-list 5 --owner <maintainer> --format json`.
 
 ### 4.5 Verify facts before recommending
 
@@ -148,7 +154,7 @@ Never recommend APIs, libraries, model parameters, or CLI commands from training
 - Live docs
 - The repo's own code
 
-Confidently wrong is worse than uncertainly right. Flag uncertainty inline ("verified against installed v0.8.5", "best-guess - verify before using").
+For any API method, library behaviour, or CLI flag named in a response: include a one-line proof inline (a paste from `--help`, the package source, or a live doc URL), or explicitly label the claim as unverified. No naked claims. Confidently wrong is worse than uncertainly right.
 
 ### 4.6 Don't impose architecture
 
@@ -181,6 +187,8 @@ Before committing, audit your change for:
 - **Consistency**: does it match the patterns already used in adjacent files?
 - **No surprise side effects**: are you touching files outside the stated scope without callout?
 
+For anything publicly visible (PR descriptions, commit messages, docs, blog content): also ask "does this read well to a stranger following this project?" — the repo is public and people read it cold.
+
 This complements 4.6 - review for these, not for "did I follow clean-architecture textbook patterns."
 
 ### 4.9 Default model is paid Gemini Flash; other paid models require justification
@@ -189,7 +197,7 @@ This complements 4.6 - review for these, not for "did I follow clean-architectur
 
 Cost expectations under the default stack:
 - Full pipeline demo: ≈$0.005
-- Full eval run (3 samples, judge included): ≈$0.03
+- Full eval run (all 7 samples, judge included): a few cents
 - ~10× cheaper than the prior Claude Opus 4.7 baseline (≈$0.30–0.50 per demo, ≈$1–2 per eval).
 
 Adding any *other* paid LLM call (Anthropic Claude, OpenAI, larger Gemini Pro) requires:
@@ -198,6 +206,30 @@ Adding any *other* paid LLM call (Anthropic Claude, OpenAI, larger Gemini Pro) r
 3. Explicit user cost approval per `feedback_cost_approval`.
 
 This rule exists because the workshop's cost target is "as close to $0 as quality allows" - not strict $0. The Gemini cutover proved RTIA's quality is fine on Flash; the paid tier removes the 20 RPD ceiling without meaningfully changing the cost target.
+
+### 4.10 Close the PR loop yourself
+
+After opening a PR, don't park it waiting for the user to click merge. The flow is: wait for CI green → self-review the diff with critical eyes (treat it like someone else wrote it) → squash-merge with `--delete-branch`. Only stop short of merging when CI is red, the diff actually warrants discussion, or the user has explicitly asked to hold.
+
+From inside a git worktree, `gh pr merge --squash --delete-branch` may fail with `'main' is already used by worktree at <path>` because the CLI tries to update the local main checkout. Fall back to the API call: `gh api -X PUT repos/<owner>/<repo>/pulls/<n>/merge -f merge_method=squash`. The remote branch is usually auto-deleted by the repo's "delete branch on merge" setting.
+
+This pairs with 4.8. Self-review at commit time catches what you wrote; this self-review (post-CI, pre-merge) catches what the diff *as a whole* looks like to a reader.
+
+### 4.11 Comments explain WHY, not WHAT
+
+The code already shows what it does. Comments fill the intent gap a future reader can't infer from the code itself - trade-offs, non-obvious constraints, "we tried X first and it broke because Y." If a comment restates what the code does, delete it.
+
+Specifically avoid:
+- Ceremonial comments (`# constructor`, `# helper function`, `// loop through items`)
+- Restating type signatures the code already has
+- `TODO` without a linked issue
+
+Specifically keep:
+- Why this approach was picked over the obvious alternative
+- External constraint refs (link to ADR, issue, or upstream bug)
+- Non-obvious failure modes the code defends against
+
+This complements 4.6 (don't over-engineer) and 4.8 (self-review) - same family. Readers shouldn't have to dig in the author's head to understand the WHY.
 
 ---
 
@@ -219,21 +251,20 @@ When designing or modifying any agent, start from: **which section of the final 
 
 ## 6. Where the roadmap lives
 
-The 16-phase road-to-production plan lives in the maintainer's local working notes (not in this repo). Ask the maintainer if you need the current plan location.
+The original 16-phase road-to-production plan is **complete** (v1.1.0 shipped). Ongoing work is now tracked as Epics + Issues on **GitHub Project #5**, not in a local plan file. The project's learning focus remains: **testing AI applications + integrating AI into QA processes**.
 
-The plan is ordered for the maintainer's learning focus: **testing AI applications + integrating AI into QA processes**. Phases 4-6 (golden dataset → DeepEval suite → CI eval gate) come before remaining agent work so each new agent is built on calibrated test foundations, not retrofitted.
-
-Don't start work on a phase without first reading the relevant section of the plan. If a question of priority or dependency arises mid-phase, the plan is the source of truth.
+For any new piece of work: find the relevant Epic on Project #5, or create a new Epic + child Issues, before opening a PR. If priority or dependency is unclear, the Project board is the source of truth.
 
 ---
 
 ## 7. Things that have bitten us (read these before they bite again)
 
-- **Gemini's caching API ≠ Anthropic's `cache_control`** - Gemini uses a separate `client.caches.create()` call referenced via the `cached_content` kwarg. Anthropic-style inline `cache_control: ephemeral` blocks do not exist on Gemini and were removed in the ADR-0006 cutover. We currently use no caching (prompts are small enough; free tier removes cost driver).
+- **Gemini's caching API ≠ Anthropic's `cache_control`** - Gemini uses a separate `client.caches.create()` call referenced via the `cached_content` kwarg. Anthropic-style inline `cache_control: ephemeral` blocks do not exist on Gemini and were removed in the ADR-0006 cutover.
+- **RTIA has its own LLM response cache** - keyed on `sha256(model_id + prompt_hash + canonicalised messages)` per `agents/_llm_utils.py:_make_cache_key`, used for local eval iteration so a re-run on unchanged inputs is free. **Disabled in the CI regression job** via both `RTIA_LLM_CACHE=disabled` *and* `--no-cache` (belt-and-suspenders so removing one still leaves the other in place). Any change to model id, prompt, or message content auto-invalidates the cache. See [ADR-0013](docs/adr-0013-llm-response-cache.md) for the false-green CI trap this prevents.
 - **Gemini's max-tokens kwarg is `max_output_tokens`** - not `max_tokens`. Pre-cutover agent code used `max_tokens`; renamed across the pipeline in the ADR-0006 cutover.
 - **Gemini's LangChain wrapper validates `GOOGLE_API_KEY` at construction time** - Anthropic's defers to `invoke`. Tests need a placeholder key via `tests/conftest.py`'s autouse fixture, or `ChatGoogleGenerativeAI(...)` raises `pydantic.ValidationError` before any mock can intercept.
 - **Gemini sometimes wraps JSON output in ` ```json ` fences** despite a "no fences" instruction. `agents/_llm_utils.py:strip_json_fence()` trims them defensively. Apply to every Gemini agent.
-- **Single-sample testing is overfitting** - always test prompt changes on all 3 sample types (well-structured, vague, multi-feature). The behavior on one sample is *not* the behavior on others.
+- **Single-sample testing is overfitting** - always test prompt changes on all 7 sample types (3 baseline: well-structured, vague, multi-feature; 4 adversarial: injection-suffix, injection-inline, data-extraction, transcript-human-imperatives). The behavior on one sample is *not* the behavior on others.
 - **Worked examples beat prose rules** - when the model isn't following a prompt rule, add a concrete worked example with correct output. Far stronger than rule iteration.
 - **Worktrees can quietly switch** - Bash `cd` doesn't persist between tool calls in some Claude Code environments. Use absolute paths and `pwd && git status` at start of multi-step blocks.
 - **msgpack deserialization warning** - `AnalystOutput` etc. need to be registered for checkpointing. The current msgpack allowlist in `agents/graph.py:_allowlisted_serde()` handles this; until anything new lands, the warning is benign noise.
