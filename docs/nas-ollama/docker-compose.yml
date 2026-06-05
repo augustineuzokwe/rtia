@@ -5,16 +5,20 @@
 # Bearer-token check happens at Caddy, not Ollama, because Ollama has
 # no native auth (https://github.com/ollama/ollama/issues/849).
 #
-# Why this file is checked in standalone (not inlined in the .md guide):
-# UGOS Docker Compose UI imports YAML files directly, and copy-pasting
-# from a markdown code fence is error-prone (loses indentation, smuggles
-# stray backticks). Import this file as-is.
+# Single-file by design: the Caddyfile is inlined via the `configs:`
+# block at the bottom, so this whole file can be pasted straight into
+# the UGOS Docker "Create project" Compose field with nothing else to
+# upload. (UGOS's Compose UI is paste-only; there's no sidecar-file
+# tab, so a separate ./Caddyfile mount would silently fail to start.)
 #
 # Before bringing it up:
 #   1. CHANGE /CHANGE-ME/ollama-models on the volumes line below to a
 #      path on your fast disk (M.2 SSD if you have one). Cold loads of
 #      4-8 GB models from HDD are slow enough to matter.
-#   2. export OLLAMA_AUTH_TOKEN=<your-token>  (see docs/nas-ollama-setup.md)
+#   2. Set OLLAMA_AUTH_TOKEN in the project environment (UGOS: the
+#      "PUID=1000 PGID=10" environment field; CLI: an .env file next to
+#      this one, or `export OLLAMA_AUTH_TOKEN=...`). See
+#      docs/nas-ollama-setup.md "Generating the token".
 
 services:
   ollama:
@@ -77,23 +81,23 @@ services:
     # both this line and RTIA_OLLAMA_HOST on the client.
     ports:
       - "11435:11435"
+    configs:
+      # Caddyfile is delivered via the inline `configs:` block below
+      # rather than a bind-mounted ./Caddyfile, so the stack is a single
+      # paste into the UGOS GUI. mode 0444 = read-only to all; a
+      # compromised Caddy can't rewrite its own auth config.
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+        mode: 0444
     volumes:
-      # Caddyfile is mounted read-only so a compromised Caddy can't
-      # rewrite its own config to disable the auth gate. Keep
-      # docker-compose.yml and Caddyfile in the same directory on the
-      # NAS so this relative path resolves correctly.
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      # Caddy writes TLS state + config snapshots here. Named volumes
-      # are writable; that's why read_only: true on Caddy itself is
-      # safe to use (writes land in the named volumes, not on the
-      # locked root FS).
+      # Caddy writes TLS state + config snapshots here (persistent across
+      # restarts - the data dir is not a cache).
       - caddy_data:/data
       - caddy_config:/config
     environment:
-      # Token value is injected from the operator's environment. Don't
-      # hardcode it in Caddyfile or commit it. See
-      # docs/nas-ollama-setup.md "Generating the token" for the
-      # openssl recipe.
+      # Token value is injected from the project environment. Don't
+      # hardcode it in the configs block or commit it. See
+      # docs/nas-ollama-setup.md "Generating the token".
       - OLLAMA_AUTH_TOKEN
     cap_drop:
       - ALL
@@ -101,11 +105,14 @@ services:
       # Required to bind a privileged port if you ever move :11435 →
       # :443. Drop if staying on high ports.
       - NET_BIND_SERVICE
-    read_only: true
-    tmpfs:
-      # Caddy uses /tmp for short-lived scratch files (template
-      # rendering, occasional debug dumps).
-      - /tmp
+    # NOT used here: `read_only: true`. Docker cannot deliver an inline
+    # `configs:` (content:) entry into a read-only service - it fails at
+    # startup with "cannot create config ... in read-only service caddy:
+    # `file` is the sole supported option". Since the single-paste UGOS
+    # deploy depends on the inline Caddyfile, read_only is dropped here.
+    # The remaining hardening (cap_drop ALL, no-new-privileges, network
+    # isolation, single host port) carries the weight; Caddy's own
+    # writable paths are scoped to the named volumes above regardless.
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
@@ -113,6 +120,43 @@ services:
       - rtia-llm
     depends_on:
       - ollama
+
+configs:
+  caddyfile:
+    # Inline Caddyfile. NOTE the `$$` on the token line: Docker Compose
+    # interpolates single `$` in this file, so `{$OLLAMA_AUTH_TOKEN}`
+    # would be eaten by Compose before Caddy sees it. `$$` renders to a
+    # literal `$` in the materialised config, leaving Caddy's own
+    # `{$OLLAMA_AUTH_TOKEN}` env-substitution syntax intact. Caddy then
+    # substitutes the token from its container environment at load time.
+    content: |
+      :11435 {
+          # Structured logging. Caddy redacts the Authorization header by
+          # default, so the token is never logged - only request + status.
+          log {
+              output stdout
+              format console
+              level INFO
+          }
+
+          # Bearer-token gate. Matches the request's Authorization header
+          # against "Bearer <token>", where <token> is substituted by
+          # Caddy from the OLLAMA_AUTH_TOKEN env var at config-load time.
+          @authorized header Authorization "Bearer {$$OLLAMA_AUTH_TOKEN}"
+
+          handle @authorized {
+              reverse_proxy ollama:11434 {
+                  # Stream tokens as Ollama produces them (don't buffer
+                  # the whole response until inference ends).
+                  flush_interval -1
+              }
+          }
+
+          handle {
+              # Anything unauthenticated gets a bare 401, no hint why.
+              respond "Unauthorized" 401
+          }
+      }
 
 networks:
   rtia-llm:

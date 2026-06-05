@@ -26,21 +26,23 @@ Ship all three; don't skip the firewall on the assumption "Caddy will catch it."
 
 ---
 
-## 1. `docker-compose.yml` and `Caddyfile`
+## 1. `docker-compose.yml`
 
-Two standalone files live under [`docs/nas-ollama/`](nas-ollama/):
+One file: [`docs/nas-ollama/docker-compose.yml`](nas-ollama/docker-compose.yml).
+The Caddyfile is inlined inside it via the Compose `configs:` block, so there's
+nothing else to copy. Paste the whole file into the UGOS Docker "Create project"
+Compose field, or `docker compose up -d` from the command line on any NAS OS.
 
-- [`docker-compose.yml`](nas-ollama/docker-compose.yml) — the two-service stack
-- [`Caddyfile`](nas-ollama/Caddyfile) — the Bearer-token proxy config
+**Before bringing it up, do two things:**
 
-Download or copy both to the same directory on your NAS (e.g.
-`/volume1/docker/rtia-ollama/`). Import the compose file via the UGOS Docker
-Compose UI, or `docker compose up -d` from the command line on any NAS OS.
-
-**Before bringing it up, edit one line:** the `volumes` entry for the
-`ollama` service has `/CHANGE-ME/ollama-models` as the left-side bind-mount
-path. Change it to a directory on your fast disk (M.2 SSD strongly preferred
-since cold loads of 4–8 GB models from HDD are noticeably slow).
+1. **Edit one line:** the `volumes` entry for the `ollama` service has
+   `/CHANGE-ME/ollama-models` as the left-side bind-mount path. Change it to a
+   directory on your fast disk (M.2 SSD strongly preferred since cold loads of
+   4–8 GB models from HDD are noticeably slow).
+2. **Set `OLLAMA_AUTH_TOKEN`** in the project environment (see
+   [§2](#2-generating-the-token)). In the UGOS GUI that's the environment field
+   on the Create-project screen; on the CLI an `.env` file next to the compose
+   file, or `export OLLAMA_AUTH_TOKEN=...` before `docker compose up`.
 
 ### What the stack does, in one paragraph
 
@@ -50,23 +52,23 @@ host port (`:11435`); `ollama` has no `ports:` block, so it's only reachable
 via the `OLLAMA_HOST` env var, because the default is localhost-only and
 Caddy in a sibling container can't reach a sibling's loopback). Caddy
 forwards authenticated requests over the bridge to `ollama:11434`. Both
-services run with `cap_drop: ALL`, `security_opt: no-new-privileges`, and
-resource limits; Caddy additionally runs `read_only: true` (its writable
-paths are explicit named volumes), Ollama does not (see "On hardening"
-below).
+services run with `cap_drop: ALL` and `security_opt: no-new-privileges`;
+Ollama additionally gets resource limits.
 
-### On hardening, two notes worth understanding before changing things
+### On hardening, three notes worth understanding before changing things
 
-**Why `read_only: true` is on Caddy but NOT on Ollama.** Ollama writes
-runtime state (SSH-style keys, lock files, occasional cached binaries) in
-places that aren't always covered by a single bind mount + tmpfs. Multiple
-upstream reports ([ollama #7471](https://github.com/ollama/ollama/issues/7471)
-and similar on Bazzite, NixOS) confirm that `read_only: true` can break
-Ollama startup. The safer call is to drop `read_only` on Ollama and keep
-the other hardening (`cap_drop: ALL`, `no-new-privileges`, mem/cpu limits,
-network isolation, no host port). Caddy's writable paths are scoped to
-named volumes (`caddy_data`, `caddy_config`), so its `read_only: true` is
-safe.
+**Why neither service uses `read_only: true`.** It was tried on both and
+dropped on both, for different reasons. On Ollama, `read_only` breaks startup
+because Ollama writes runtime state (SSH-style keys, lock files, cached
+binaries) in places a single bind mount + tmpfs doesn't cover (upstream
+[ollama #7471](https://github.com/ollama/ollama/issues/7471) and similar on
+Bazzite, NixOS). On Caddy, Docker refuses to deliver the inline `configs:`
+Caddyfile into a read-only service (`cannot create config ... in read-only
+service caddy: \`file\` is the sole supported option`), and the single-paste
+deploy depends on that inline Caddyfile. Both were verified by actually
+bringing the stack up, not just linting it. The remaining hardening
+(`cap_drop: ALL`, `no-new-privileges`, network isolation, single host port)
+carries the weight.
 
 **Why neither service has a `user:` directive (and the UGOS PUID/PGID GUI
 hint doesn't apply).** UGOS Docker UI suggests setting `PUID=1000 PGID=10`
@@ -82,9 +84,11 @@ export of the models directory, for example), `chown` the bind-mount
 directory after the first `ollama pull` instead of fighting the container
 image.
 
-**Verify the YAML before deploying:** `docker compose config -f docker-compose.yml`
-parses and expands the file. A syntax error is much cheaper to find on
-your laptop than after it's running on the NAS.
+**Why the token line in the inlined Caddyfile uses `$$`.** Docker Compose
+interpolates `$` in the compose file, so a bare `{$OLLAMA_AUTH_TOKEN}` in the
+`configs:` content would be eaten by Compose before Caddy ever saw it. The
+`$$` renders to a literal `$` in the materialised config, leaving Caddy's own
+`{$OLLAMA_AUTH_TOKEN}` env-substitution intact. Leave the `$$` as-is.
 
 ---
 
@@ -113,7 +117,7 @@ TrueNAS, Unraid all do this differently; check your OS's docs).
 
 ## 3. Router-level guidance
 
-The compose + Caddyfile above give you authenticated remote Ollama. The
+The compose stack above gives you authenticated remote Ollama. The
 firewall layer is what prevents a compromised LAN device (a guest phone,
 an IoT bulb, the kid's laptop) from probing Ollama at all, even with
 the right token.
@@ -177,8 +181,9 @@ curl -sv http://<NAS-IP>:11435/api/tags 2>&1 | tail -20
 Expected: HTTP 401 with body `Unauthorized`.
 
 If 200: the auth layer isn't holding. Caddy may not be loading the env
-var, or the Caddyfile matcher isn't catching the no-header case. Check
-`docker compose logs caddy` and re-read the Caddyfile.
+var (check `OLLAMA_AUTH_TOKEN` is set in the project environment), or the
+matcher in the inlined Caddyfile isn't catching the no-header case. Check
+`docker compose logs caddy` and re-read the `configs:` block in the compose file.
 
 ### Probe 3: with token, from a different LAN device → expect blocked
 
