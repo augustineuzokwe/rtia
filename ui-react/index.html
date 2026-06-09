@@ -3,7 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RTIA</title>
+    <title>RTIA — Requirements & Test Intelligence Assistant</title>
+    <script>
+      // Apply the persisted (or system) theme before first paint so dark
+      // mode never flashes white on load. Mirrors the logic in lib/theme.ts.
+      (function () {
+        try {
+          var stored = localStorage.getItem("rtia-theme");
+          var dark =
+            stored === "dark" ||
+            (!stored &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.documentElement.classList.add("dark");
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

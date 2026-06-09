@@ -10,6 +10,8 @@ A multi-agent AI assistant that takes raw software requirements - feature reques
 
 Two human-in-the-loop checkpoints keep a PO, PM, BA or QA in control: one *before* story generation (to resolve critical ambiguities) and one *after* (to review the generated story before AC generation).
 
+![RTIA's React UI: paste a requirement or drop a PDF/Markdown file, then run it through the Analyst → PO → Story → Acceptance → Tests → Review → Backlog pipeline](docs/img/ui-intake-dark.png)
+
 ## How It Works
 
 ```mermaid

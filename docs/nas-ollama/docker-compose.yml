@@ -1,0 +1,83 @@
+# RTIA local-LLM stack: Ollama behind a Caddy Bearer-token proxy.
+# Single file by design - the Caddyfile is inlined via `configs:` so the
+# whole stack pastes into the UGOS Docker UI with nothing else to upload.
+# Full rationale + setup steps: docs/nas-ollama-setup.md
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: rtia-ollama
+    volumes:
+      # CHANGE the left side to a path on your fast disk (M.2 SSD).
+      - /CHANGE-ME/ollama-models:/root/.ollama
+    environment:
+      # 0.0.0.0, not the default 127.0.0.1: Caddy in a sibling container
+      # can't reach Ollama's loopback. Safe - Ollama has no host port.
+      - OLLAMA_HOST=0.0.0.0:11434
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 24g
+    cpus: "4"
+    restart: unless-stopped
+    networks:
+      - rtia-llm
+
+  caddy:
+    image: caddy:latest
+    container_name: rtia-caddy
+    ports:
+      - "11435:11435"
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+        mode: 0444
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - OLLAMA_AUTH_TOKEN
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    # No read_only: incompatible with inline `configs:` (Docker refuses
+    # to start). See docs/nas-ollama-setup.md "On hardening".
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - rtia-llm
+    depends_on:
+      - ollama
+
+configs:
+  caddyfile:
+    content: |
+      :11435 {
+          log {
+              output stdout
+              format console
+              level INFO
+          }
+          # $$ (not $) - Compose interpolates single $ before Caddy sees
+          # it; $$ renders to a literal $ for Caddy's own env-substitution.
+          @authorized header Authorization "Bearer {$$OLLAMA_AUTH_TOKEN}"
+          handle @authorized {
+              reverse_proxy ollama:11434 {
+                  flush_interval -1
+              }
+          }
+          handle {
+              respond "Unauthorized" 401
+          }
+      }
+
+networks:
+  rtia-llm:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
