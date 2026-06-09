@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { AppHeader } from "@/components/AppHeader";
+import { Hero } from "@/components/Hero";
 import { IntakePanel } from "@/components/IntakePanel";
 import { RunPanel } from "@/components/RunPanel";
 import { RunSummary } from "@/components/RunSummary";
@@ -17,30 +19,24 @@ export default function App() {
   const [run, setRun] = useState<ActiveRun | null>(null);
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="container mx-auto max-w-[1100px] space-y-8 px-4 py-10">
-        <header className="space-y-1">
-          <h1 className="text-3xl font-semibold tracking-tight">RTIA</h1>
-          <p className="text-muted-foreground">
-            Requirements → backlog-ready user story.
-          </p>
-        </header>
-
+    <div className="min-h-screen bg-background text-foreground">
+      <AppHeader />
+      <main className="mx-auto max-w-[1100px] space-y-10 px-4 pb-16 pt-8">
         {run ? (
-          <>
+          <div className="space-y-6">
             <RunSummary
               threadId={run.state.thread_id}
               startedAt={run.startedAt}
             />
-            <RunPanel
-              initial={run.state}
-              onStartOver={() => setRun(null)}
+            <RunPanel initial={run.state} onStartOver={() => setRun(null)} />
+          </div>
+        ) : (
+          <>
+            <Hero />
+            <IntakePanel
+              onStarted={(state) => setRun({ state, startedAt: Date.now() })}
             />
           </>
-        ) : (
-          <IntakePanel
-            onStarted={(state) => setRun({ state, startedAt: Date.now() })}
-          />
         )}
 
         <footer className="border-t border-border pt-4 text-xs text-muted-foreground">
@@ -59,7 +55,7 @@ export default function App() {
           </a>{" "}
           available during the Epic 6 migration.
         </footer>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
