@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { UploadCloud } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -9,9 +10,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import {
   ApiError,
   runPipeline,
@@ -45,6 +46,7 @@ export function IntakePanel({ onStarted }: IntakePanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState<"upload" | "run" | null>(null);
+  const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const onUpload = async (file: File | undefined) => {
@@ -129,15 +131,40 @@ export function IntakePanel({ onStarted }: IntakePanelProps) {
 
         <div className="space-y-2">
           <Label htmlFor="file-upload">…or upload a file</Label>
-          <Input
-            id="file-upload"
-            data-testid="intake-file"
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.md,.markdown,application/pdf,text/markdown"
-            disabled={busy !== null}
-            onChange={(e) => onUpload(e.target.files?.[0])}
-          />
+          <label
+            htmlFor="file-upload"
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (busy === null) setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              if (busy === null) onUpload(e.dataTransfer.files?.[0]);
+            }}
+            className={cn(
+              "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-input bg-muted/30 px-4 py-6 text-center transition-colors hover:border-primary/50 hover:bg-accent/50",
+              dragging && "border-primary bg-accent",
+              busy !== null && "pointer-events-none opacity-50",
+            )}
+          >
+            <UploadCloud className="size-6 text-muted-foreground" aria-hidden />
+            <span className="text-sm font-medium">
+              {busy === "upload" ? "Extracting…" : "Drop a PDF or Markdown file, or click to browse"}
+            </span>
+            <span className="text-xs text-muted-foreground">.pdf · .md</span>
+            <input
+              id="file-upload"
+              data-testid="intake-file"
+              ref={fileInputRef}
+              type="file"
+              className="sr-only"
+              accept=".pdf,.md,.markdown,application/pdf,text/markdown"
+              disabled={busy !== null}
+              onChange={(e) => onUpload(e.target.files?.[0])}
+            />
+          </label>
         </div>
 
         <p className="text-xs text-muted-foreground" data-testid="intake-helper">
@@ -187,7 +214,19 @@ function humanizeError(e: unknown, kind: UploadKind | null): string {
     if (e.status === 401) {
       return "API token missing or invalid. Reopen the URL printed in the server banner.";
     }
+    // 5xx on the intake calls means the request never reached a working
+    // pipeline — almost always the backend (or its Vite proxy) is down,
+    // not a real run error (those return 200 with status="error").
+    if (e.status >= 500) {
+      return "Can't reach the RTIA backend. Is the API server running on :8000?";
+    }
     return e.message;
+  }
+  // fetch() rejects with a TypeError when the network call itself fails
+  // (server not listening, CORS, dropped connection) — surface the same
+  // actionable hint rather than the cryptic "Failed to fetch".
+  if (e instanceof TypeError) {
+    return "Can't reach the RTIA backend. Is the API server running on :8000?";
   }
   if (kind === "pdf") {
     return "PDF upload failed. Check the server logs and try again.";
