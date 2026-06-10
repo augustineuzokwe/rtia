@@ -23,7 +23,7 @@ from pathlib import Path
 
 import yaml
 
-_CI_WORKFLOW = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "ci.yml"
+_CI_WORKFLOW = Path(__file__).resolve().parent.parent.parent / ".github" / "workflows" / "ci.yml"
 
 
 def _load_ci_workflow() -> dict:
