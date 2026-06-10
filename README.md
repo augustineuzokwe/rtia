@@ -159,7 +159,7 @@ The demo runs the pipeline against `evals/sample-requirements/sample-01-well-str
 uv run python scripts/run_api.py
 ```
 
-Starts a FastAPI server on `127.0.0.1:8000`. The React SPA is served at `/` from `ui-react/dist/` (run `cd ui-react && npm install && npm run build` once); the legacy Gradio UI stays mounted at `/legacy` during the Epic 6 migration. The startup banner prints a tokenized URL (`http://127.0.0.1:8000/?token=…`) - open it in a browser to paste a requirement or upload a PDF/Markdown file and step through the PO and review checkpoints. All API endpoints require `Authorization: Bearer <token>`; set `RTIA_API_TOKEN` in `.env` to pin a stable token across restarts.
+Starts a FastAPI server on `127.0.0.1:8000`. The React SPA is served at `/` from `ui-react/dist/` (run `pnpm install && pnpm --filter ui-react build` once); the legacy Gradio UI stays mounted at `/legacy` during the Epic 6 migration. The startup banner prints a tokenized URL (`http://127.0.0.1:8000/?token=…`) - open it in a browser to paste a requirement or upload a PDF/Markdown file and step through the PO and review checkpoints. All API endpoints require `Authorization: Bearer <token>`; set `RTIA_API_TOKEN` in `.env` to pin a stable token across restarts.
 
 ### Run the tests
 

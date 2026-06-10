@@ -1,0 +1,9 @@
+# pnpm workspace — the JS side of RTIA (frontend + E2E) on one package
+# manager, with a shared content-addressed store and a single root
+# pnpm-lock.yaml. Shared tooling deps stay aligned by hand (the two
+# packages barely overlap, so a catalog buys little — see ADR/plan).
+#
+# `e2e` is added here when the Playwright suite is scaffolded (Epic 7, #305).
+packages:
+  - ui-react
+  # - e2e
