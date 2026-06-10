@@ -20,7 +20,7 @@ def _load_smoke_module():
     """Import the script as a module so we can unit-test its helpers."""
     spec = importlib.util.spec_from_file_location(
         "rtia_smoke",
-        Path(__file__).resolve().parent.parent / "scripts" / "run_integration_smoke.py",
+        Path(__file__).resolve().parent.parent.parent / "scripts" / "run_integration_smoke.py",
     )
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None

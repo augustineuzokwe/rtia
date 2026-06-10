@@ -188,7 +188,7 @@ class TestNightlyWorkflowContract:
         import yaml
 
         wf_path = (
-            Path(__file__).resolve().parent.parent
+            Path(__file__).resolve().parent.parent.parent
             / ".github"
             / "workflows"
             / "nightly-safety-regression.yml"

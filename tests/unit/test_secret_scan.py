@@ -203,7 +203,7 @@ def test_multiple_findings_returned_in_position_order() -> None:
 # ---------------------------------------------------------------------------
 
 
-_SAMPLES_DIR = Path(__file__).resolve().parent.parent / "evals" / "sample-requirements"
+_SAMPLES_DIR = Path(__file__).resolve().parent.parent.parent / "evals" / "sample-requirements"
 
 
 def test_all_committed_samples_scan_clean() -> None:
