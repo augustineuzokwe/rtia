@@ -71,8 +71,11 @@ uv run python scripts/run_pipeline_demo.py sample-02-vague-ambiguous.md
 uv run python scripts/run_pipeline_demo.py sample-03-multi-feature.md
 # Samples 04-07 are adversarial (injection / data-extraction / human-imperative)
 # and are exercised by evals/run_evals.py rather than the interactive demo.
-uv run python scripts/run_api.py                       # FastAPI + Gradio UI at http://127.0.0.1:8000/?token=…
+pnpm install && pnpm --filter ui-react build           # build the React SPA once (served at / by run_api.py)
+uv run python scripts/run_api.py                       # FastAPI + React UI at http://127.0.0.1:8000/?token=…
 ```
+
+**Frontend tooling is pnpm** (a workspace at the repo root, `pnpm-workspace.yaml`). `ui-react/` is the React SPA; the `e2e/` Playwright project joins the workspace under Epic 7. `run_api.py` serves the pre-built `ui-react/dist/` at `/`; if it's missing, `GET /` returns a 500 with the build hint - run `pnpm --filter ui-react build` first.
 
 The demo requires `GOOGLE_API_KEY` in `.env` (see `.env.example`). LangSmith tracing is optional - set `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY=lsv2_pt_…` + `LANGSMITH_PROJECT=rtia` to enable.
 

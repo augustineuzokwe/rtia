@@ -3,9 +3,14 @@ __pycache__/
 *.py[codz]
 *$py.class
 
-# Node / Vite (ui-react)
+# Node / Vite / pnpm (ui-react + e2e workspace)
 node_modules/
+.pnpm/
 ui-react/dist/
+# Playwright E2E artefacts (e2e/ scaffolded under Epic 7)
+e2e/test-results/
+e2e/playwright-report/
+e2e/.cache/
 
 # C extensions
 *.so
