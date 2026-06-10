@@ -238,8 +238,12 @@ LEARNINGS.md
 evals/reports/
 .deepeval*
 
-# Claude Code per-checkout state - scheduled-task lock + local settings
-.claude/
+# Claude Code per-checkout state - scheduled-task lock + local settings.
+# Ignore everything under .claude/ EXCEPT the project-scoped subagents we've
+# vendored + hardened for this repo (the Playwright E2E team). launch.json,
+# local settings, and worktrees stay ignored.
+.claude/*
+!.claude/agents/
 
 # macOS Finder artefacts - created automatically whenever a folder is
 # opened in Finder. Ignore both top-level and nested to catch them
