@@ -3,9 +3,14 @@ __pycache__/
 *.py[codz]
 *$py.class
 
-# Node / Vite (ui-react)
+# Node / Vite / pnpm (ui-react + e2e workspace)
 node_modules/
+.pnpm/
 ui-react/dist/
+# Playwright E2E artefacts (e2e/ scaffolded under Epic 7)
+e2e/test-results/
+e2e/playwright-report/
+e2e/.cache/
 
 # C extensions
 *.so
@@ -238,7 +243,10 @@ LEARNINGS.md
 evals/reports/
 .deepeval*
 
-# Claude Code per-checkout state - scheduled-task lock + local settings
+# Claude Code per-checkout state - scheduled-task lock, local settings,
+# and project-scoped subagents (the Playwright pw-* team). The repo is
+# public, so these stay OUT of git and live only in each maintainer's
+# local checkout. (They were briefly tracked in #377; removed in #380.)
 .claude/
 
 # macOS Finder artefacts - created automatically whenever a folder is

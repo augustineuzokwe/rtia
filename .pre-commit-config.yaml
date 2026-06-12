@@ -37,6 +37,7 @@ repos:
   # Excludes:
   #   .secrets.baseline - the file itself (would self-flag)
   #   uv.lock          - package hashes look like high-entropy secrets
+  #   pnpm-lock.yaml   - same: pnpm integrity hashes read as high-entropy
   #   evals/reports/   - generated artifacts, gitignored but listed
   #                      defensively in case a contributor force-adds
   - repo: https://github.com/Yelp/detect-secrets
@@ -48,5 +49,6 @@ repos:
           (?x)^(
             \.secrets\.baseline|
             uv\.lock|
+            pnpm-lock\.yaml|
             evals/reports/.*
           )$
