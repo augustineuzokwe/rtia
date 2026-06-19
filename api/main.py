@@ -1,6 +1,6 @@
 """FastAPI application factory for RTIA's Phase 14 surface.
 
-Mounts the Gradio UI at ``/`` so a single process + a single token covers
+Serves the React SPA at ``/`` so a single process + a single token covers
 both API and UI. The startup banner prints a tokenized URL the operator
 can open directly.
 
@@ -11,7 +11,7 @@ Layered like the demo script:
    AND LangSmith tracing is on (Phase 12.4 guard).
 3. Mint the API token (or read ``RTIA_API_TOKEN``).
 4. Build the runner (one compiled pipeline per process).
-5. Mount routes + Gradio.
+5. Mount routes + the React UI.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from langgraph.errors import InvalidUpdateError
 from pydantic import BaseModel, Field
@@ -183,15 +183,14 @@ def create_app(runner: PipelineRunner | None = None, token: str | None = None) -
 
     _register_routes(app)
     _install_ui_auth_middleware(app)
-    _mount_gradio(app)
     _mount_react(app)
     return app
 
 
 def _install_ui_auth_middleware(app: FastAPI) -> None:
-    """Gate the Gradio mount on the same token as the API routes.
+    """Gate the React static mount on the same token as the API routes.
 
-    ``mount_gradio_app`` mounts the UI as a sub-application that bypasses
+    ``StaticFiles`` mounts the SPA as a sub-application that bypasses
     FastAPI's ``Depends`` machinery, so per-route auth doesn't apply. The
     middleware accepts the token from any of three sources, in order:
 
@@ -199,14 +198,14 @@ def _install_ui_auth_middleware(app: FastAPI) -> None:
     2. ``?token=…`` query param (one-click open from the printed URL).
     3. ``rtia_token`` cookie (auto-set after a successful #1 or #2,
        so the browser doesn't 401 itself on the absolute-path asset
-       fetches Gradio emits - ``/assets/index-*.js`` etc. - which the
+       fetches the SPA emits - ``/assets/index-*.js`` etc. - which the
        browser fires *without* the original query string).
 
     API routes ``/pipeline*`` / ``/uploads*`` skip the middleware (they
     have their own ``Depends(verify_token)`` that emits a richer 401),
     but they ALSO accept the cookie because the dependency in
     ``api/auth.py`` reads it. This means an in-browser fetch from the
-    Gradio JS bundle to the API hits succeed without the JS needing to
+    SPA JS bundle to the API hits succeed without the JS needing to
     know the token.
 
     Cookie is ``HttpOnly``, ``SameSite=Strict``, ``Path=/`` - adequate
@@ -463,38 +462,10 @@ def _register_routes(app: FastAPI) -> None:
         return UploadResult(text=text, char_count=len(text))
 
 
-def _mount_gradio(app: FastAPI) -> None:
-    """Mount the Gradio Blocks app at ``/legacy``.
-
-    Imported lazily so importing ``api.main`` for unit tests doesn't pay
-    the Gradio import cost (it pulls in numpy, pillow, etc.). Tests that
-    don't care about the UI mount construct ``create_app`` and use
-    ``TestClient`` against the API routes only.
-
-    Epic 6 (#291) moved this from ``/`` to ``/legacy`` so the React SPA
-    can take over the root. The mount is removed entirely in US-26.
-    """
-    import gradio as gr
-
-    from ui.gradio_app import build_blocks
-
-    # The bare ``/legacy`` path needs an explicit redirect to ``/legacy/``
-    # because ``mount_gradio_app`` mounts an inner ASGI app whose routes
-    # start at ``/``; Starlette forwards the exact-match ``/legacy`` to
-    # the inner app with an empty path, which it can't serve. Register
-    # the redirect **before** the mount so the route table sees it first.
-    @app.get("/legacy", include_in_schema=False)
-    def _legacy_redirect() -> RedirectResponse:
-        return RedirectResponse(url="/legacy/", status_code=307)
-
-    blocks = build_blocks(app)
-    gr.mount_gradio_app(app, blocks, path="/legacy")
-
-
 _REACT_DIST = Path(__file__).resolve().parent.parent / "ui-react" / "dist"
 _REACT_BUILD_HINT = (
     "ui-react build directory not found.\n"
-    "Run: cd ui-react && npm install && npm run build\n"
+    "Run: pnpm install && pnpm --filter ui-react build\n"
     f"Expected: {_REACT_DIST}\n"
 )
 
@@ -503,12 +474,9 @@ def _mount_react(app: FastAPI) -> None:
     """Serve the React SPA at ``/`` from ``ui-react/dist/``.
 
     When the build directory is missing (clean checkout that hasn't run
-    ``npm run build`` yet), register a fallback route that returns a
-    500 with build instructions instead of letting Starlette surface a
-    bare ``RuntimeError: Directory does not exist`` traceback.
-
-    Must be called *after* ``_mount_gradio`` so the ``/legacy`` Gradio
-    sub-app isn't shadowed by the ``/`` static mount.
+    ``pnpm --filter ui-react build`` yet), register a fallback route that
+    returns a 500 with build instructions instead of letting Starlette
+    surface a bare ``RuntimeError: Directory does not exist`` traceback.
     """
     if not _REACT_DIST.is_dir() or not (_REACT_DIST / "index.html").is_file():
 

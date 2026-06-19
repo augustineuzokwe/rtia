@@ -46,7 +46,7 @@ rtia/
 │   └── validate_samples.py   # Sample structural validator
 ├── .github/workflows/     # CI (lint + format + tests)
 ├── api/                   # FastAPI app + bearer-token auth + exporters bridge
-├── ui/                    # Gradio Blocks UI mounted at /
+├── ui-react/              # React + Tailwind + shadcn/ui SPA mounted at /
 ├── exporters/             # Jira + GitHub backends behind one Exporter Protocol
 └── docs/                  # ADRs + USAGE.md
 ```
@@ -88,7 +88,7 @@ uv run pre-commit run detect-secrets --all-files # verify the hook is clean
 
 This is the *commit-time* layer; the runtime layer (`agents/_secret_scan.py`, #124) catches secrets pasted into requirements at invocation time. Both are needed - they cover different threat surfaces.
 
-**API token (`RTIA_API_TOKEN`):** the `run_api.py` entrypoint mints a fresh URL-safe bearer token per process unless `RTIA_API_TOKEN` is set in `.env`. The token gates all `/pipeline*` and `/uploads/*` endpoints (`Authorization: Bearer <token>`) and the Gradio mount accepts it via `?token=…` so the printed startup URL is one-click. Set `RTIA_API_HOST` / `RTIA_API_PORT` to override the default `127.0.0.1:8000`.
+**API token (`RTIA_API_TOKEN`):** the `run_api.py` entrypoint mints a fresh URL-safe bearer token per process unless `RTIA_API_TOKEN` is set in `.env`. The token gates all `/pipeline*` and `/uploads/*` endpoints (`Authorization: Bearer <token>`) and the React UI mount accepts it via `?token=…` so the printed startup URL is one-click. Set `RTIA_API_HOST` / `RTIA_API_PORT` to override the default `127.0.0.1:8000`.
 
 **Multi-story split:** when the Analyst's output has `implied_stories ≥ 2`, the PO checkpoint emits a different interrupt payload (`{"mode": "split", "implied_stories": [...], "critical_ambiguities": [...]}`) and resume value (`{"selected_story_titles": [...], "answers": {...}}`); the conditional edge routes to `split_node` (pure Python, no LLM) which writes `state["split_stories"]` and ends. Terminal status is `ThreadStatus.DONE_SPLIT`. The Story Writer / AC Generator / Test Case Writer / Reviewer are SKIPPED entirely on this path. Single-story requirements (`implied_stories ≤ 1`) still go through the deep flow unchanged.
 

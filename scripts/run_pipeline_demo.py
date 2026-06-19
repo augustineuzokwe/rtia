@@ -95,7 +95,7 @@ def collect_po_answers(critical_questions: list[str]) -> dict[str, str]:
 def collect_split_selection(payload: dict) -> dict:
     """Phase 15.4 - CLI prompt for the split PO checkpoint.
 
-    Mirrors the Gradio CheckboxGroup. Default behaviour (empty input)
+    Mirrors the React UI's split-mode checkbox selection. Default behaviour (empty input)
     keeps every implied story - matches Q2's "fan out everything"
     default and the graph's empty-selection contract.
     """

@@ -164,7 +164,7 @@ A per-run or per-job ceiling on total tokens consumed. RTIA's are enforced in CI
 | [Ollama](https://ollama.com/) | Local LLM runner for Llama, Qwen, Mistral, etc. | Exploratory swap target - see project plan §3 |
 | [Promptfoo](https://www.promptfoo.dev/docs/intro/) | Prompt-regression testing | NOT adopted; referenced as design source for cache (Issue #230) |
 | [Pydantic](https://docs.pydantic.dev/) | Python schema validation | Every agent's structured-output parsing |
-| [Gradio](https://www.gradio.app/) | Python UI framework | `ui/gradio_app.py` - the RTIA web UI |
+| [Gradio](https://www.gradio.app/) | Python UI framework | Removed in US-26; was `ui/gradio_app.py`. The UI is now the React SPA under `ui-react/` |
 | [ADF](https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/) | Atlassian Document Format - Jira's content model | `exporters/_adf.py` - Markdown → ADF conversion (see #223) |
 
 ---

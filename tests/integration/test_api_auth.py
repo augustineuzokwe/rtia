@@ -77,8 +77,8 @@ def test_query_param_sets_session_cookie():
     """First navigation with ``?token=`` sets the ``rtia_token`` cookie.
 
     Without this, the browser's subsequent asset fetches under the
-    Gradio mount drop the query string and get 401'd - the page renders
-    blank. The cookie keeps in-browser auth sticky.
+    React static mount drop the query string and get 401'd - the page
+    renders blank. The cookie keeps in-browser auth sticky.
     """
     from api.models import ThreadState, ThreadStatus
 
@@ -88,11 +88,11 @@ def test_query_param_sets_session_cookie():
     )
     app = create_app(runner=runner, token="cookie-token")
     client = TestClient(app)
-    # Hit the Gradio mount path (middleware path), not the API route.
+    # Hit a non-API path (the middleware path), not an API route.
     r = client.get("/healthcheck?token=cookie-token", follow_redirects=False)
-    # Whatever the underlying response (likely 404 from Gradio because
-    # the path doesn't exist), the middleware should have set the cookie
-    # because the token was valid.
+    # Whatever the underlying response (404 because the path doesn't
+    # exist), the middleware should have set the cookie because the
+    # token was valid.
     cookie = r.cookies.get("rtia_token")
     assert cookie == "cookie-token"
 
