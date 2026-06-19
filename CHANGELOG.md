@@ -2,6 +2,12 @@
 
 All notable changes to RTIA are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+
+- **Gradio UI decommissioned (US-26).** The React SPA reached feature parity and is now the only UI surface. Removed the `/legacy` Gradio mount from `api/main.py`, deleted the `ui/` package, and dropped the `gradio` dependency from `pyproject.toml` (lockfile regenerated). The React UI is served at `/` from `ui-react/dist/`; build it once with `pnpm --filter ui-react build`.
+
 ## [1.0.0] - 2026-05-28
 
 First public release. Everything below is what `main` ships today.

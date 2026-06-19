@@ -1,9 +1,7 @@
 """Mount-layout tests for Epic 6 / US-16.
 
-After the React scaffold landed, ``/`` serves the SPA's static build and
-the Gradio UI moves to ``/legacy``. These tests don't exercise the real
-Gradio mount (it's stubbed out by ``create_app`` without it for unit
-tests), so we test the two layers that matter at the API level:
+``/`` serves the SPA's static build. These tests exercise the two layers
+that matter at the API level:
 
 1. The fallback-when-missing behaviour - clear 500 with a build hint
    instead of a stack trace, gated by the same bearer token as the rest
@@ -47,8 +45,8 @@ def test_root_returns_500_with_build_hint_when_dist_missing(
     r = client.get("/", headers=_auth())
     assert r.status_code == 500
     body = r.text
-    assert "npm install" in body
-    assert "npm run build" in body
+    assert "pnpm install" in body
+    assert "pnpm --filter ui-react build" in body
     # Sanity: not a stack trace.
     assert "Traceback" not in body
 
@@ -75,8 +73,8 @@ def test_root_serves_react_index_when_dist_present(
 def test_react_static_assets_are_token_gated(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Asset fetches without the bearer token must 401, matching the
-    Gradio-era behaviour - the SPA's JS/CSS are part of the gated UI."""
+    """Asset fetches without the bearer token must 401 - the SPA's
+    JS/CSS are part of the gated UI."""
     dist = tmp_path / "dist"
     (dist / "assets").mkdir(parents=True)
     (dist / "index.html").write_text("<html></html>", encoding="utf-8")

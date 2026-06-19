@@ -1,5 +1,13 @@
 # UI Contract - `ui/gradio_app.py`
 
+> **HISTORICAL (removed in US-26).** The Gradio UI this document describes
+> was decommissioned once the React SPA reached parity; `ui/gradio_app.py`
+> no longer exists. This file is retained for historical context (it's
+> linked from the 1.0.0 changelog). The current UI is the React SPA under
+> `ui-react/`, which owns panel-visibility logic client-side. For the live
+> status → UI mapping, see `ThreadStatus` in `api/models.py` and the
+> components in `ui-react/src/`.
+
 **Audience:** anyone modifying the Gradio UI or adding a new
 `ThreadStatus`. Read [docs/USAGE.md](USAGE.md) first if you're an
 end-user; this file is the developer-facing rulebook.

@@ -39,7 +39,7 @@ graph TD
 - The **PO checkpoint** resolves missing information *before* the system makes assumptions. The Analyst classifies each ambiguity by severity so the PO only pauses for genuinely blocking questions, not every detail.
 - The **Story Review checkpoint** verifies the *output* - catching cases where the Story Writer's interpretation of the resolved inputs doesn't match what the PO actually meant.
 
-**Where the artifact goes.** The composed `FinalUserStory` is downloadable as JSON from the API, viewable in the Gradio UI, and exportable to Jira (REST v3 + ADF) or GitHub Issues (with optional Projects v2 placement) via `POST /pipeline/{thread_id}/export`. Split placeholders export via `/export-deferred`.
+**Where the artifact goes.** The composed `FinalUserStory` is downloadable as JSON from the API, viewable in the React UI, and exportable to Jira (REST v3 + ADF) or GitHub Issues (with optional Projects v2 placement) via `POST /pipeline/{thread_id}/export`. Split placeholders export via `/export-deferred`.
 
 > **Glossary (docs vs code mapping):** docs call this "split path" + "placeholder stories" because that reads naturally in product/PM language. The code uses the same vocabulary - LangGraph node `split`, state field `split_stories`, JSON values `"mode": "split"` / `"status": "done_split"`. See [docs/glossary.md](docs/glossary.md) for the full vocabulary reference.
 
@@ -48,7 +48,7 @@ graph TD
 A PO or BA has raw requirements. Instead of manually writing user stories, ACs, and test cases from scratch, they paste the requirements into RTIA. The system generates a first draft at each stage. The PO answers a small number of critical clarifying questions up front and reviews the generated story before the pipeline continues to AC generation.
 
 **Input formats:** Free text · PDF · Markdown (uploaded through the UI or sent as JSON to the API).
-**Output destinations:** JSON download · Gradio UI render · push to a Jira project · push to a GitHub repository's Issues + Projects v2 board.
+**Output destinations:** JSON download · React UI render · push to a Jira project · push to a GitHub repository's Issues + Projects v2 board.
 
 > **End-user guide:** if you're a PO, PM, BA or QA using RTIA rather than building it, read [docs/USAGE.md](docs/USAGE.md) - it walks you from "I have a requirement" to "I have a backlog-ready artifact" without assuming any developer knowledge.
 
@@ -64,7 +64,7 @@ A PO or BA has raw requirements. Instead of manually writing user stories, ACs, 
 | LLM evaluation | DeepEval |
 | Tracing | LangSmith (opt-in) |
 | API | FastAPI + bearer-token auth |
-| UI | React + Tailwind + shadcn/ui (mounted at `/`); Gradio Blocks at `/legacy` during the Epic 6 migration |
+| UI | React + Tailwind + shadcn/ui (mounted at `/`) |
 | Exporters | Jira REST v3 (ADF) · GitHub Issues + Projects v2 (GraphQL) |
 | CI/CD | GitHub Actions |
 
@@ -76,7 +76,6 @@ rtia/
 ├── prompts/         # Prompt templates (one module per agent; versioned with code)
 ├── api/             # FastAPI routes + bearer-token auth + exporter bridge
 ├── ui-react/        # Vite + React + TS + Tailwind + shadcn/ui SPA (mounted at /)
-├── ui/              # Legacy Gradio Blocks frontend (mounted at /legacy; removed in US-26)
 ├── exporters/       # Jira + GitHub backends behind one Exporter Protocol
 ├── evals/           # Golden samples + DeepEval suite + N-runs runner
 ├── scripts/         # Demo + API entry points (run_pipeline_demo.py, run_api.py)
@@ -159,7 +158,7 @@ The demo runs the pipeline against `evals/sample-requirements/sample-01-well-str
 uv run python scripts/run_api.py
 ```
 
-Starts a FastAPI server on `127.0.0.1:8000`. The React SPA is served at `/` from `ui-react/dist/` (run `pnpm install && pnpm --filter ui-react build` once); the legacy Gradio UI stays mounted at `/legacy` during the Epic 6 migration. The startup banner prints a tokenized URL (`http://127.0.0.1:8000/?token=…`) - open it in a browser to paste a requirement or upload a PDF/Markdown file and step through the PO and review checkpoints. All API endpoints require `Authorization: Bearer <token>`; set `RTIA_API_TOKEN` in `.env` to pin a stable token across restarts.
+Starts a FastAPI server on `127.0.0.1:8000`. The React SPA is served at `/` from `ui-react/dist/` (run `pnpm install && pnpm --filter ui-react build` once). The startup banner prints a tokenized URL (`http://127.0.0.1:8000/?token=…`) - open it in a browser to paste a requirement or upload a PDF/Markdown file and step through the PO and review checkpoints. All API endpoints require `Authorization: Bearer <token>`; set `RTIA_API_TOKEN` in `.env` to pin a stable token across restarts.
 
 ### Run the tests
 
