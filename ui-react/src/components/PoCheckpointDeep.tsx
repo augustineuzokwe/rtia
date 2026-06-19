@@ -94,7 +94,11 @@ export function PoCheckpointDeep({
           const id = `po-answer-${i}`;
           return (
             <div key={q} className="space-y-2" data-testid={`po-question-${i}`}>
-              <Label htmlFor={id} className="text-sm font-medium leading-snug">
+              <Label
+                htmlFor={id}
+                data-testid={`po-question-label-${i}`}
+                className="text-sm font-medium leading-snug"
+              >
                 {q}
               </Label>
               <Textarea

@@ -21,7 +21,7 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-14 max-w-[1100px] items-center justify-between px-4">
-        <a href="/" className="flex items-center gap-2.5">
+        <a href="/" data-testid="header-home-link" className="flex items-center gap-2.5">
           <span
             aria-hidden
             className="grid h-7 w-7 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground"

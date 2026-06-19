@@ -6,4 +6,4 @@
 # `e2e` is added here when the Playwright suite is scaffolded (Epic 7, #305).
 packages:
   - ui-react
-  # - e2e
+  - e2e
