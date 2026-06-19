@@ -67,7 +67,9 @@ export function RunPanel({ initial, onStartOver }: RunPanelProps) {
             <CardTitle>Run in progress</CardTitle>
             <CardDescription>
               Thread{" "}
-              <code className="font-mono text-xs">{current.thread_id}</code>
+              <code className="font-mono text-xs" data-testid="run-thread-id">
+                {current.thread_id}
+              </code>
             </CardDescription>
           </div>
           <StatusBadge status={current.status} />
@@ -117,7 +119,10 @@ export function RunPanel({ initial, onStartOver }: RunPanelProps) {
             !isDone &&
             !isDoneSplit &&
             !isError && (
-              <p className="text-sm text-muted-foreground">
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="run-placeholder-message"
+              >
                 Polish UI lands in US-25. In the meantime the legacy{" "}
                 <a className="underline" href="/legacy">
                   Gradio UI

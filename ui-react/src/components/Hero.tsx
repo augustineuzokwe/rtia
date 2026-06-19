@@ -42,6 +42,7 @@ export function Hero() {
         <ol
           className="flex flex-wrap items-center gap-x-1.5 gap-y-2"
           aria-label="Pipeline stages"
+          data-testid="hero-stages"
         >
           {STAGES.map((stage, i) => {
             const isTerminal = stage === "Backlog";

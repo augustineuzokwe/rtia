@@ -159,8 +159,12 @@ export function ExportPanel({ threadId, status }: ExportPanelProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="github">GitHub Issues</SelectItem>
-                <SelectItem value="jira">Jira</SelectItem>
+                <SelectItem value="github" data-testid="backend-option-github">
+                  GitHub Issues
+                </SelectItem>
+                <SelectItem value="jira" data-testid="backend-option-jira">
+                  Jira
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -331,6 +335,7 @@ export function ExportPanel({ threadId, status }: ExportPanelProps) {
                         href={r.url}
                         target="_blank"
                         rel="noreferrer"
+                        data-testid={`export-result-url-${i}`}
                       >
                         Open
                       </a>

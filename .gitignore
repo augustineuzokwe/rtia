@@ -249,6 +249,11 @@ evals/reports/
 # local checkout. (They were briefly tracked in #377; removed in #380.)
 .claude/
 
+# pw-* agent working state (resume journal + project-state.md). Same
+# reasoning as .claude/ above - keep the Playwright agent machinery out
+# of the public repo.
+.pw-agents/
+
 # macOS Finder artefacts - created automatically whenever a folder is
 # opened in Finder. Ignore both top-level and nested to catch them
 # wherever Finder drops one.

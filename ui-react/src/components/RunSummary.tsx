@@ -31,7 +31,11 @@ export function RunSummary({ threadId, startedAt }: RunSummaryProps) {
     >
       <div className="flex items-center justify-between gap-3">
         <span className="min-w-0 truncate">
-          Run started at <span className="font-medium">{timeShort}</span> ·{" "}
+          Run started at{" "}
+          <span className="font-medium" data-testid="run-summary-time">
+            {timeShort}
+          </span>{" "}
+          ·{" "}
           <code className="font-mono text-[11px]">{tidShort}…</code>
         </span>
         <button
