@@ -180,3 +180,82 @@ jobs:
           path: evals/reports/ci-run.json
           if-no-files-found: ignore
           retention-days: 14
+
+  e2e:
+    # Playwright E2E against the React SPA. Free + deterministic (it never
+    # touches a live LLM): every backend runs RTIA_LLM_PROVIDER=fake, so the
+    # 4 scenarios are canned fixtures, not Gemini calls - exactly the
+    # "fast, free, deterministic" signal the header says CI should gate on.
+    # No GOOGLE_API_KEY needed; the fake provider never constructs the
+    # Google client. CI wiring for US-27's suite (US-28).
+    name: E2E (Playwright, fake provider)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install Python deps (for the fake-LLM backends)
+        run: uv sync --all-groups
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install JS deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the SPA
+        # The fake backends serve ui-react/dist at /, so it must exist before
+        # they start (globalSetup also builds it, but building here keeps the
+        # backend's first GET / from 500ing).
+        run: pnpm --filter ui-react build
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter e2e install-browsers
+
+      - name: Run E2E suite
+        # start backends + wait for readiness + run, all in ONE shell so the
+        # backgrounded uv processes stay alive for the test run (a separate
+        # step could let them be reaped between steps).
+        run: |
+          set -euo pipefail
+          bash e2e/scripts/start-backends.sh
+          for port in 8001 8002 8003 8004; do
+            for i in $(seq 1 45); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${port}/" || echo 000)
+              if [ "$code" = "401" ]; then echo "  backend :${port} ready"; break; fi
+              if [ "$i" -eq 45 ]; then
+                echo "::error::backend :${port} never came up (last HTTP code: ${code})"
+                cat e2e/scripts/.logs/*.log || true
+                exit 1
+              fi
+              sleep 1
+            done
+          done
+          pnpm --filter e2e test
+
+      - name: Stop fake backends
+        if: always()
+        run: bash e2e/scripts/stop-backends.sh || true
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: e2e/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
