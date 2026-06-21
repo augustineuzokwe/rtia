@@ -18,10 +18,10 @@ PID_DIR="${HERE}/.pids"
 LOG_DIR="${HERE}/.logs"
 mkdir -p "${PID_DIR}" "${LOG_DIR}"
 
-# Must match e2e/fixtures/constants.ts:PINNED_TOKEN.
+# Must match e2e/data/constants.ts:PINNED_TOKEN.
 PINNED_TOKEN="e2e-pinned-token"
 
-# scenario:port pairs — must match e2e/fixtures/constants.ts:BACKENDS.
+# scenario:port pairs — must match e2e/data/constants.ts:BACKENDS.
 BACKENDS=(
   "deep_clean:8001"
   "deep_with_po:8002"

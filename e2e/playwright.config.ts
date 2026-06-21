@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { BACKENDS } from './fixtures/constants';
+import { BACKENDS } from './data/constants';
 
 // Five projects, Chromium only. Four map 1:1 to the four deterministic fake
 // backends (one scenario per process per port — RTIA_FAKE_SCENARIO is

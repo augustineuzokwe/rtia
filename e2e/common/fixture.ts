@@ -4,9 +4,8 @@
 // `new`. Specs import from `@common/base` (the stable entry surface), which
 // re-exports this; nothing should import this file directly except `base.ts`.
 //
-// Note the deliberate singular/plural split: `common/fixture.ts` (this file) is
-// the Playwright-fixtures DI; `fixtures/` (plural) is static test DATA
-// (constants, sample files). Two different meanings of "fixture".
+// "Fixture" here means the Playwright DI only. Static test DATA (the pinned
+// token, backend ports, sample files) lives separately under `data/`.
 //
 // Auth: the SPA's lib/api.ts:getToken() reads ?token=… on first visit, writes
 // it to localStorage.rtia_token (sent as a Bearer header on every fetch — no
@@ -15,7 +14,7 @@
 // active project (one fake-backend port per scenario).
 import { test as base, expect } from '@playwright/test';
 
-import { PINNED_TOKEN } from '@fixtures/constants';
+import { PINNED_TOKEN } from '@data/constants';
 
 import IntakePage from '@pages/intake.page';
 import RunPage from '@pages/run.page';

@@ -16,13 +16,12 @@ A layered framework — specs read as business flows, machinery lives below them
 | `common/base.ts` | entry surface | the single import for specs; re-exports the extended `test` + `expect` |
 | `common/fixture.ts` | Playwright fixtures | the `test.extend` DI — defines `page` (auth-seeded) + every page/step fixture |
 | `common/step.ts` | base step | shared base class for step objects |
-| `fixtures/` | test **data** | static inputs: `constants.ts` (pinned token, backend ports) + `files/` |
+| `data/` | test **data** | static inputs: `constants.ts` (pinned token, backend ports) + `files/` |
 
-> **Two meanings of "fixture".** `common/fixture.ts` (singular) is the
-> Playwright dependency-injection layer — the code that builds `test`.
-> `fixtures/` (plural) is static test **data**. Specs only ever import from
-> `@common/base`; `base.ts` re-exports `fixture.ts`, so the DI wiring can change
-> without touching a spec.
+> **"fixture" means one thing here:** the Playwright DI in `common/fixture.ts`
+> (the code that builds `test`). Static test **data** lives under `data/`. Specs
+> only ever import from `@common/base`; `base.ts` re-exports `fixture.ts`, so the
+> DI wiring can change without touching a spec.
 
 ## Why four backends
 
@@ -82,7 +81,7 @@ persists it to `localStorage.rtia_token`, sends it as a **Bearer header** (no
 cookie), and strips the query param from the URL. The token is **pinned** to
 `e2e-pinned-token` in two places that must stay in sync:
 
-- `e2e/fixtures/constants.ts` → `PINNED_TOKEN` (the auth fixture seeds `?token=`)
+- `e2e/data/constants.ts` → `PINNED_TOKEN` (the auth fixture seeds `?token=`)
 - `e2e/scripts/start-backends.sh` → `RTIA_API_TOKEN` (each backend honours it
   via `api/auth.py:generate_token()`)
 
