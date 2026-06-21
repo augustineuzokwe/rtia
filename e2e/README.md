@@ -4,8 +4,25 @@ End-to-end tests for the RTIA React SPA, driven against four **deterministic
 fake-LLM backends** (no Gemini calls, zero cost, no flakiness from model
 nondeterminism). This is the `e2e` package of the repo-root pnpm workspace.
 
-> **Stage 1 (scaffold) only.** `tests/` is intentionally empty. Specs land in
-> Stage 2.
+## Layout
+
+A layered framework — specs read as business flows, machinery lives below them:
+
+| Path | Layer | Holds |
+| --- | --- | --- |
+| `tests/` | specs | one flow per file; import `test` from `@common/base`, zero `new`, no locators |
+| `steps/` | steps | workflows **+ all assertions**, composed from page objects |
+| `pages/` | page objects | locators + atomic interactions, **no assertions** |
+| `common/base.ts` | entry surface | the single import for specs; re-exports the extended `test` + `expect` |
+| `common/fixture.ts` | Playwright fixtures | the `test.extend` DI — defines `page` (auth-seeded) + every page/step fixture |
+| `common/step.ts` | base step | shared base class for step objects |
+| `fixtures/` | test **data** | static inputs: `constants.ts` (pinned token, backend ports) + `files/` |
+
+> **Two meanings of "fixture".** `common/fixture.ts` (singular) is the
+> Playwright dependency-injection layer — the code that builds `test`.
+> `fixtures/` (plural) is static test **data**. Specs only ever import from
+> `@common/base`; `base.ts` re-exports `fixture.ts`, so the DI wiring can change
+> without touching a spec.
 
 ## Why four backends
 
@@ -69,5 +86,6 @@ cookie), and strips the query param from the URL. The token is **pinned** to
 - `e2e/scripts/start-backends.sh` → `RTIA_API_TOKEN` (each backend honours it
   via `api/auth.py:generate_token()`)
 
-The auth fixture (`e2e/fixtures/auth.ts`) overrides `page` so each test's first
-navigation lands on `/?token=<pinned>`, exactly mirroring a human's one-click URL.
+The `page` fixture in `e2e/common/fixture.ts` overrides the default `page` so
+each test's first navigation lands on `/?token=<pinned>`, exactly mirroring a
+human's one-click URL.
