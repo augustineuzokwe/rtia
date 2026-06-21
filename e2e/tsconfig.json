@@ -17,7 +17,7 @@
       "@common/*": ["./common/*"],
       "@pages/*": ["./pages/*"],
       "@steps/*": ["./steps/*"],
-      "@fixtures/*": ["./fixtures/*"]
+      "@data/*": ["./data/*"]
     }
   },
   "include": [
@@ -26,7 +26,7 @@
     "common/**/*.ts",
     "pages/**/*.ts",
     "steps/**/*.ts",
-    "fixtures/**/*.ts",
+    "data/**/*.ts",
     "tests/**/*.ts"
   ],
   "exclude": ["node_modules", "playwright-report", "test-results"]

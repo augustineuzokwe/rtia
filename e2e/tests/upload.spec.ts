@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import test from '@common/base';
 
 const PDF_FIXTURE = fileURLToPath(
-  new URL('../fixtures/files/req.pdf', import.meta.url),
+  new URL('../data/files/req.pdf', import.meta.url),
 );
 
 test.describe('intake file upload', () => {
