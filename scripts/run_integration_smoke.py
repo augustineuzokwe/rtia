@@ -17,7 +17,7 @@ break?"), not story quality (Phase 6 evals own that).
 Usage:
     uv run python scripts/run_integration_smoke.py
     uv run python scripts/run_integration_smoke.py \
-        --model claude-haiku-4-5-20251001 \
+        --model gemini-3.5-flash \
         --budget-input-tokens 50000 \
         --budget-output-tokens 5000
 
@@ -47,10 +47,10 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from dotenv import load_dotenv
-from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
 
-from agents.config import DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_SECONDS
+from agents.config import DEFAULT_MAX_RETRIES, DEFAULT_MODEL, DEFAULT_TIMEOUT_SECONDS
 from agents.final_artifact import FinalUserStory
 from agents.requirements_analyst import _PROMPT_HASH as ANALYST_PROMPT_HASH
 from agents.requirements_analyst import AnalystOutput
@@ -64,15 +64,14 @@ from prompts.requirements_analyst_prompts import (
     USER_PROMPT_TEMPLATE as ANALYST_USER_PROMPT_TEMPLATE,
 )
 
-# Default model for nightly runs: cheapest dated ID currently published.
-# (Anthropic dated IDs only exist for Haiku 4.5 and below today; see ADR-0001.)
-DEFAULT_INTEGRATION_MODEL = "claude-haiku-4-5-20251001"
+# Default model: the same Gemini Flash the pipeline and eval gate use, so a
+# manual smoke run mirrors the production stack (ADR-0006 / ADR-0007). Tracks
+# agents.config.DEFAULT_MODEL so a model bump flows here automatically.
+DEFAULT_INTEGRATION_MODEL = DEFAULT_MODEL
 
-# Token budget for a single nightly run across all samples. Calibrated to be
-# roughly 2x the observed Phase 6 baseline (input≈6.9k, output≈0.9k on Opus
-# for Analyst alone; adding Story Writer ≈ doubles it). The budget is a
-# regression tripwire, not a SLO - bump it deliberately when a real prompt
-# change moves the floor.
+# Token budget for a single run across all samples. A generous tripwire
+# (~2x a typical baseline) to catch a cost blowup, not an SLO - bump it
+# deliberately when a real prompt change moves the floor.
 DEFAULT_BUDGET_INPUT_TOKENS = 50_000
 DEFAULT_BUDGET_OUTPUT_TOKENS = 5_000
 
@@ -107,8 +106,8 @@ class SampleResult:
         return not self.failures and self.final_story is not None
 
 
-def _make_llm(model: str) -> ChatAnthropic:
-    return ChatAnthropic(
+def _make_llm(model: str) -> ChatGoogleGenerativeAI:
+    return ChatGoogleGenerativeAI(
         model=model,
         timeout=DEFAULT_TIMEOUT_SECONDS,
         max_retries=DEFAULT_MAX_RETRIES,
@@ -127,13 +126,13 @@ _FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
 
 
 def _strip_json_fences(raw: str) -> str:
-    """Strip ```json ... ``` fences that smaller models sometimes wrap output in.
+    """Strip ```json ... ``` fences the model sometimes wraps output in.
 
-    The agent prompts explicitly forbid markdown fences, and Opus respects
-    that. Haiku/Sonnet are less reliable on this exact instruction, so the
-    smoke script (which deliberately runs against a cheaper model) strips
-    them defensively rather than treating a wrapped-but-valid JSON response
-    as a failure. The pipeline agent path keeps strict parsing.
+    The agent prompts explicitly forbid markdown fences, but Gemini
+    occasionally adds them anyway (a known quirk - see
+    agents/_llm_utils.strip_json_fence, which the real pipeline applies
+    for the same reason). This helper mirrors that defence so a
+    wrapped-but-valid JSON response is parsed rather than failed.
     """
     text = raw.strip()
     if text.startswith("```"):

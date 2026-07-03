@@ -1,30 +1,31 @@
 name: Integration smoke (manual)
 
 # Runs the live agent pipeline against every sample requirement using the
-# cheapest dated Anthropic model and a hard token budget. Catches behaviour
-# regressions that mocked unit tests cannot see (prompt drift, schema
-# mismatches, missing assumptions, accidental cost blowups).
+# same Gemini Flash model as the pipeline and eval gate, plus a hard token
+# budget. Catches behaviour regressions that mocked unit tests cannot see
+# (prompt drift, schema mismatches, missing assumptions, accidental cost
+# blowups).
 #
 # **Manual trigger only.** The nightly cron was intentionally removed - RTIA
 # is local-dev today, so the value of catching overnight drift does not yet
 # justify the recurring (small) API spend. Re-enable the cron when the
 # Phase 14 API endpoint lands and the pipeline starts serving real requests.
-# Trigger on demand via: gh workflow run integration-smoke.yml
+# Trigger on demand via: gh workflow run nightly-integration.yml
 
 on:
   workflow_dispatch:
     inputs:
       model:
-        description: "Anthropic model ID (override the script default if needed)"
+        description: "Gemini model ID (override the script default if needed)"
         required: false
-        default: "claude-haiku-4-5-20251001"
+        default: "gemini-3.5-flash"
 
 permissions:
   contents: read
 
 jobs:
   smoke:
-    name: Live agent pipeline (all samples, low-cost model)
+    name: Live agent pipeline (all samples, Gemini Flash)
     runs-on: ubuntu-latest
     # Budget should comfortably cover the script's own ~2-3 minute runtime
     # while still failing fast on a wedged call.
@@ -43,12 +44,11 @@ jobs:
 
       - name: Run integration smoke
         env:
-          # Distinct secret from any human-developer key so usage shows up
-          # in billing under its own label and can be capped/rotated
-          # independently. Falls back to the standard key only when present
-          # to make ad-hoc workflow_dispatch runs from a fork easier.
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY_INTEGRATION || secrets.ANTHROPIC_API_KEY }}
+          # Same Gemini key the eval gate uses: GOOGLE_API_KEY_CI when set
+          # (so CI/automation spend is billed under its own label and can be
+          # capped/rotated independently), falling back to GOOGLE_API_KEY.
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY_CI || secrets.GOOGLE_API_KEY }}
         run: |
           set -euo pipefail
           uv run python scripts/run_integration_smoke.py \
-            --model "${{ github.event.inputs.model || 'claude-haiku-4-5-20251001' }}"
+            --model "${{ github.event.inputs.model || 'gemini-3.5-flash' }}"
