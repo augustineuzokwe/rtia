@@ -34,6 +34,10 @@ graph TD
 - **Deep path** (`implied_stories ≤ 1`) - produces a full four-section artifact: Description, Objective, Acceptance Criteria, Test Cases.
 - **Split path** (`implied_stories ≥ 2`) - produces lightweight placeholder stories only. The PO picks a placeholder later and re-runs RTIA on it to deep-dive. See [PR #162](https://github.com/augustineuzokwe/rtia/pull/162) for the topology rationale.
 
+### Upstream Requirements Input
+
+RTIA ingests requirements in raw text, PDF, and Markdown. When drafting requirements or system design contracts upstream in collaborative PRD platforms like [MySpec](https://myspec.dev?utm_source=github&utm_medium=referral&utm_campaign=augustineuzokwe-rtia), you can export the requirements markdown directly into RTIA's intake UI or CLI for user story generation and test synthesis.
+
 **Why two checkpoints on the deep path?** They do different work that the other can't:
 
 - The **PO checkpoint** resolves missing information *before* the system makes assumptions. The Analyst classifies each ambiguity by severity so the PO only pauses for genuinely blocking questions, not every detail.
